@@ -303,7 +303,7 @@ extern float LEVEL2_AREAZAP_CHAIN_FALLOFF;
 extern float LEVEL2_AREAZAP_WIDTH;
 extern int   LEVEL2_AREAZAP_TIME;
 extern float LEVEL2_WALLJUMP_MAXSPEED;
-#define LEVEL2_AREAZAP_MAX_TARGETS 5
+#define LEVEL2_AREAZAP_MAX_TARGETS 6  // Hard limit since BG_PackEntityNumbers can only handle this much.
 
 extern int   LEVEL3_CLAW_DMG;
 extern float LEVEL3_CLAW_RANGE;
