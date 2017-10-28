@@ -306,64 +306,6 @@ bool G_FindFuel( gentity_t *self )
 }
 
 /*
-================
-Trace a bounding box against entities, but not the world
-Also check there is a line of sight between the start and end point
-FIXME: does not work correctly if width or height is big enough that the trace box
-is not contained inside the attacking player's bounding box. The trace protrudes in the +z
-direction for painsaw and all primary attacks of marauder and larger aliens. This means
-if an enemy is standing on your head with these weapons the trace does not hit although
-it should be in range.
-================
-*/
-static void G_WideTrace(
-		trace_t *tr, gentity_t *ent, const glm::vec3& muzzle, const glm::vec3& forward,
-		const float range, const float width, const float height, gentity_t **target )
-{
-	float  halfDiagonal;
-
-	*target = nullptr;
-
-	if ( !ent->client )
-	{
-		return;
-	}
-
-	// Calculate box to use for trace
-	glm::vec3 maxs{ width, width, height };
-	glm::vec3 mins = -maxs;
-	halfDiagonal = glm::length( maxs );
-
-	G_UnlaggedOn( ent, GLM4READ( muzzle ), range + halfDiagonal );
-
-	// Trace box against entities
-	glm::vec3 end;
-	VectorMA( muzzle, range, forward, end );
-	trap_Trace( tr, muzzle, mins, maxs, end, ent->s.number, CONTENTS_BODY, 0 );
-
-	if ( tr->entityNum != ENTITYNUM_NONE )
-	{
-		*target = &g_entities[ tr->entityNum ];
-	}
-
-	// Line trace against the world, so we never hit through obstacles.
-	// The range is reduced according to the former trace so we don't hit something behind the
-	// current target.
-	float scale = glm::distance( muzzle, VEC2GLM( tr->endpos ) ) + halfDiagonal;
-	VectorMA( muzzle, scale, forward, end );
-	trap_Trace( tr, muzzle, {}, {}, end, ent->s.number, CONTENTS_SOLID, 0 );
-
-	// In case we hit a different target, which can happen if two potential targets are close,
-	// switch to it, so we will end up with the target we were looking at.
-	if ( tr->entityNum != ENTITYNUM_NONE )
-	{
-		*target = &g_entities[ tr->entityNum ];
-	}
-
-	G_UnlaggedOff();
-}
-
-/*
 ======================
 Round a vector to integers for more efficient network
 transmission, but make sure that it rounds towards a given point
@@ -950,169 +892,6 @@ LEVEL2
 
 ======================================================================
 */
-#define MAX_ZAPS MAX_CLIENTS
-
-static zap_t zaps[ MAX_ZAPS ];
-
-static void FindZapChainTargets( zap_t *zap )
-{
-	gentity_t *ent = zap->targets[ 0 ]; // the source
-	int       entityList[ MAX_GENTITIES ];
-
-	glm::vec3 range = { LEVEL2_AREAZAP_CHAIN_RANGE, LEVEL2_AREAZAP_CHAIN_RANGE, LEVEL2_AREAZAP_CHAIN_RANGE };
-	glm::vec3 origin = VEC2GLM( ent->s.origin );
-	glm::vec3 maxs = origin + range;
-	glm::vec3 mins = origin - range;
-
-	int num = trap_EntitiesInBox( GLM4RW( mins ), GLM4RW( maxs ), entityList, MAX_GENTITIES );
-
-	for ( int i = 0; i < num; i++ )
-	{
-		gentity_t *enemy = &g_entities[ entityList[ i ] ];
-
-		// don't chain to self; noclippers can be listed, don't chain to them either
-		if ( enemy == ent || ( enemy->client && enemy->client->noclip ) )
-		{
-			continue;
-		}
-
-		float distance = glm::distance( origin, VEC2GLM( enemy->s.origin ) );
-
-		//TODO: implement support for map-entities
-		if ( G_Team( enemy ) == TEAM_HUMANS
-				&& ( enemy->client || enemy->s.eType == entityType_t::ET_BUILDABLE )
-				&& Entities::IsAlive( enemy )
-				&& distance <= LEVEL2_AREAZAP_CHAIN_RANGE )
-		{
-			// world-LOS check: trace against the world, ignoring other BODY entities
-			trace_t tr;
-			trap_Trace( &tr, origin, glm::vec3(), glm::vec3(), VEC2GLM( enemy->s.origin ),
-			            ent->s.number, CONTENTS_SOLID, 0 );
-
-			if ( tr.entityNum == ENTITYNUM_NONE )
-			{
-				zap->targets[ zap->numTargets ] = enemy;
-				zap->distances[ zap->numTargets ] = distance;
-
-				if ( ++zap->numTargets >= LEVEL2_AREAZAP_MAX_TARGETS )
-				{
-					return;
-				}
-			}
-		}
-	}
-}
-
-// origin is just used for PVS determinations
-static void UpdateZapEffect( zap_t *zap, const glm::vec3 &origin )
-{
-	int i;
-	int entityNums[ LEVEL2_AREAZAP_MAX_TARGETS + 1 ];
-
-	entityNums[ 0 ] = zap->creator->s.number;
-
-	ASSERT_LE(zap->numTargets, LEVEL2_AREAZAP_MAX_TARGETS);
-
-	for ( i = 0; i < zap->numTargets; i++ )
-	{
-		entityNums[ i + 1 ] = zap->targets[ i ]->s.number;
-	}
-
-	BG_PackEntityNumbers( &zap->effectChannel->s,
-	                      entityNums, zap->numTargets + 1 );
-
-	G_SetOrigin( zap->effectChannel, origin );
-	trap_LinkEntity( zap->effectChannel );
-}
-
-static void CreateNewZap( gentity_t *creator, const glm::vec3 &muzzle,
-                          const glm::vec3 &forward, gentity_t *target )
-{
-	int   i;
-	zap_t *zap;
-
-	for ( i = 0; i < MAX_ZAPS; i++ )
-	{
-		zap = &zaps[ i ];
-
-		if ( zap->used )
-		{
-			continue;
-		}
-
-		zap->used = true;
-		zap->timeToLive = LEVEL2_AREAZAP_TIME;
-
-		zap->creator = creator;
-		zap->targets[ 0 ] = target;
-		zap->numTargets = 1;
-
-		// Zap chains only originate from alive entities.
-		if (target->Damage((float)LEVEL2_AREAZAP_DMG, creator, VEC2GLM( target->s.origin ),
-		                           forward, DAMAGE_NO_LOCDAMAGE, MOD_LEVEL2_ZAP)) {
-			FindZapChainTargets( zap );
-
-			for ( i = 1; i < zap->numTargets; i++ )
-			{
-				float damage = LEVEL2_AREAZAP_DMG * ( 1 - powf( ( zap->distances[ i ] /
-				               LEVEL2_AREAZAP_CHAIN_RANGE ), LEVEL2_AREAZAP_CHAIN_FALLOFF ) ) + 1;
-
-				zap->targets[i]->Damage(damage, zap->creator, VEC2GLM( zap->targets[i]->s.origin ),
-				                       forward, DAMAGE_NO_LOCDAMAGE, MOD_LEVEL2_ZAP);
-			}
-		}
-
-		zap->effectChannel = G_NewEntity( NO_CBSE );
-		zap->effectChannel->s.eType = entityType_t::ET_LEV2_ZAP_CHAIN;
-		zap->effectChannel->classname = "lev2zapchain";
-		UpdateZapEffect( zap, muzzle );
-
-		return;
-	}
-}
-
-void G_UpdateZaps( int msec )
-{
-	int   i, j;
-	zap_t *zap;
-
-	for ( i = 0; i < MAX_ZAPS; i++ )
-	{
-		zap = &zaps[ i ];
-
-		if ( !zap->used )
-		{
-			continue;
-		}
-
-		zap->timeToLive -= msec;
-
-		// first, the disappearance of players is handled immediately in G_ClearPlayerZapEffects()
-
-		// the deconstruction or gibbing of a directly targeted buildable destroys the whole zap effect
-		if ( zap->timeToLive <= 0 || !zap->targets[ 0 ]->inuse )
-		{
-			G_FreeEntity( zap->effectChannel );
-			zap->used = false;
-			continue;
-		}
-
-		// the deconstruction or gibbing of chained buildables destroy the appropriate beams
-		for ( j = 1; j < zap->numTargets; j++ )
-		{
-			if ( !zap->targets[ j ]->inuse )
-			{
-				zap->targets[ j-- ] = zap->targets[ --zap->numTargets ];
-			}
-		}
-
-		glm::vec3 attackerForward;
-		AngleVectors( VEC2GLM( zap->creator->client->ps.viewangles ), &attackerForward, nullptr, nullptr );
-		glm::vec3 attackerMuzzle = G_CalcMuzzlePoint( zap->creator, attackerForward );
-
-		UpdateZapEffect( zap, attackerMuzzle );
-	}
-}
 
 /*
 ===============
@@ -1121,35 +900,9 @@ Called from G_LeaveTeam() and TeleportPlayer().
 */
 void G_ClearPlayerZapEffects( gentity_t *player )
 {
-	int   i, j;
-	zap_t *zap;
-
-	for ( i = 0; i < MAX_ZAPS; i++ )
-	{
-		zap = &zaps[ i ];
-
-		if ( !zap->used )
-		{
-			continue;
-		}
-
-		// the disappearance of the creator or the first target destroys the whole zap effect
-		if ( zap->creator == player || zap->targets[ 0 ] == player )
-		{
-			G_FreeEntity( zap->effectChannel );
-			zap->used = false;
-			continue;
-		}
-
-		// the disappearance of chained players destroy the appropriate beams
-		for ( j = 1; j < zap->numTargets; j++ )
-		{
-			if ( zap->targets[ j ] == player )
-			{
-				zap->targets[ j-- ] = zap->targets[ --zap->numTargets ];
-			}
-		}
-	}
+	ForEntities<ZapComponent>([&player] (Entity& entity, ZapComponent&) {
+		entity.ClearZap(*player->entity);
+	});
 }
 
 static void FireAreaZap( gentity_t *ent )
@@ -1166,7 +919,7 @@ static void FireAreaZap( gentity_t *ent )
 	if ( G_Team( traceEnt ) == TEAM_HUMANS &&
 			( traceEnt->client || traceEnt->s.eType == entityType_t::ET_BUILDABLE ) )
 	{
-		CreateNewZap( ent, muzzle, forward, traceEnt );
+		ent->entity->ZapTarget(*traceEnt->entity);
 	}
 }
 

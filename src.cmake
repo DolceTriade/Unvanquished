@@ -339,6 +339,8 @@ set(SGAMELIST
     ${GAMELOGIC_DIR}/sgame/components/TrapperComponent.h
     ${GAMELOGIC_DIR}/sgame/components/TurretComponent.cpp
     ${GAMELOGIC_DIR}/sgame/components/TurretComponent.h
+    ${GAMELOGIC_DIR}/sgame/components/ZapComponent.h
+    ${GAMELOGIC_DIR}/sgame/components/ZapComponent.cpp
 
     ${GAMELOGIC_DIR}/sgame/lua/Interpreter.cpp
     ${GAMELOGIC_DIR}/sgame/lua/Interpreter.h
