@@ -1016,3 +1016,61 @@ bool gentity_t::Damage( float amount, gentity_t* source,
 	}
 	return true;
 }
+
+/*
+================
+Trace a bounding box against entities, but not the world
+Also check there is a line of sight between the start and end point
+FIXME: does not work correctly if width or height is big enough that the trace box
+is not contained inside the attacking player's bounding box. The trace protrudes in the +z
+direction for painsaw and all primary attacks of marauder and larger aliens. This means
+if an enemy is standing on your head with these weapons the trace does not hit although
+it should be in range.
+================
+*/
+void G_WideTrace(
+		trace_t *tr, gentity_t *ent, const glm::vec3& muzzle, const glm::vec3& forward,
+		const float range, const float width, const float height, gentity_t **target )
+{
+	float  halfDiagonal;
+
+	*target = nullptr;
+
+	if ( !ent->client )
+	{
+		return;
+	}
+
+	// Calculate box to use for trace
+	glm::vec3 maxs{ width, width, height };
+	glm::vec3 mins = -maxs;
+	halfDiagonal = glm::length( maxs );
+
+	G_UnlaggedOn( ent, GLM4READ( muzzle ), range + halfDiagonal );
+
+	// Trace box against entities
+	glm::vec3 end;
+	VectorMA( muzzle, range, forward, end );
+	trap_Trace( tr, muzzle, mins, maxs, end, ent->s.number, CONTENTS_BODY, 0 );
+
+	if ( tr->entityNum != ENTITYNUM_NONE )
+	{
+		*target = &g_entities[ tr->entityNum ];
+	}
+
+	// Line trace against the world, so we never hit through obstacles.
+	// The range is reduced according to the former trace so we don't hit something behind the
+	// current target.
+	float scale = glm::distance( muzzle, VEC2GLM( tr->endpos ) ) + halfDiagonal;
+	VectorMA( muzzle, scale, forward, end );
+	trap_Trace( tr, muzzle, {}, {}, end, ent->s.number, CONTENTS_SOLID, 0 );
+
+	// In case we hit a different target, which can happen if two potential targets are close,
+	// switch to it, so we will end up with the target we were looking at.
+	if ( tr->entityNum != ENTITYNUM_NONE )
+	{
+		*target = &g_entities[ tr->entityNum ];
+	}
+
+	G_UnlaggedOff();
+}
