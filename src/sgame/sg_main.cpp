@@ -2390,6 +2390,12 @@ void G_RunFrame( int levelTime )
 				}
 				else if ( i < MAX_CLIENTS )
 				{
+
+					// Do CBSE style thinking for clients too.
+					if ( auto* thinkingComponent = ent->entity->Get<ThinkingComponent>() )
+					{
+						thinkingComponent->Think();
+					}
 					G_RunClient( ent );
 					continue;
 				}
@@ -2446,7 +2452,6 @@ void G_RunFrame( int levelTime )
 	G_CalculateAvgPlayers();
 	G_SpawnClients( TEAM_ALIENS );
 	G_SpawnClients( TEAM_HUMANS );
-	G_UpdateZaps( msec );
 	Beacon::Frame( );
 
 	// Run Lua timers, if any...

@@ -326,6 +326,7 @@ float             G_Distance( gentity_t *ent1, gentity_t *ent2 );
 float G_DistanceToBBox( const glm::vec3 &origin, gentity_t* ent );
 int BG_FOpenGameOrPakPath( Str::StringRef filename, fileHandle_t &handle );
 bool G_IsOnFire( const gentity_t *ent );
+void G_WideTrace( trace_t *tr, gentity_t *ent, const glm::vec3& muzzle, const glm::vec3& forward, const float range, const float width, const float height, gentity_t **target );
 
 // sg_weapon.c
 void              G_ForceWeaponChange( gentity_t *ent, weapon_t weapon );
