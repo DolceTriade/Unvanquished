@@ -689,13 +689,15 @@ struct zap_t
 {
 	bool  used;
 
-	gentity_t *creator;
-	gentity_t *targets[ LEVEL2_AREAZAP_MAX_TARGETS ];
+	GentityRef creator;
+	GentityRef targets[ LEVEL2_AREAZAP_MAX_TARGETS ];
 	int       numTargets;
 	float     distances[ LEVEL2_AREAZAP_MAX_TARGETS ];
 
-	int       timeToLive;
+	int       timeAlive;
+	int       timeWrongTarget;
 
+	// Owned by this struct
 	gentity_t *effectChannel;
 };
 
