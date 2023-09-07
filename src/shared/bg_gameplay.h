@@ -379,6 +379,9 @@ extern int   LCANNON_CHARGE_AMMO;
 extern int   MEDKIT_POISON_IMMUNITY_TIME;
 extern int   MEDKIT_STARTUP_TIME;
 extern int   MEDKIT_STARTUP_SPEED;
+extern int   BIOKIT_INTERVAL;
+extern float BIOKIT_MODIFIER;
+extern int   BIOKIT_STAMINA_REGEN;
 
 // movement
 #define MIN_WALK_NORMAL   0.7f // can't walk on very steep slopes
