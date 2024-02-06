@@ -2056,6 +2056,11 @@ bool G_AlienEvolve( gentity_t *ent, class_t newClass, bool report, bool dryRun )
 		return false;
 	}
 
+	if ( newClass == currentClass )
+	{
+		return false; // prevent recharging goon barbs, for example
+	}
+
 	// all the checks passed
 	if ( !dryRun )
 	{
