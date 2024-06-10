@@ -30,6 +30,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "Entities.h"
 #include "CBSE.h"
 #include "sg_cm_world.h"
+#include "sgame/lua/Hooks.h"
 
 // sg_client.c -- client functions that don't happen every frame
 
@@ -1376,6 +1377,8 @@ void ClientBegin( int clientNum )
 		client->sess.seenWelcome = 1;
 		G_TriggerMenu( client->num(), MN_WELCOME );
 	}
+
+	Lua::ExecClientConnectHooks( ent, true );
 }
 
 /** Creates basic client entity of specific type, copying state from an old instance. */
@@ -1799,6 +1802,8 @@ void ClientSpawn( gentity_t *ent, gentity_t *spawn, const vec3_t origin, const v
 	// (re)tag the client for its team
 	Beacon::DeleteTags( ent );
 	Beacon::Tag( ent, (team_t)ent->client->ps.persistant[ PERS_TEAM ], true );
+
+	Lua::ExecPlayerSpawnHooks( ent );
 }
 
 /*
@@ -1861,4 +1866,6 @@ void ClientDisconnect( int clientNum )
 	CalculateRanks();
 
 	Beacon::PropagateAll();
+
+	Lua::ExecClientConnectHooks( ent, false );
 }
