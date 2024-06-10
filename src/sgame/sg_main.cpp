@@ -33,6 +33,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "botlib/bot_api.h"
 #include "common/FileSystem.h"
 #include "lua/Interpreter.h"
+#include "lua/Hooks.h"
+
 
 #define INTERMISSION_DELAY_TIME 1000
 
@@ -1979,6 +1981,8 @@ void CheckExitRules()
 		return;
 	}
 
+	team_t team;
+
 	// if at the intermission, wait for all non-bots to
 	// signal ready, then go to next level
 	if ( level.intermissiontime )
@@ -2055,6 +2059,20 @@ void CheckExitRules()
 		LogExit( "Aliens win." );
 		G_MapLog_Result( 'a' );
 	}
+	else if ( ( team = Lua::ExecGameEndHooks() ) != TEAM_NONE )
+	{
+		// Lua decided game is over.
+		level.lastWin = team;
+		const char* teamName = BG_TeamNamePlural( team );
+		G_MapLog_Result( *teamName );
+		std::string message = va( "%s Win", teamName );
+		message[0] = toupper(message[0]);
+		trap_SendServerCommand( -1, va( "print_tr \"%s\"", message.c_str() ) );
+		trap_SetConfigstring( CS_WINNER, message.c_str() );
+		G_notify_sensor_end( team );
+		LogExit( va( "%s.", message.c_str() ) );
+
+	}
 	else if ( g_emptyTeamsSkipMapTime.Get() &&
 		( level.time - level.startTime ) / 60000 >=
 		g_emptyTeamsSkipMapTime.Get() &&
@@ -2069,6 +2087,7 @@ void CheckExitRules()
 		G_MapLog_Result( 't' );
 	}
 }
+
 
 /*
 ========================================================================
