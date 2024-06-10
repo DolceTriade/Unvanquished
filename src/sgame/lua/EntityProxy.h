@@ -39,6 +39,7 @@ Maryland 20850 USA.
 
 #include "sgame/sg_local.h"
 #include "shared/bg_lua.h"
+#include "sgame/lua/Client.h"
 
 namespace Lua {
 
@@ -72,7 +73,10 @@ struct EntityProxy
 			void ( *pain )( gentity_t *self, gentity_t *attacker, int damage );
 			void ( *die )( gentity_t *self, gentity_t *inflictor, gentity_t *attacker, int mod );
 		};
+
 	};
+
+    std::unique_ptr<Client> client;  // If the stored entity is a client, this will be set, else nullptr.
 
 	std::unordered_map<FunctionType, EntityFunction, std::hash<int>> funcs;
 	lua_State *L;
