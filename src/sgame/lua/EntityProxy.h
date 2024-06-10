@@ -41,6 +41,7 @@ Maryland 20850 USA.
 #include "shared/bg_lua.h"
 #include "sgame/lua/Client.h"
 #include "sgame/lua/Bot.h"
+#include "sgame/lua/Buildable.h"
 
 namespace Lua {
 
@@ -79,6 +80,7 @@ struct EntityProxy
 
     std::unique_ptr<Client> client;  // If the stored entity is a client, this will be set, else nullptr.
     std::unique_ptr<Bot> bot;  // If the stored entity is a bot, this will be set, else nullptr.
+    std::unique_ptr<Buildable> buildable;  // If the stored entity is a buildable, this will be set, else nullptr.
 
 	std::unordered_map<FunctionType, EntityFunction, std::hash<int>> funcs;
 	lua_State *L;
