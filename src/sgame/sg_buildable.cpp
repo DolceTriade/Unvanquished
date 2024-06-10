@@ -33,6 +33,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "Entities.h"
 #include "CBSE.h"
 #include "sg_cm_world.h"
+#include "sgame/lua/Hooks.h"
 
 /**
  * @return Whether the means of death allow for an under-attack warning.
@@ -1868,6 +1869,8 @@ static gentity_t *FinishSpawningBuildable( gentity_t *ent, bool force )
 	trap_LinkEntity( built );
 
 	Beacon::Tag( built, (team_t)BG_Buildable( buildable )->team, true );
+
+	Lua::ExecBuildableSpawnedHooks( built );
 
 	return built;
 }
