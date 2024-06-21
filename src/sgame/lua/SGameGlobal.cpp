@@ -119,6 +119,7 @@ class SGameGlobal
 	// @tparam array origin Position of the buildable.
 	// @tparam array angles Orientation of the buildable.
 	// @tparam array normal Normal of the buildable.
+	// @tparam boolean force Force build the buildable
 	// @treturn buildable.BuildableProxy The buildable.
 	// @usage -- trapper -328.875000 -1913.489868 69.430603 0.000000 100.000000 91.000000 1.000000 0.000000 0.000000 30.000000 100.000000 0.000000
 	// @usage buildable = sgame.SpawnBuildable('trapper', {328.875000,-1913.489868,-1913.489868}, {0, 100, 91}, {1, 0, 0}) -- You can ignore the last three numbers from the layout line.
@@ -133,6 +134,8 @@ class SGameGlobal
 			return 0;
 		}
 
+		bool force = lua_toboolean( L, 5 );
+
 		const char *buildableName = luaL_checkstring(L, 1);
 		const buildableAttributes_t *ba = BG_BuildableByName( buildableName );
 		if (ba->number == BA_NONE)
@@ -144,7 +147,7 @@ class SGameGlobal
 		VectorCopy( origin, builder->s.pos.trBase );
 		VectorCopy( angles, builder->s.angles );
 		VectorCopy( normal, builder->s.origin2 );
-		gentity_t* buildable = G_SpawnBuildableImmediately( builder, ba->number );
+		gentity_t* buildable = G_SpawnBuildableImmediately( builder, ba->number, force );
 		if ( !buildable )
 		{
 			return 0;
