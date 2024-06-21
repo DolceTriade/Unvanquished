@@ -83,6 +83,11 @@ namespace {
 // @tfield array origin Read/Write.
 // @within EntityProxy
 GET_FUNC2( origin, Shared::Lua::PushVec3( L, proxy->ent->s.origin ) )
+/// Entity origin2. Array of floats starting at index 1.
+// Can mean a lot of things depending on the context.
+// @tfield array origin Read/Write.
+// @within EntityProxy
+GET_FUNC2( origin2, Shared::Lua::PushVec3( L, proxy->ent->s.origin2 ) )
 /// Entity classname.
 // @tfield string class_name Read only.
 // @within EntityProxy
@@ -204,6 +209,18 @@ static int Setorigin( lua_State* L )
 		vec3_t origin;
 		Shared::Lua::CheckVec3( L, 2, origin );
 		VectorCopy( origin, proxy->ent->s.origin );
+	}
+	return 0;
+}
+
+static int Setorigin2( lua_State* L )
+{
+	if ( lua_istable( L, 2 ) )
+	{
+		EntityProxy* proxy = LuaLib<EntityProxy>::check( L, 1 );
+		vec3_t origin;
+		Shared::Lua::CheckVec3( L, 2, origin );
+		VectorCopy( origin, proxy->ent->s.origin2 );
 	}
 	return 0;
 }
@@ -441,32 +458,34 @@ RegType<::Lua::EntityProxy> EntityProxyMethods[] = {
 };
 
 luaL_Reg EntityProxyGetters[] = {
-    GETTER( origin ),
-    GETTER( id ),
-    GETTER( class_name ),
-    GETTER( angles ),
-    GETTER( team ),
-    GETTER( nextthink ),
-    GETTER( mins ),
-    GETTER( maxs ),
-    GETTER( number ),
-    // Getters for functions just return bool if the function is set.
-    GETTER( think ),
-    GETTER( reset ),
-    GETTER( touch ),
-    GETTER( use ),
-    GETTER( pain ),
-    GETTER( die ),
+	GETTER( origin ),
+	GETTER( origin2 ),
+	GETTER( id ),
+	GETTER( class_name ),
+	GETTER( angles ),
+	GETTER( team ),
+	GETTER( nextthink ),
+	GETTER( mins ),
+	GETTER( maxs ),
+	GETTER( number ),
+	// Getters for functions just return bool if the function is set.
+	GETTER( think ),
+	GETTER( reset ),
+	GETTER( touch ),
+	GETTER( use ),
+	GETTER( pain ),
+	GETTER( die ),
 
-    GETTER( client ),
-    GETTER( bot ),
-    GETTER( buildable ),
+	GETTER( client ),
+	GETTER( bot ),
+	GETTER( buildable ),
 
-    { nullptr, nullptr }
+	{ nullptr, nullptr }
 };
 
 luaL_Reg EntityProxySetters[] = {
 	SETTER( origin ),
+	SETTER( origin2 ),
 	SETTER( angles ),
 	SETTER( nextthink ),
 	SETTER( mins ),

@@ -197,6 +197,34 @@ int Methodcommand( lua_State* L, Client* c )
 	return 0;
 }
 
+/// Force this client to have this weapon.
+// If the client has another weapon, it will be removed.
+// @tparam string weapon The weapon to force
+// @usage client:forceweapon('rifle')
+// @within Client
+int Methodforceweapon( lua_State* L, Client* c )
+{
+	if ( !c || !c->ent || !c->ent->client )
+	{
+		Log::Warn( "trying to access stale client info!" );
+		return 0;
+	}
+
+	const char* weaponName = luaL_checkstring( L, 1 );
+	const weaponAttributes_t* weapon = BG_WeaponByName( weaponName );
+	if ( weapon->number == 0 )
+	{
+		Log::Warn( "invalid weapon: %s", weaponName );
+		return 0;
+	}
+
+	c->ent->client->ps.stats[ STAT_WEAPON ] = weapon->number;
+	G_GiveMaxAmmo( c->ent );
+	G_ForceWeaponChange( c->ent, weapon->number );
+
+	return 0;
+}
+
 int Setname( lua_State* L )
 {
 	Client* c = LuaLib<Client>::check( L, 1 );
@@ -326,6 +354,7 @@ RegType<::Lua::Client> ClientMethods[] = {
 	{ "kill", Methodkill },
 	{ "teleport", Methodteleport },
 	{ "cmd", Methodcommand },
+	{ "forceweapon", Methodforceweapon },
 
 	{ nullptr, nullptr },
 };
