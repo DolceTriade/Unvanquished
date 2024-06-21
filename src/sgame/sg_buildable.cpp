@@ -1846,6 +1846,7 @@ static gentity_t *FinishSpawningBuildable( gentity_t *ent, bool force )
 	{
 		Log::Debug( "^3G_FinishSpawningBuildable: %s startsolid at %s",
 		          built->classname, vtos( built->s.origin ) );
+		Entities::Kill( built, ent, MOD_SUICIDE );
 		G_FreeEntity( built );
 		return nullptr;
 	}
@@ -1885,10 +1886,10 @@ void G_SpawnBuildable( gentity_t *ent, buildable_t buildable )
 
 // Immediately spawn buildable instead of waiting a few frames. Also return the newly built buildable.
 // Assumes that ent is a placeholder entity that will be freed automatically by this function.
-gentity_t* G_SpawnBuildableImmediately( gentity_t *ent, buildable_t buildable )
+gentity_t* G_SpawnBuildableImmediately( gentity_t *ent, buildable_t buildable, bool force )
 {
 	ent->s.modelindex = buildable;
-	gentity_t* ret = FinishSpawningBuildable( ent, false );
+	gentity_t* ret = FinishSpawningBuildable( ent, force );
 	G_FreeEntity( ent );
 	return ret;
 }
