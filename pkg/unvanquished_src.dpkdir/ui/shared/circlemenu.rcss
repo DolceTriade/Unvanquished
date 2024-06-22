@@ -48,11 +48,15 @@ div.circlemenu-circle {
 	text-align: center;
 	decorator: image(/ui/assets/circlemenu/circle);
 	z-index: 2;
+	transform: scale(1.0);
+	transition: transform opacity color background-color image-color 0.75s elastic-out;
 }
 .circlemenu button:hover,
 .circlemenu button:active,
 .circlemenu button:focus {
 	decorator: image(/ui/assets/circlemenu/circle-hover);
+	transform: scale(1.2);
+
 }
 
 .circlemenu button.disabled,
