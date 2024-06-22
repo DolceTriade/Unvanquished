@@ -264,6 +264,25 @@ int Methodforceteam( lua_State* L, Client* c )
 	return 0;
 }
 
+/// Check if the client has the given admin flag.
+// If the client is allowed the action of the flag, the
+// @tparam string flag The flag to check for. Either the command name or a flag from sg_admin.h.
+// @treturn boolean | nil Returns true if the flag is allowed and false otherwise. Returns nil on error.
+// @usage client:haspermission('bot')
+// @within Client
+int Methodhaspermission( lua_State* L, Client* c )
+{
+	if ( !c || !c->ent || !c->ent->client )
+	{
+		Log::Warn( "trying to access stale client info!" );
+		return 0;
+	}
+
+	const char* flag = luaL_checkstring( L, 1 );
+	lua_pushboolean( L, G_admin_permission( c->ent, flag ) );
+	return 1;
+}
+
 int Setname( lua_State* L )
 {
 	Client* c = LuaLib<Client>::check( L, 1 );
@@ -395,6 +414,7 @@ RegType<::Lua::Client> ClientMethods[] = {
 	{ "cmd", Methodcommand },
 	{ "forceweapon", Methodforceweapon },
 	{ "forceteam", Methodforceteam },
+	{ "haspermission", Methodhaspermission},
 
 	{ nullptr, nullptr },
 };
