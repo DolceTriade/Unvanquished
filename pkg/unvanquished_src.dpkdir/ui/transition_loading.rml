@@ -85,6 +85,19 @@
 				text-align: center;
 			}
 
+			changelog {
+				display: block;
+				position: absolute;
+				top: 6em;
+				right: 1em;
+				padding: .7em 1em 1em 1em;
+				background-color: #00000080;
+				border-color: white;
+				border-width: .05em 0em .05em 0em;
+				color: white;
+			}
+
+
 			.serverlevelname {
 				font-size: 3em;
 			}
@@ -107,6 +120,10 @@
 		<div class="levelshot">
 		<levelshot_loading/>
 		</div>
+
+		<changelog>
+			<include src="ui/changelog.rml" />
+		</changelog>
 
 		<infobox>
 			<div class="serverlevelname"><levelname/></div>
