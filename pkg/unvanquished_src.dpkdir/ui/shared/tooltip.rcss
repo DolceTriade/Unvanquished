@@ -7,10 +7,13 @@ tooltip {
     text-align: center;
     display: none;
     z-index: 999;
+    opacity: 0;
+    transition: opacity 0.25s linear-in;
 }
 parent {
     display: block;
 }
 parent:hover > tooltip {
     display: block;
+    opacity: 1;
 }
