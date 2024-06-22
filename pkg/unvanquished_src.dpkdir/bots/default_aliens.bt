@@ -28,7 +28,11 @@ selector
 				{
 					condition myTimer >= 20000
 					{
-						action suicide
+						sequence
+						{
+							action resetMyTimer
+							action suicide
+						}
 					}
 					action evolveTo( PCL_ALIEN_BUILDER0_UPG )
 					action evolveTo( PCL_ALIEN_BUILDER0 )
