@@ -91,6 +91,7 @@ web {
 ilink {
 	color: #136d67; /* Dark cyan */
 	tab-index: auto;
+	transition: color 0.25s linear-in;
 }
 ilink:hover {
 	color: #00f8ff; /* Bright cyan */
@@ -100,6 +101,7 @@ ilink:hover {
 ilink-options {
 	color: #0edfeb; /* Dark cyan */
 	tab-index: auto;
+	transition: color 0.25s linear-in;
 }
 ilink-options:hover {
 	color: #dfff00;
@@ -117,6 +119,7 @@ scrollbarvertical {
 
 scrollbarvertical sliderbar {
 	background-color: #136d6788; /* Dark cyan */
+	transition: color 0.25s linear-in;
 }
 
 scrollbarvertical sliderbar:hover {
