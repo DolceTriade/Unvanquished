@@ -47,7 +47,7 @@ class Timer
    public:
 	void Add( int delayMs, int callbackRef, lua_State* L )
 	{
-		events.push_back( { delayMs, callbackRef, L } );
+		newEvents.push_back( { delayMs, callbackRef, L } );
 	}
 
 	void RunUpdate( int time )
@@ -72,6 +72,10 @@ class Timer
 				++it;
 			}
 		}
+
+		// Add new events added this frame at the end so we don't end up in an infinite loop.
+		events.insert( events.end(), newEvents.begin(), newEvents.end() );
+		newEvents.clear();
 	}
 
    private:
@@ -84,6 +88,7 @@ class Timer
 
 	int lastTime;
 	std::list<TimerEvent> events;
+	std::list<TimerEvent> newEvents;
 };
 
 static Timer timer;
