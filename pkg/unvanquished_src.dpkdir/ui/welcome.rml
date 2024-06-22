@@ -20,7 +20,29 @@
 				<br />
 				<br />
 				<translate>Close this menu and click anywhere to join a team and begin playing!</translate>
+				Look at the side bar for more information about the gamemodes.
+				Use /callvote juggernaut or /callvote towerdefense to start any of those modes.
+				Of course, /callvote alienpve and /callvote humanpve work too!
+
 				<include src="ui/changelog.rml" />
+			</panel>
+			<tab>
+				<img class="emoticon" src="/emoticons/official" />
+				<translate>Juggernaut</translate>
+			</tab>
+			<panel>
+				<p>The Juggernaut game mode designates a juggernaut.</p>
+				<p>The juggernaut must get a specific number of kills as the juggernaut to win (10 by default).</p>
+				<p>The number of kills can be changed using /callvote jugkills.</p>
+			</panel>
+			<tab>
+				<img class="emoticon" src="/emoticons/official" />
+				<translate>Tower Defense</translate>
+			</tab>
+			<panel>
+				<p>In tower defense, you have 5 minutes to build enough to survive 4 alien waves. Each wave is ~100 aliens.</p>
+				<p>During the wave, you cannot build, however between each wave, you have 1 minute to rebuild.</p>
+				<p>Good luck!</p>
 			</panel>
 		</tabset>
 	</body>
