@@ -280,7 +280,7 @@ void G_TeleportPlayer( gentity_t *player, glm::vec3 const& origin, glm::vec3 con
 	BG_PlayerStateToEntityState( &player->client->ps, &player->s, true );
 
 	// use the precise origin for linking
-	VectorCopy( player->client->ps.origin, player->r.currentOrigin );
+	G_SetOrigin( player, origin );
 
 	if ( player->client->sess.spectatorState == SPECTATOR_NOT )
 	{
