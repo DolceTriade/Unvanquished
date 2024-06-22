@@ -29,7 +29,11 @@ selector
 				{
 					condition myTimer >= 20000
 					{
-						action suicide
+						sequence
+						{
+							action resetMyTimer
+							action suicide
+						}
 					}
 					sequence
 					{
