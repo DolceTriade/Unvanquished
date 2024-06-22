@@ -126,6 +126,7 @@ static int Getteam( lua_State* L )
 	EntityProxy* proxy = LuaLib<EntityProxy>::check( L, 1 );
 	if ( !proxy || !proxy->ent ) return 0;
 	team_t team = TEAM_NONE;
+
 	switch ( proxy->ent->s.eType )
 	{
 		case entityType_t::ET_BUILDABLE:
@@ -133,8 +134,13 @@ static int Getteam( lua_State* L )
 			break;
 
 		case entityType_t::ET_PLAYER:
-			team = static_cast<team_t>( proxy->ent->client->pers.team );
-			break;
+		case entityType_t::ET_INVISIBLE:
+			if ( proxy->ent->client )
+			{
+				team = static_cast<team_t>( proxy->ent->client->pers.team );
+				break;
+			}
+			// Fall through otherwise.
 
 		default:
 			team = proxy->ent->mapEntity.conditions.team;
