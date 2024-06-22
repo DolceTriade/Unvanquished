@@ -13,6 +13,10 @@ datagridheader {
 	margin-top: 1em;
 }
 
+datagridrow {
+	transition: background-color 0.25s linear-in;
+}
+
 /* Alternate colours of each row */
 datagridrow:nth-child(even) {
 	background-color: #444444;
