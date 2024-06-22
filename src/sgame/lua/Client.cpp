@@ -225,6 +225,45 @@ int Methodforceweapon( lua_State* L, Client* c )
 	return 0;
 }
 
+/// Force this client to be on the specified team.
+// If the client has another weapon, it will be removed.
+// @tparam string team The team to force (alien, human, spectators)
+// @usage client:forceteam('aliens')
+// @within Client
+int Methodforceteam( lua_State* L, Client* c )
+{
+	if ( !c || !c->ent || !c->ent->client )
+	{
+		Log::Warn( "trying to access stale client info!" );
+		return 0;
+	}
+	std::string teamStr = Str::ToLower( luaL_checkstring( L, 1 ) );
+	if ( teamStr.empty() )
+	{
+		Log::Warn( "team cannot be empty" );
+		return 0;
+	}
+
+	team_t team = TEAM_ALL;
+	switch ( teamStr[0] )
+	{
+		case 'a':
+			team = TEAM_ALIENS;
+			break;
+		case 'h':
+			team = TEAM_HUMANS;
+			break;
+		case 's':
+			team = TEAM_NONE;
+			break;
+		default:
+			Log::Warn( "invalid team: %s", teamStr );
+			return 0;
+	}
+	G_ChangeTeam( c->ent, team );
+	return 0;
+}
+
 int Setname( lua_State* L )
 {
 	Client* c = LuaLib<Client>::check( L, 1 );
@@ -355,6 +394,7 @@ RegType<::Lua::Client> ClientMethods[] = {
 	{ "teleport", Methodteleport },
 	{ "cmd", Methodcommand },
 	{ "forceweapon", Methodforceweapon },
+	{ "forceteam", Methodforceteam },
 
 	{ nullptr, nullptr },
 };
