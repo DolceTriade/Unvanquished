@@ -104,14 +104,20 @@ int RegisterVote( lua_State* L )
         // Setup function arguments.
         // Calling entity.
         LuaLib<EntityProxy>::push( L, Entity::CreateProxy( ent, L ) );
-        //
+        // Push team
         lua_pushstring( L, BG_TeamName( team ) );
+
+		// Push raw args.
+		// arg[0] == vote name
+		// arg[n] == args
+		// Using ipairs will not iterate over the vote name, but it will be
+		// accessible via args[0].
         const Cmd::Args& args = trap_Args();
         lua_createtable( L, args.Argc(), 0 );
         for ( int i = 1; i < args.Argc(); ++i )
         {
             lua_pushstring( L, args.Argv( i ).c_str() );
-            lua_rawseti( L, -2, i );  // lua arrays start at 1
+            lua_rawseti( L, -2, i - 1 );  // lua arrays start at 1
         }
 
         // Call the above function with two arguments and zero return values.

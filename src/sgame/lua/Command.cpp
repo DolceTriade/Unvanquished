@@ -54,7 +54,7 @@ struct LuaServerCommand : public Cmd::LambdaCmd
 
 				  // Push arguments to Lua too.
 				  lua_createtable( L, args.Argc(), 0 );
-				  for ( int i = 1; i < args.Argc(); ++i )
+				  for ( int i = 0; i < args.Argc(); ++i )
 				  {
 					  lua_pushstring( L, args.Argv( i ).c_str() );
 					  lua_rawseti( L, -2, i );  // lua arrays start at 1
@@ -174,7 +174,7 @@ bool RunClientCommand( gentity_t* ent )
     }
     // Push arguments to Lua too.
     lua_createtable( L, args.Argc(), 0 );
-    for ( int i = 1; i < args.Argc(); ++i )
+    for ( int i = 0; i < args.Argc(); ++i )
     {
         lua_pushstring( L, args.Argv( i ).c_str() );
         lua_rawseti( L, -2, i );  // lua arrays start at 1

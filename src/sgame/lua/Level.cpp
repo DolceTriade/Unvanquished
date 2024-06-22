@@ -208,6 +208,10 @@ GET_FUNC( num_connected_clients, lua_pushinteger( L, level.numConnectedClients )
 // @tfield integer num_connected_players Read only.
 // @within Level
 GET_FUNC( num_connected_players, lua_pushinteger( L, level.numConnectedPlayers ) )
+/// Whether we are in intermission.
+// @tfield boolean intermission Read only.
+// @within Level
+GET_FUNC( intermission, lua_pushboolean( L, level.intermissiontime > 0 ) )
 /// The TeamProxy object for accessing alien information.
 // @tfield TeamProxy aliens
 // @see TeamProxy
@@ -238,6 +242,7 @@ luaL_Reg LevelGetters[] = {
 	GETTER( match_time ),
 	GETTER( num_connected_clients ),
 	GETTER( num_connected_players ),
+	GETTER( intermission ),
 	GETTER( aliens ),
 	GETTER( humans ),
 
