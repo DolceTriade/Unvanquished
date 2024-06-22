@@ -20,6 +20,7 @@
 				<br />
 				<br />
 				<translate>Close this menu and click anywhere to join a team and begin playing!</translate>
+				<include src="ui/changelog.rml" />
 			</panel>
 		</tabset>
 	</body>
