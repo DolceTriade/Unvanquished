@@ -115,7 +115,7 @@ static int Setskill( lua_State* L )
 		Log::Warn( "trying to access stale bot info!" );
 		return 0;
 	}
-	int skill = luaL_checkinteger( L, 1 );
+	int skill = luaL_checkinteger( L, 2 );
 	G_BotSetSkill( c->ent->client->num(), skill );
 	return 0;
 }
