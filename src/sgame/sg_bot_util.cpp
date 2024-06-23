@@ -767,17 +767,17 @@ int BotGetDesiredBuy( gentity_t *self, weapon_t &weapon, upgrade_t upgrades[], s
 	{
 		// buy armor before anything else
 		buyArmors();
-		buyRadar();
 		buyWeapons();
 		buyTools();
+		buyRadar();
 	}
 	else
 	{
 		buyWeapons();
-		buyRadar();
 		// armor isn't the highest priority in this case
 		buyArmors();
 		buyTools();
+		buyRadar();
 	}
 
 	return numUpgrades;
