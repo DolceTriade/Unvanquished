@@ -57,6 +57,7 @@ static std::vector<LuaHook> teamChangeHooks;
 static std::vector<LuaHook> playerSpawnHooks;
 static std::vector<LuaHook> gameEndHooks;
 static std::vector<LuaHook> buildableSpawnedHooks;
+static std::vector<LuaHook> shutdownHooks;
 
 /// Install a callback that will be called for every chat message.
 // The callback should be  function(EntityProxy, team, message).
@@ -262,6 +263,34 @@ void ExecBuildableSpawnedHooks( gentity_t* ent )
 	}
 }
 
+/// Install a callback that will be called when the game is about to shutdown.
+// The callback should be function().
+// @function RegisterShutdownHook
+// @tparam function callback function()
+int RegisterShutdownHook( lua_State* L )
+{
+	if ( lua_isfunction( L, 1 ) )
+	{
+		int ref = luaL_ref( L, LUA_REGISTRYINDEX );
+		buildableSpawnedHooks.emplace_back( L, ref );
+	}
+	return 0;
+}
+
+void ExecShutdownHooks()
+{
+	for ( const auto& hook : shutdownHooks )
+	{
+		lua_rawgeti( hook.first, LUA_REGISTRYINDEX, hook.second );
+		if ( lua_pcall( hook.first, 0, 0, 0 ) != 0 )
+		{
+			Log::Warn( "Could not run lua shutdown hook callback: %s",
+			           lua_tostring( hook.first, -1 ) );
+		}
+	}
+}
+
+
 RegType<Hooks> HooksMethods[] = {
 	{ nullptr, nullptr },
 };
@@ -296,6 +325,8 @@ void ExtraInit<::Lua::Hooks>( lua_State* L, int metatable_index )
 	lua_setfield( L, metatable_index - 1, "RegisterGameEndHook" );
 	lua_pushcfunction( L, ::Lua::RegisterBuildableSpawnedHook );
 	lua_setfield( L, metatable_index - 1, "RegisterBuildableSpawnedHook" );
+	lua_pushcfunction( L, ::Lua::RegisterShutdownHook );
+	lua_setfield( L, metatable_index - 1, "RegisterShutdownHook" );
 }
 }  // namespace Lua
 }  // namespace Shared
