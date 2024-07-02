@@ -1414,6 +1414,53 @@ void G_WeightAttack( gentity_t *self, gentity_t *victim )
 	victim->client->nextCrushTime = level.time + WEIGHTDMG_REPEAT;
 }
 
+void G_BsuitStompAttack( gentity_t *self, gentity_t *victim )
+{
+	// weight damage is only dealt between clients
+	if ( !self->client || !victim->client )
+	{
+		return;
+	}
+
+	// Must have bsuit
+	if ( self->client->pers.classSelection != PCL_HUMAN_BSUIT )
+	{
+		return;
+	}
+
+	// don't do friendly fire
+	if ( G_OnSameTeam( self, victim ) )
+	{
+		return;
+	}
+
+	// Only works on dretches
+	if ( victim->client->pers.classSelection != PCL_ALIEN_LEVEL0 )
+	{
+		return;
+	}
+
+	// can they even be crushed?
+	if ( victim->client->nextCrushTime > level.time )
+	{
+		return;
+	}
+
+	// victim must be on the ground
+	if ( victim->client->ps.groundEntityNum == ENTITYNUM_NONE )
+	{
+		return;
+	}
+
+	// Note that this function only triggers if the attacker is moving into the victim, which is
+	// the behavior we want.
+
+	victim->Damage(Entities::HealthOf( victim ), self, VEC2GLM( victim->s.origin ), Util::nullopt,
+							DAMAGE_NO_LOCDAMAGE, MOD_STOMP);
+
+	victim->client->nextCrushTime = level.time;
+}
+
 //======================================================================
 
 /*
