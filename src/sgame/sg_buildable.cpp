@@ -787,6 +787,8 @@ void G_Deconstruct( gentity_t *self, gentity_t *deconner, meansOfDeath_t deconTy
 	// deconstruct
 	Entities::Kill(self, deconner, deconType);
 
+	Beacon::DetachTags( self );
+
 	// TODO: Check if freeing needs to be deferred.
 	G_FreeEntity( self );
 }
