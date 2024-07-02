@@ -48,6 +48,8 @@ bool RunClientCommand( gentity_t* ent );
 
 void CleanupCommands();
 
+void SendLuaCommands( gentity_t *ent );
+
 }  // namespace Lua
 
 #endif  // LUA_COMMAND_H_
