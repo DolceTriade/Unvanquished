@@ -50,6 +50,7 @@ void ExecTeamChangeHooks( gentity_t* ent, team_t team );
 void ExecPlayerSpawnHooks( gentity_t* ent );
 void ExecBuildableSpawnedHooks( gentity_t* ent );
 team_t ExecGameEndHooks();
+void ExecShutdownHooks();
 
 }  // namespace Lua
 
