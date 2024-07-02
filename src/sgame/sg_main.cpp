@@ -740,6 +740,8 @@ void G_ShutdownGame( int /* restart */ )
 		level.logGameplayFile = 0;
 	}
 
+	Lua::ExecShutdownHooks();
+
 	G_BotCleanup();
 
 	// write all the non-bot client session data so we can get it back
