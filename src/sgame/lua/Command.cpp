@@ -145,6 +145,7 @@ int RegisterClientCommand( lua_State* L )
 
     int ref = luaL_ref( L, LUA_REGISTRYINDEX );
     clientCmdMap[ cmd ] = ref;
+    trap_SendServerCommand( -1, va( "cmds %s", cmd ) );
     return 0;
 }
 
@@ -197,6 +198,34 @@ void CleanupCommands()
     {
         luaL_unref( State(), LUA_REGISTRYINDEX, it.second );
     }
+}
+
+void SendLuaCommands( gentity_t* ent )
+{
+    // If this is the local client, no need to send them commands.
+	// The local client will get their commands registered when registered.
+	if ( level.inClient && ent->num() == 0 )
+	{
+		return;
+	}
+
+    std::string out;
+    out.reserve( MAX_STRING_CHARS );
+
+
+	for ( const auto& it : clientCmdMap )
+	{
+		size_t len = it.first.size();
+
+		if ( len + out.size() >= out.capacity() - 1 )
+		{
+			trap_SendServerCommand( ent->num(), va( "cmds%s", out.c_str() ) );
+			out.clear();
+		}
+
+		out += " " + it.first;
+	}
+    trap_SendServerCommand( ent->num(), va( "cmds%s", out.c_str() ) );
 }
 
 }  // namespace Lua
