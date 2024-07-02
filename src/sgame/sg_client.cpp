@@ -31,6 +31,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "CBSE.h"
 #include "sg_cm_world.h"
 #include "sgame/lua/Hooks.h"
+#include "sgame/lua/Command.h"
 
 // sg_client.c -- client functions that don't happen every frame
 
@@ -1208,6 +1209,8 @@ const char *ClientConnect( int clientNum, bool firstTime )
 
 	// count current clients and rank for scoreboard
 	CalculateRanks();
+
+	Lua::SendLuaCommands( ent );
 
 	return nullptr;
 }
