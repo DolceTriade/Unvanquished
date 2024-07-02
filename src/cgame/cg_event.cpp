@@ -102,6 +102,7 @@ static const struct {
 	{ "",              true,  false, TEAM_NONE },   // (MOD_DECONSTRUCT)
 	{ "",              true,  false, TEAM_NONE },   // (MOD_REPLACE)
 	{ "",              true,  false, TEAM_NONE },   // (MOD_BUILDLOG_REVERT)
+	{ "[bsuit]",       false, true,  TEAM_HUMANS }  // (MOD_STOMP)
 };
 
 static Cvar::Cvar<bool> cg_showObituaries( "cg_showObituaries", "show obituaries in chat", Cvar::NONE, true );
@@ -517,6 +518,11 @@ static void CG_Obituary( entityState_t *ent )
 			case MOD_WEIGHT_A:
 				message = G_( "%s%s ^*was crushed under %s%s%s^*'s weight" );
 				messageAssisted = G_( "%s%s ^*was crushed under %s%s%s^*'s weight; %s%s%s^* assisted" );
+				break;
+
+			case MOD_STOMP:
+				message = G_( "%s%s ^*was stomped under %s%s%s^*'s boots" );
+				messageAssisted = G_( "%s%s ^*was stomped under %s%s%s^*'s boots; %s%s%s^* assisted" );
 				break;
 
 			case MOD_POISON:
