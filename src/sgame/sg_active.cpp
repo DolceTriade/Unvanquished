@@ -402,6 +402,7 @@ static void ClientImpacts( gentity_t *ent, pmove_t *pm )
 		// deal impact and weight damage
 		G_ImpactAttack( ent, other );
 		G_WeightAttack( ent, other );
+		G_BsuitStompAttack( ent, other );
 
 		// tyrant trample
 		if ( ent->client->ps.weapon == WP_ALEVEL4 )
