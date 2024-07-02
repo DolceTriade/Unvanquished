@@ -280,20 +280,6 @@ static void ClientShove( gentity_t *ent, gentity_t *victim )
 	float  force;
 	int    entMass, vicMass;
 
-	// Don't push if the entity is not trying to move
-	if ( !ent->client->pers.cmd.rightmove && !ent->client->pers.cmd.forwardmove &&
-	     !ent->client->pers.cmd.upmove )
-	{
-		return;
-	}
-
-	// Cannot push enemy players unless they are walking on the player
-	if ( !G_OnSameTeam( ent, victim ) &&
-	     victim->client->ps.groundEntityNum != ent->num() )
-	{
-		return;
-	}
-
 	// Shove force is scaled by relative mass
 	entMass = GetClientMass( ent );
 	vicMass = GetClientMass( victim );
