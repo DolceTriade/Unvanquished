@@ -342,6 +342,7 @@ void              G_CheckCkitRepair( gentity_t *self );
 void              G_ChargeAttack( gentity_t *self, gentity_t *victim );
 void              G_ImpactAttack( gentity_t *self, gentity_t *victim );
 void              G_WeightAttack( gentity_t *self, gentity_t *victim );
+void              G_BsuitStompAttack( gentity_t *self, gentity_t *victim );
 void              G_UpdateZaps( int msec );
 void              G_ClearPlayerZapEffects( gentity_t *player );
 void              G_FireWeapon( gentity_t *self, weapon_t weapon, weaponMode_t weaponMode );
