@@ -869,6 +869,7 @@ static const meansOfDeathData_t bg_meansOfDeathData[] =
 	{ MOD_DECONSTRUCT, "MOD_DECONSTRUCT" },
 	{ MOD_REPLACE, "MOD_REPLACE" },
 	{ MOD_BUILDLOG_REVERT, "MOD_BUILDLOG_REVERT" },
+	{ MOD_STOMP, "MOD_STOMP" },
 };
 
 static const size_t bg_numMeansOfDeath = ARRAY_LEN( bg_meansOfDeathData );
