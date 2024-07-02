@@ -1221,6 +1221,7 @@ enum meansOfDeath_t
   MOD_DECONSTRUCT,
   MOD_REPLACE,
   MOD_BUILDLOG_REVERT,
+  MOD_STOMP,
 };
 
 // NOTE: BUTTON_TALK, BUTTON_WALKING and BUTTON_ANY are defined in daemon
