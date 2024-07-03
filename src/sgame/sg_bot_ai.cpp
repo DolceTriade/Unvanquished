@@ -824,6 +824,20 @@ AINodeStatus_t BotActionChangeGoal( gentity_t *self, AIGenericNode_t *node )
 	return STATUS_SUCCESS;
 }
 
+AINodeStatus_t BotActionChangeBehavior( gentity_t *self, AIGenericNode_t *node )
+{
+	AIActionNode_t *a = ( AIActionNode_t * ) node;
+
+	if( a->nparams != 1 )
+	{
+		Log::Warn( "Incorrect number of arguments to changeBehavior action: %d", a->nparams );
+	}
+
+	const char *behavior = AIUnBoxString( a->params[ 0 ] );
+
+	return G_BotSetBehavior( self->botMind, behavior ) ? STATUS_SUCCESS : STATUS_FAILURE;
+}
+
 AINodeStatus_t BotActionEvolveTo( gentity_t *self, AIGenericNode_t *node )
 {
 	AIActionNode_t *action = ( AIActionNode_t * ) node;
