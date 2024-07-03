@@ -229,7 +229,7 @@ Scoring functions for logic
 =======================
 */
 
-botEntityAndDistance_t BotGetHealTarget( const gentity_t *self )
+botGoalAndDistance_t BotGetHealTarget( const gentity_t *self )
 {
 	if ( G_Team( self ) == TEAM_HUMANS )
 	{
@@ -241,7 +241,7 @@ botEntityAndDistance_t BotGetHealTarget( const gentity_t *self )
 
 	for ( buildable_t buildable : { BA_A_BOOSTER, BA_A_OVERMIND, BA_A_SPAWN, BA_A_LEECH })
 	{
-		botEntityAndDistance_t candidate =
+		botGoalAndDistance_t candidate =
 			self->botMind->closestBuildings[ buildable ];
 
 		// We skip buildings on roof or walls as bots can't wallwalk.
@@ -250,7 +250,7 @@ botEntityAndDistance_t BotGetHealTarget( const gentity_t *self )
 		// TODO:
 		// - The dot product is used to simply extract z component, maybe remove it
 		// - Maybe check if the building is over the navmesh
-		if ( candidate.ent && ( glm::dot( VEC2GLM(candidate.ent->s.origin2), up ) >= MIN_WALK_NORMAL || buildable == BA_A_BOOSTER ) )
+		if ( candidate.goal.getTargetedEntity() && ( glm::dot( VEC2GLM(candidate.goal.getTargetedEntity()->s.origin2), up ) >= MIN_WALK_NORMAL || buildable == BA_A_BOOSTER ) )
 		{
 			return candidate;
 		}
@@ -792,12 +792,12 @@ Entity Querys
 void BotFindClosestBuildings( gentity_t *self )
 {
 	gentity_t *testEnt;
-	botEntityAndDistance_t *ent;
+	botGoalAndDistance_t *goal;
 
 	// clear out building list
 	for ( unsigned i = 0; i < ARRAY_LEN( self->botMind->closestBuildings ); i++ )
 	{
-		self->botMind->closestBuildings[ i ].ent = nullptr;
+		self->botMind->closestBuildings[ i ].goal = nullptr;
 		self->botMind->closestBuildings[ i ].distance = std::numeric_limits<float>::max();
 	}
 
@@ -845,12 +845,12 @@ void BotFindClosestBuildings( gentity_t *self )
 
 		newDist = Distance( self->s.origin, testEnt->s.origin );
 
-		ent = &self->botMind->closestBuildings[ testEnt->s.modelindex ];
+		goal = &self->botMind->closestBuildings[ testEnt->s.modelindex ];
 
-		if ( newDist < ent->distance )
+		if ( newDist < goal->distance )
 		{
-			ent->ent = testEnt;
-			ent->distance = newDist;
+			goal->goal = testEnt;
+			goal->distance = newDist;
 		}
 	}
 }
@@ -863,7 +863,7 @@ void BotFindDamagedFriendlyStructure( gentity_t *self )
 	team_t team = G_Team( self );
 
 	gentity_t *target;
-	self->botMind->closestDamagedBuilding.ent = nullptr;
+	self->botMind->closestDamagedBuilding.goal = nullptr;
 	self->botMind->closestDamagedBuilding.distance = std::numeric_limits<float>::max();
 
 	minDistSqr = Square( self->botMind->closestDamagedBuilding.distance );
@@ -910,7 +910,7 @@ void BotFindDamagedFriendlyStructure( gentity_t *self )
 		distSqr = DistanceSquared( self->s.origin, target->s.origin );
 		if ( distSqr < minDistSqr )
 		{
-			self->botMind->closestDamagedBuilding.ent = target;
+			self->botMind->closestDamagedBuilding.goal = target;
 			self->botMind->closestDamagedBuilding.distance = sqrtf( distSqr );
 			minDistSqr = distSqr;
 		}
@@ -1032,56 +1032,56 @@ botTarget_t BotGetRushTarget( const gentity_t *self )
 	gentity_t const* rushTarget = nullptr;
 	if ( G_Team( self ) == TEAM_HUMANS )
 	{
-		if ( self->botMind->closestBuildings[BA_A_SPAWN].ent )
+		if ( self->botMind->closestBuildings[BA_A_SPAWN].goal.targetsValidEntity() )
 		{
-			rushTarget = self->botMind->closestBuildings[BA_A_SPAWN].ent;
+			rushTarget = self->botMind->closestBuildings[BA_A_SPAWN].goal.getTargetedEntity();
 		}
-		else if ( self->botMind->closestBuildings[BA_A_OVERMIND].ent )
+		else if ( self->botMind->closestBuildings[BA_A_OVERMIND].goal.targetsValidEntity() )
 		{
-			rushTarget = self->botMind->closestBuildings[BA_A_OVERMIND].ent;
+			rushTarget = self->botMind->closestBuildings[BA_A_OVERMIND].goal.getTargetedEntity();
 		}
-		else if ( self->botMind->closestBuildings[BA_A_BOOSTER].ent )
+		else if ( self->botMind->closestBuildings[BA_A_BOOSTER].goal.targetsValidEntity() )
 		{
-			rushTarget = self->botMind->closestBuildings[BA_A_BOOSTER].ent;
+			rushTarget = self->botMind->closestBuildings[BA_A_BOOSTER].goal.getTargetedEntity();
 		}
-		else if ( self->botMind->closestBuildings[BA_A_ACIDTUBE].ent )
+		else if ( self->botMind->closestBuildings[BA_A_ACIDTUBE].goal.targetsValidEntity() )
 		{
-			rushTarget = self->botMind->closestBuildings[BA_A_ACIDTUBE].ent;
+			rushTarget = self->botMind->closestBuildings[BA_A_ACIDTUBE].goal.getTargetedEntity();
 		}
-		else if ( self->botMind->closestBuildings[BA_A_HIVE].ent )
+		else if ( self->botMind->closestBuildings[BA_A_HIVE].goal.targetsValidEntity() )
 		{
-			rushTarget = self->botMind->closestBuildings[BA_A_HIVE].ent;
+			rushTarget = self->botMind->closestBuildings[BA_A_HIVE].goal.getTargetedEntity();
 		}
-		else if ( self->botMind->closestBuildings[BA_A_SPIKER].ent )
+		else if ( self->botMind->closestBuildings[BA_A_SPIKER].goal.targetsValidEntity() )
 		{
-			rushTarget = self->botMind->closestBuildings[BA_A_SPIKER].ent;
+			rushTarget = self->botMind->closestBuildings[BA_A_SPIKER].goal.getTargetedEntity();
 		}
 	}
 	else    //team aliens
 	{
-		if ( self->botMind->closestBuildings[BA_H_SPAWN].ent )
+		if ( self->botMind->closestBuildings[BA_H_SPAWN].goal.targetsValidEntity() )
 		{
-			rushTarget = self->botMind->closestBuildings[BA_H_SPAWN].ent;
+			rushTarget = self->botMind->closestBuildings[BA_H_SPAWN].goal.getTargetedEntity();
 		}
-		else if ( self->botMind->closestBuildings[BA_H_REACTOR].ent )
+		else if ( self->botMind->closestBuildings[BA_H_REACTOR].goal.targetsValidEntity() )
 		{
-			rushTarget = self->botMind->closestBuildings[BA_H_REACTOR].ent;
+			rushTarget = self->botMind->closestBuildings[BA_H_REACTOR].goal.getTargetedEntity();
 		}
-		else if ( self->botMind->closestBuildings[BA_H_ARMOURY].ent )
+		else if ( self->botMind->closestBuildings[BA_H_ARMOURY].goal.targetsValidEntity() )
 		{
-			rushTarget = self->botMind->closestBuildings[BA_H_ARMOURY].ent;
+			rushTarget = self->botMind->closestBuildings[BA_H_ARMOURY].goal.getTargetedEntity();
 		}
-		else if ( self->botMind->closestBuildings[BA_H_MEDISTAT].ent )
+		else if ( self->botMind->closestBuildings[BA_H_MEDISTAT].goal.targetsValidEntity() )
 		{
-			rushTarget = self->botMind->closestBuildings[BA_H_MEDISTAT].ent;
+			rushTarget = self->botMind->closestBuildings[BA_H_MEDISTAT].goal.getTargetedEntity();
 		}
-		else if ( self->botMind->closestBuildings[BA_H_MGTURRET].ent )
+		else if ( self->botMind->closestBuildings[BA_H_MGTURRET].goal.targetsValidEntity() )
 		{
-			rushTarget = self->botMind->closestBuildings[BA_H_MGTURRET].ent;
+			rushTarget = self->botMind->closestBuildings[BA_H_MGTURRET].goal.getTargetedEntity();
 		}
-		else if ( self->botMind->closestBuildings[BA_H_ROCKETPOD].ent )
+		else if ( self->botMind->closestBuildings[BA_H_ROCKETPOD].goal.targetsValidEntity() )
 		{
-			rushTarget = self->botMind->closestBuildings[BA_H_ROCKETPOD].ent;
+			rushTarget = self->botMind->closestBuildings[BA_H_ROCKETPOD].goal.getTargetedEntity();
 		}
 	}
 	target = rushTarget;
@@ -1095,16 +1095,16 @@ botTarget_t BotGetRetreatTarget( const gentity_t *self )
 	//FIXME, this seems like it could be done better...
 	if ( self->client->pers.team == TEAM_HUMANS )
 	{
-		if ( self->botMind->closestBuildings[BA_H_REACTOR].ent )
+		if ( self->botMind->closestBuildings[BA_H_REACTOR].goal.targetsValidEntity() )
 		{
-			retreatTarget = self->botMind->closestBuildings[BA_H_REACTOR].ent;
+			retreatTarget = self->botMind->closestBuildings[BA_H_REACTOR].goal.getTargetedEntity();
 		}
 	}
 	else
 	{
-		if ( self->botMind->closestBuildings[BA_A_OVERMIND].ent )
+		if ( self->botMind->closestBuildings[BA_A_OVERMIND].goal.targetsValidEntity() )
 		{
-			retreatTarget = self->botMind->closestBuildings[BA_A_OVERMIND].ent;
+			retreatTarget = self->botMind->closestBuildings[BA_A_OVERMIND].goal.getTargetedEntity();
 		}
 	}
 	target = retreatTarget;
@@ -2561,11 +2561,11 @@ void BotSearchForEnemy( gentity_t *self )
 		enemy = BotPopEnemy( queue );
 	} while ( enemy && !BotEntityIsValidEnemyTarget( self, enemy ) );
 
-	self->botMind->bestEnemy.ent = enemy;
+	self->botMind->bestEnemy.goal = enemy;
 
-	if ( self->botMind->bestEnemy.ent )
+	if ( self->botMind->bestEnemy.goal.targetsValidEntity() )
 	{
-		self->botMind->bestEnemy.distance = Distance( self->s.origin, self->botMind->bestEnemy.ent->s.origin );
+		self->botMind->bestEnemy.distance = Distance( self->s.origin, self->botMind->bestEnemy.goal.getTargetedEntity()->s.origin );
 	}
 	else
 	{
