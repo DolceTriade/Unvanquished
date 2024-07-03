@@ -256,6 +256,7 @@ AINodeStatus_t BotBehaviorNode( gentity_t *self, AIGenericNode_t *node );
 
 // action nodes
 AINodeStatus_t BotActionChangeGoal( gentity_t *self, AIGenericNode_t *node );
+AINodeStatus_t BotActionChangeBehavior( gentity_t *self, AIGenericNode_t *node );
 AINodeStatus_t BotActionMoveToGoal( gentity_t *self, AIGenericNode_t *node );
 AINodeStatus_t BotActionFireWeapon( gentity_t *self, AIGenericNode_t *node );
 AINodeStatus_t BotActionAimAtGoal( gentity_t *self, AIGenericNode_t *node );
