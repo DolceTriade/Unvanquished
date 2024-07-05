@@ -4,7 +4,8 @@
 
 MiningComponent::MiningComponent(Entity& entity, ThinkingComponent& r_ThinkingComponent)
 	: MiningComponentBase(entity, r_ThinkingComponent)
-	, active(false) {
+	, active(false)
+	, timeBuilt(level.matchTime) {
 
 	// Already calculate the predicted efficiency.
 	CalculateEfficiency();
@@ -105,4 +106,8 @@ void MiningComponent::InformNeighbors() {
 
 float MiningComponent::Efficiency(bool predict) {
 	return predict ? predictedEfficiency : currentEfficiency;
+}
+
+int MiningComponent::TimeBuilt() const {
+	return timeBuilt;
 }
