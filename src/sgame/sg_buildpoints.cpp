@@ -88,8 +88,11 @@ void G_UpdateBuildPointBudgets() {
 	}
 
 	ForEntities<MiningComponent>([&] (Entity& entity, MiningComponent& miningComponent) {
+		float halfLife = std::pow(2.0f, static_cast<float>(miningComponent.TimeBuilt()) /
+	                            (60000.0f * g_buildPointRecoveryRateHalfLife.Get()));
+		float minerBP = g_buildPointBudgetPerMiner.Get() / halfLife;
 		level.team[G_Team(entity.oldEnt)].totalBudget += miningComponent.Efficiency() *
-		                                                 g_buildPointBudgetPerMiner.Get();
+		                                                 minerBP;
 	});
 }
 
