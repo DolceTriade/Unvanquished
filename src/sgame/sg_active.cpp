@@ -280,6 +280,12 @@ static void ClientShove( gentity_t *ent, gentity_t *victim )
 	float  force;
 	int    entMass, vicMass;
 
+	// victim must be on the ground
+	if ( victim->client->ps.groundEntityNum == ENTITYNUM_NONE )
+	{
+		return;
+	}
+
 	// Shove force is scaled by relative mass
 	entMass = GetClientMass( ent );
 	vicMass = GetClientMass( victim );
@@ -294,11 +300,6 @@ static void ClientShove( gentity_t *ent, gentity_t *victim )
 	if ( force < 0 )
 	{
 		force = 0;
-	}
-
-	if ( force > 150 )
-	{
-		force = 150;
 	}
 
 	// Give the victim some shove velocity
@@ -329,34 +330,7 @@ static void ClientShove( gentity_t *ent, gentity_t *victim )
 		victim->client->ps.pm_flags |= PMF_TIME_KNOCKBACK;
 	}
 }
-static void PushBot(gentity_t * ent, gentity_t * other)
-{
-	vec3_t dir, ang, f, r;
-	float oldspeed;
 
-	oldspeed = VectorLength(other->client->ps.velocity);
-	if(oldspeed < 200)
-	{
-		oldspeed = 200;
-	}
-
-	VectorSubtract(other->r.currentOrigin, ent->r.currentOrigin, dir);
-	VectorNormalize(dir);
-	vectoangles(dir, ang);
-	AngleVectors(ang, f, r, nullptr);
-	f[2] = 0;
-	r[2] = 0;
-
-	VectorMA(other->client->ps.velocity, 200, f, other->client->ps.velocity);
-	VectorMA(other->client->ps.velocity, 100 * ((level.time + (ent->s.number * 1000)) % 4000 < 2000 ? 1.0 : -1.0), r,
-	other->client->ps.velocity);
-
-	if(VectorLengthSquared(other->client->ps.velocity) > oldspeed * oldspeed)
-	{
-		VectorNormalize(other->client->ps.velocity);
-		VectorScale(other->client->ps.velocity, oldspeed, other->client->ps.velocity);
-	}
-}
 /*
 ==============
 ClientImpacts
@@ -400,19 +374,6 @@ static void ClientImpacts( gentity_t *ent, pmove_t *pm )
 		if ( other->client )
 		{
 			ClientShove( ent, other );
-
-			//bot should get pushed out the way
-			if( other->client->pers.isBot && ent->client->pers.team == other->client->pers.team)
-			{
-				PushBot(ent, other);
-			}
-
-			// if we are standing on their head, then we should be pushed also
-			if( ent->client->pers.isBot && ent->s.groundEntityNum == other->s.number &&
-			    other->client && ent->client->pers.team == other->client->pers.team)
-			{
-				PushBot(other, ent);
-			}
 		}
 
 		// touch triggers
