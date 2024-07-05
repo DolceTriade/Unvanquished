@@ -452,8 +452,9 @@ static float PM_CmdScale( usercmd_t *cmd, bool zFlight )
 	float modifier = 1.0f;
 	int   staminaJumpCost = BG_Class( pm->ps->stats[ STAT_CLASS ] )->staminaJumpCost;
 	int   stamina = pm->ps->stats[ STAT_STAMINA ];
+	team_t team = static_cast<team_t>( pm->ps->persistant[ PERS_TEAM ] );
 
-	if ( pm->ps->persistant[ PERS_TEAM ] == TEAM_HUMANS && pm->ps->pm_type == PM_NORMAL )
+	if ( team == TEAM_HUMANS && pm->ps->pm_type == PM_NORMAL )
 	{
 		bool wasSprinting, sprint;
 
@@ -539,11 +540,12 @@ static float PM_CmdScale( usercmd_t *cmd, bool zFlight )
 		// TODO: Move modifer into upgrade/class config files of armour items/classes
 		if ( pm->ps->stats[ STAT_STATE ] & SS_CREEPSLOWED )
 		{
-			if ( BG_InventoryContainsUpgrade( UP_LIGHTARMOUR, pm->ps->stats ) ||
-			     BG_InventoryContainsUpgrade( UP_MEDIUMARMOUR, pm->ps->stats ) ||
-			     BG_InventoryContainsUpgrade( UP_BATTLESUIT,  pm->ps->stats ) )
+			// HACK: Scale creep effect with armor
+			if ( team == TEAM_HUMANS )
 			{
-				modifier *= CREEP_ARMOUR_MODIFIER;
+				float armorBuf = 1.0f - CREEP_MODIFIER;
+				float multiplier = std::max<float>( 0.0f, pm->ps->stats[ STAT_CLASS ] - PCL_HUMAN_NAKED ) /  ( PCL_HUMAN_BSUIT - PCL_HUMAN_NAKED );
+				modifier *= ( CREEP_MODIFIER + ( multiplier * armorBuf ) );
 			}
 			else
 			{
@@ -554,7 +556,17 @@ static float PM_CmdScale( usercmd_t *cmd, bool zFlight )
 		// Apply level1 slow modifier
 		if ( pm->ps->stats[ STAT_STATE2 ] & SS2_LEVEL1SLOW )
 		{
-			modifier *= LEVEL1_SLOW_MOD;
+			// HACK: Scale creep effect with armor
+			if ( team == TEAM_HUMANS )
+			{
+				float armorBuf = 1.0f - LEVEL1_SLOW_MOD;
+				float multiplier = std::max<float>( 0.0f, pm->ps->stats[ STAT_CLASS ] - PCL_HUMAN_NAKED ) /  ( PCL_HUMAN_BSUIT - PCL_HUMAN_NAKED );
+				modifier *= ( LEVEL1_SLOW_MOD + ( multiplier * armorBuf ) );
+			}
+			else
+			{
+				modifier *= LEVEL1_SLOW_MOD;
+			}
 		}
 	}
 
@@ -4479,7 +4491,12 @@ static void PM_HumanStaminaEffects()
 	// Remove stamina based on status effects
 	if ( stats[ STAT_STATE2 ] & SS2_LEVEL1SLOW )
 	{
-		stats[ STAT_STAMINA ] -= pml.msec * STAMINA_LEVEL1SLOW_TAKE;
+		int take = STAMINA_LEVEL1SLOW_TAKE;
+		// HACK: Scale effect with armor
+		int multiplier = std::max( 0, pm->ps->stats[ STAT_CLASS ] - PCL_HUMAN_NAKED );
+		if ( multiplier > 0 ) take *= 1.0f - ( 0.333f * multiplier );
+
+		stats[ STAT_STAMINA ] -= pml.msec * take;
 	}
 
 	// Check stamina limits
