@@ -64,16 +64,21 @@ class MiningComponent: public MiningComponentBase {
 		float Efficiency(bool predict = false);
 
 		/**
-		 * @param predict Whether to assume that the miner and its non-dead neighbors are active.
-		 * @return The current or potential (if predicting) budget gain of this miner.
+		 * @return The the level time at which this buildable was built.
 		 */
-		int Budget(bool predict = false);
+		int TimeBuilt() const;
 
 	private:
 		/**
 		 * @brief Whether the miner is currently mining (and interfering with other miners).
 		 */
 		bool active;
+
+		/**
+		 * @brief The the level time at which this buildable was built.
+		 */
+		int timeBuilt;
+
 
 		/**
 		 * @brief Current efficiency.

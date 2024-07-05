@@ -956,9 +956,11 @@ static void ClientTimerActions( gentity_t *ent, int msec )
 
 					if ( buildable == BA_H_DRILL || buildable == BA_A_LEECH )
 					{
+						float halfLife = std::pow(2.0f, static_cast<float>(level.matchTime) /
+	                            (60000.0f * g_buildPointRecoveryRateHalfLife.Get()));
 						float deltaEff = G_RGSPredictEfficiencyDelta(dummy, team);
 						int   deltaBP  = (int)(level.team[team].totalBudget + deltaEff *
-						                       g_buildPointBudgetPerMiner.Get()) -
+						                       g_buildPointBudgetPerMiner.Get() / halfLife) -
 						                 (int)(level.team[team].totalBudget);
 
 						signed char deltaEffNetwork = (signed char)((float)0x7f * deltaEff);
