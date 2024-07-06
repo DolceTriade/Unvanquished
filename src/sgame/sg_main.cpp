@@ -122,7 +122,7 @@ Cvar::Callback<Cvar::Cvar<int>> g_BPInitialBudgetHumans(
 		});
 Cvar::Callback<Cvar::Cvar<int>> g_BPInitialBudgetAliens(
 		"g_BPInitialBudgetAliens",
-		"Initial build points count for humans",
+		"Initial build points count for aliens",
 		Cvar::SERVERINFO,
 		-1,
 		[](int) {
