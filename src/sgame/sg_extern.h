@@ -109,6 +109,7 @@ extern Cvar::Cvar<float> g_alienOffCreepRegenHalfLife;
 
 extern Cvar::Cvar<int> g_teamImbalanceWarnings;
 extern Cvar::Cvar<int> g_freeFundPeriod;
+extern Cvar::Cvar<int> g_freeFundMax;
 
 extern Cvar::Range<Cvar::Cvar<int>> g_unlagged;
 
