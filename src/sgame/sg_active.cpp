@@ -1039,7 +1039,9 @@ static void ClientTimerActions( gentity_t *ent, int msec )
 		     client->pers.aliveSeconds % g_freeFundPeriod.Get() == 0 )
 		{
 			// Give clients some credit periodically
-			G_AddCreditToClient( client, PLAYER_BASE_VALUE, true );
+			float momentumExtra = level.team[ team ].momentum / MOMENTUM_MAX;
+			momentumExtra *= g_freeFundMax.Get();
+			G_AddCreditToClient( client, PLAYER_BASE_VALUE + static_cast<int>( momentumExtra ), true );
 		}
 
 		int devolveReturnedCredits = std::min(
