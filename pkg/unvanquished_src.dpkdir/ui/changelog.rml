@@ -1,14 +1,15 @@
 <div>
     <p><h1>Changelog</h1></p>
-
-    <p><h3>2024-06-21</h3>
+    <p><h3>2024-07-07</h3>
         <ul>
-            <li>New Chaingun</li>
-            <li>New Psaw</li>
-            <li>Uscaled luci and ckit textures</li>
-            <li>Upscaled creep texture</li>
-            <li>Tower defense and Juggernaut game modes</li>
-            <li>Redsky's circle menus</li>
+            <li>Marazap requires constant aim</li>
+            <li>Mantis and Creep effects are debuffed by armor</li>
+            <li>Can shove people around</li>
+            <li>Scale BP from miners with time (ie, more time, less BP from new miners)</li>
+            <li>Bsuits can walk over dretches</li>
+            <li>Fix jiggly mouse bug in circle menus</li>
+            <li>kai's scoreboard</li>
+            <li>kai's biokit</li>
         </ul>
     </p>
 </div>
