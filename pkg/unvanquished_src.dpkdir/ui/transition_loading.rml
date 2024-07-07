@@ -90,6 +90,7 @@
 				position: absolute;
 				top: 6em;
 				right: 1em;
+				width: 30%;
 				padding: .7em 1em 1em 1em;
 				background-color: #00000080;
 				border-color: white;
