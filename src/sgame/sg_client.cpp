@@ -1185,10 +1185,12 @@ const char *ClientConnect( int clientNum, bool firstTime )
 		return userInfoError;
 	}
 
-	G_LogPrintf( "ClientConnect: %i [%s] (%s) \"%s^*\" \"%s^*\"",
+	G_LogPrintf( "ClientConnect: %i [%s] (%s) \"%s^*\" \"%c%s%c^*\"",
 	             clientNum, client->pers.ip.str[0] ? client->pers.ip.str : "127.0.0.1", client->pers.guid,
 	             client->pers.netname,
-	             client->pers.netname );
+				 Color::Constants::DECOLOR_OFF,
+	             client->pers.netname,
+				 Color::Constants::DECOLOR_ON );
 
 	// don't do the "xxx connected" messages if they were caried over from previous level
 	if ( firstTime )
@@ -1255,10 +1257,14 @@ const char *ClientBotConnect( int clientNum, bool firstTime )
 		return userInfoError;
 	}
 
-	G_LogPrintf( "ClientConnect: %i [%s] (%s) \"%s^*\" \"%s^*\" [BOT]",
+	ent->r.svFlags |= SVF_BOT;
+
+	G_LogPrintf( "ClientConnect: %i [%s] (%s) \"%s^*\" \"%c%s%c^*\" [BOT]",
 	             clientNum, client->pers.ip.str[0] ? client->pers.ip.str : "127.0.0.1", client->pers.guid,
 	             client->pers.netname,
-	             client->pers.netname );
+				 Color::Constants::DECOLOR_OFF,
+	             client->pers.netname,
+				 Color::Constants::DECOLOR_ON );
 
 	// count current clients and rank for scoreboard
 	CalculateRanks();
