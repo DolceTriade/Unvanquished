@@ -66,7 +66,7 @@ struct LuaServerCommand : public Cmd::LambdaCmd
 					  Log::Warn( "Could not run lua server callback: %s: %s", args.Argv( 0 ), lua_tostring( L, -1 ) );
 				  }
 			  },
-			  nullptr ), ref( ref )
+			  Cmd::NoopComplete ), ref( ref )
 	{}
 
     virtual ~LuaServerCommand()
