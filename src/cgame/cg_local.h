@@ -1492,6 +1492,7 @@ struct cgMedia_t
 	qhandle_t outlineShader;
 
 	qhandle_t level2ZapTS;
+	qhandle_t mdriverTS;
 
 	qhandle_t balloonShader;
 	qhandle_t connectionShader;
