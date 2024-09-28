@@ -1064,6 +1064,7 @@ void CG_InitWeapons()
 	}
 
 	cgs.media.level2ZapTS = CG_RegisterTrailSystem( "trails/weapons/level2upg/lightning" );
+	cgs.media.mdriverTS = CG_RegisterTrailSystem( "trails/weapons/mdriver/tail" );
 }
 
 /*
@@ -2564,6 +2565,18 @@ void CG_HandleWeaponHitEntity( entityState_t *es, vec3_t origin )
 	{
 		DrawTracer( muzzle, origin, cg_tracerChance.Get(), cg_tracerLength.Get(),
 		            cg_tracerWidth.Get() );
+		if ( weapon == WP_MASS_DRIVER )
+		{
+			centity_t *attacker = ( attackerNum == cg.predictedPlayerState.clientNum ) ? &cg.predictedPlayerEntity : &cg_entities[ attackerNum ];
+			attacker->muzzleTS = CG_SpawnNewTrailSystem( cgs.media.mdriverTS );
+			if ( !attacker->muzzleTS ) return;
+			attacker->muzzleTSDeathTime = cg.time + cg_teslaTrailTime.Get();
+
+			CG_SetAttachmentPoint( &attacker->muzzleTS->frontAttachment, muzzle );
+			CG_AttachToPoint( &attacker->muzzleTS->frontAttachment );
+			CG_SetAttachmentPoint( &attacker->muzzleTS->backAttachment, origin );
+			CG_AttachToPoint( &attacker->muzzleTS->backAttachment );
+		}
 	}
 }
 
@@ -2609,6 +2622,19 @@ void CG_HandleWeaponHitWall( entityState_t *es, vec3_t origin )
 	{
 		DrawTracer( muzzle, origin, cg_tracerChance.Get(), cg_tracerLength.Get(),
 		            cg_tracerWidth.Get() );
+
+		if ( weapon == WP_MASS_DRIVER )
+		{
+			centity_t *attacker = ( attackerNum == cg.predictedPlayerState.clientNum ) ? &cg.predictedPlayerEntity : &cg_entities[ attackerNum ];
+			attacker->muzzleTS = CG_SpawnNewTrailSystem( cgs.media.mdriverTS );
+			if ( !attacker->muzzleTS ) return;
+			attacker->muzzleTSDeathTime = cg.time + cg_teslaTrailTime.Get();
+
+			CG_SetAttachmentPoint( &attacker->muzzleTS->frontAttachment, muzzle );
+			CG_AttachToPoint( &attacker->muzzleTS->frontAttachment );
+			CG_SetAttachmentPoint( &attacker->muzzleTS->backAttachment, origin );
+			CG_AttachToPoint( &attacker->muzzleTS->backAttachment );
+		}
 	}
 }
 
