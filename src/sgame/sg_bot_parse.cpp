@@ -424,7 +424,12 @@ static AIValue_t timeSinceLastCombat( gentity_t *self, const AIValue_t* )
 static AIValue_t usableBuildPoints( gentity_t *self, const AIValue_t* )
 {
 	team_t team = G_Team( self );
-	int buildPoints = G_GetFreeBudget( team );
+	int unused = level.team[ team ].unusedBP;
+	if ( level.team[team].spentBudget + unused > level.team[team].totalBudget )
+	{
+		return AIBoxInt( 0 );
+	}
+	int buildPoints = G_GetSpendableBudget( team );
 	if ( team == TEAM_ALIENS && !BG_BuildableUnlocked( BA_A_BOOSTER ) )
 	{
 		// save build points to build a booster as soon as unlocked
