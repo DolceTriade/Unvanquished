@@ -1492,10 +1492,12 @@ void CG_AddPlayerWeapon( refEntity_t *parent, playerState_t *ps, centity_t *cent
 			if ( noGunModel )
 			{
 				CG_SetAttachmentTag( &cent->muzzlePS->attachment, parent, parent->hModel, "tag_weapon" );
+				CG_AttachmentPoint( &cent->muzzlePS->attachment, cent->muzzle );
 			}
 			else
 			{
 				CG_SetAttachmentTag( &cent->muzzlePS->attachment, &gun, gun.hModel, "tag_flash" );
+				CG_AttachmentPoint( &cent->muzzlePS->attachment, cent->muzzle );
 			}
 		}
 
@@ -2186,15 +2188,7 @@ static bool CalcMuzzlePoint( int entityNum, vec3_t muzzle )
 		return false;
 	}
 
-	if ( cent->muzzlePS && CG_Attached( &cent->muzzlePS->attachment ) )
-	{
-		CG_AttachmentPoint( &cent->muzzlePS->attachment, muzzle );
-	}
-	else
-	{
-		return false;
-	}
-
+	VectorCopy( cent->muzzle, muzzle );
 	return true;
 }
 

@@ -798,6 +798,7 @@ struct centity_t
 
 	particleSystem_t      *muzzlePS;
 	bool              muzzlePsTrigger;
+	vec3_t            muzzle;
 
 	particleSystem_t      *jetPackPS[ 2 ];
 	jetPackState_t        jetPackState;
