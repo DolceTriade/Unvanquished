@@ -1500,10 +1500,12 @@ void CG_AddPlayerWeapon( refEntity_t* parent, playerState_t* ps, centity_t* cent
 			if ( noGunModel )
 			{
 				CG_SetAttachmentTag( &cent->muzzlePS->attachment, cent, weaponAttachmentEntityID, parent->hModel, "tag_weapon" );
+				CG_AttachmentPoint( &cent->muzzlePS->attachment, cent->muzzle );
 			}
 			else
 			{
 				CG_SetAttachmentTag( &cent->muzzlePS->attachment, cent, weaponAttachmentEntityID + 1, gun.hModel, "tag_flash" );
+				CG_AttachmentPoint( &cent->muzzlePS->attachment, cent->muzzle );
 			}
 		}
 
@@ -1779,7 +1781,7 @@ void CG_AddViewWeapon( playerState_t *ps )
 	{
 		std::vector<refEntity_t> ents{ hand };
 		ents.reserve( 4 );
-		
+
 		CG_AddPlayerWeapon( &hand, ps, &cg.predictedPlayerEntity, 0, ents );
 
 		AddRefEntities( cent, ents );
@@ -2195,15 +2197,7 @@ static bool CalcMuzzlePoint( int entityNum, vec3_t muzzle )
 		return false;
 	}
 
-	if ( cent->muzzlePS && CG_Attached( &cent->muzzlePS->attachment ) )
-	{
-		CG_AttachmentPoint( &cent->muzzlePS->attachment, muzzle );
-	}
-	else
-	{
-		return false;
-	}
-
+	VectorCopy( cent->muzzle, muzzle );
 	return true;
 }
 
