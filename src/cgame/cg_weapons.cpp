@@ -1494,6 +1494,21 @@ void CG_AddPlayerWeapon( refEntity_t* parent, playerState_t* ps, centity_t* cent
 
 	if ( CG_IsParticleSystemValid( &cent->muzzlePS ) )
 	{
+		if ( ps || cg.renderingThirdPerson ||
+		     cent->currentState.number != cg.predictedPlayerState.clientNum )
+		{
+			if ( noGunModel )
+			{
+				CG_SetAttachmentTag( &cent->muzzlePS->attachment, cent, weaponAttachmentEntityID, parent->hModel, "tag_weapon" );
+				CG_AttachmentPoint( &cent->muzzlePS->attachment, cent->muzzle );
+			}
+			else
+			{
+				CG_SetAttachmentTag( &cent->muzzlePS->attachment, cent, weaponAttachmentEntityID + 1, gun.hModel, "tag_flash" );
+				CG_AttachmentPoint( &cent->muzzlePS->attachment, cent->muzzle );
+			}
+		}
+
 		//if the PS is infinite disable it when not firing
 		if ( !firing && CG_IsParticleSystemInfinite( cent->muzzlePS ) )
 		{
@@ -1765,7 +1780,7 @@ void CG_AddViewWeapon( playerState_t *ps )
 	{
 		std::vector<refEntity_t> ents{ hand };
 		ents.reserve( 4 );
-		
+
 		CG_AddPlayerWeapon( &hand, ps, &cg.predictedPlayerEntity, 0, ents );
 
 		AddRefEntities( cent, ents );
@@ -2181,15 +2196,7 @@ static bool CalcMuzzlePoint( int entityNum, vec3_t muzzle )
 		return false;
 	}
 
-	if ( cent->muzzlePS && CG_Attached( &cent->muzzlePS->attachment ) )
-	{
-		CG_AttachmentPoint( &cent->muzzlePS->attachment, muzzle );
-	}
-	else
-	{
-		return false;
-	}
-
+	VectorCopy( cent->muzzle, muzzle );
 	return true;
 }
 
