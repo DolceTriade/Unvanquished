@@ -3218,6 +3218,7 @@ finish_up:
 		{
 			CG_DestroyParticleSystem( &cent->jetPackPS[ 1 ] );
 		}
+		VectorClear( cent->muzzle );
 	}
 
 	VectorCopy( surfNormal, cent->pe.lastNormal );
