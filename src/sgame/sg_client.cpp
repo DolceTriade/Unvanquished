@@ -1355,6 +1355,8 @@ void ClientBegin( int clientNum )
 	// count current clients and rank for scoreboard
 	CalculateRanks();
 
+	G_UpdateBPVampire( client->num() );
+
 	// display the help menu, if connecting the first time
 	if ( !client->sess.seenWelcome  )
 	{
