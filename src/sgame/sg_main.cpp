@@ -2255,9 +2255,6 @@ void G_RunFrame( int levelTime )
 	int        msec;
 	static int ptime3000 = 0;
 
-	extern void G_ResetStolenBP();
-	G_ResetStolenBP();
-
 	for ( team_t team : { TEAM_ALIENS, TEAM_HUMANS } )
 	{
 		level.team[ team ].unusedBP = unusedBP( team );
