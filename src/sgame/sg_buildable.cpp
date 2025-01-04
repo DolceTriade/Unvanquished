@@ -1067,16 +1067,18 @@ static itemBuildError_t PrepareBuildableReplacement( buildable_t buildable, vec3
 		return IBE_NONE;
 	}
 
-	// if we already have set buildables for removal, decrease cost
+// if we already have set buildables for removal, decrease cost
 	for ( entNum = 0; entNum < level.numBuildablesForRemoval; entNum++ )
 	{
 		cost -= G_BuildableDeconValue( level.markedBuildables[ entNum ] );
 	}
 
-	// check if we can already afford the new buildable
-	if ( Math::Clamp( G_GetFreeBudget( attr->team ), 0, std::numeric_limits<int>::max() ) >= cost )
-	{
-		return IBE_NONE;
+	// It's preferrable to replace marked buildings first with BP vampire
+	if ( !g_BPTransfer.Get() ) {
+		// check if we can already afford the new buildable
+		if ( G_GetFreeBudget( attr->team ) >= cost ) {
+			return IBE_NONE;
+		}
 	}
 
 	// build a list of additional buildables that can be deconstructed
@@ -1137,6 +1139,13 @@ static itemBuildError_t PrepareBuildableReplacement( buildable_t buildable, vec3
 		// check if we have enough resources now
 		if ( Math::Clamp( G_GetFreeBudget( attr->team ), 0, std::numeric_limits<int>::max() ) >= cost )
 		{
+			return IBE_NONE;
+		}
+	}
+
+	// Check if we can afford the new buildable with BP vampire if we don't have enough BP marked
+	if ( g_BPTransfer.Get() ) {
+		if ( G_GetFreeBudget( attr->team ) >= cost ) {
 			return IBE_NONE;
 		}
 	}
