@@ -1182,6 +1182,8 @@ struct cg_t
 	std::string bpVampireBarH;
 	std::string bpVampireBarA;
 
+	std::string bpMessage;
+
 	// centerprinting
 	int  centerPrintTime;
 	float centerPrintSizeFactor;
