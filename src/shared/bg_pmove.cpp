@@ -1054,6 +1054,8 @@ static bool PM_CheckPounce()
 				return false;
 			}
 
+			pm->pmext->pouncePayload = 1;
+
 			break;
 
 		case WP_ALEVEL3:
