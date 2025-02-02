@@ -2135,6 +2135,24 @@ static void ClientThink_real( gentity_t *self )
 
 	switch ( client->ps.weapon )
 	{
+		case WP_ALEVEL1:
+			if ( client->ps.IsWeaponReady() && client->pmext.pouncePayload > 0 )
+			{
+				glm::vec3 forward;
+				AngleVectors( VEC2GLM( client->ps.viewangles ), &forward, nullptr, nullptr );
+				glm::vec3 muzzle = G_CalcMuzzlePoint( self, forward );
+				trace_t tr;
+				gentity_t *target = nullptr;
+				G_WideTrace( &tr, self, muzzle, forward, LEVEL1_CLAW_RANGE,
+				             LEVEL1_CLAW_WIDTH, LEVEL1_CLAW_WIDTH, &target );
+				if ( target && G_Team( target ) != G_Team( self ) )
+				{
+					client->pmext.pouncePayload = 0;
+					G_FireWeapon( self, WP_ALEVEL1, WPM_PRIMARY );
+				}
+			}
+			break;
+
 		case WP_ALEVEL0:
 			if ( !G_CheckDretchAttack( self ) )
 			{

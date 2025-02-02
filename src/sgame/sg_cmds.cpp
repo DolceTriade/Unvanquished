@@ -1906,6 +1906,7 @@ static void G_AlienEvolve_evolve( gentity_t *ent, class_t newClass, const vec3_t
 		ent->client->boostedTime = oldBoostTime;
 		ent->client->ps.stats[ STAT_STATE ] |= SS_BOOSTED;
 	}
+	ent->client->pmext.pouncePayload = 0;
 }
 
 // returns true if evolve succeded
