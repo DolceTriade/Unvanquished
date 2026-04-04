@@ -163,3 +163,10 @@ function CirclemenuMouseToIndex(document, event, num)
 
 	return CirclemenuIndexSelect(tau, num)
 end
+
+function CirclemenuButtonHover(document, event, hover_handler, idx)
+	if event.target_element ~= nil then
+		event.target_element:Focus()
+	end
+	hover_handler(document, idx)
+end
