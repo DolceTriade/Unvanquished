@@ -92,10 +92,6 @@ GET_FUNC( health,
           lua_pushnumber( L,
                           Entities::HasHealthComponent( c->ent ) ? Entities::HealthOf( c->ent )
                                                                  : 0 ) )
-/// The client's ping.
-// @tfield integer ping Read only.
-// @within Client
-GET_FUNC( ping, lua_pushinteger( L, c->ent->client->ps.ping ) )
 /// The client's class.
 // @tfield string class Read only.
 // @within Client
@@ -244,7 +240,7 @@ int Methodforceteam( lua_State* L, Client* c )
 		return 0;
 	}
 
-	team_t team = TEAM_ALL;
+	team_t team = TEAM_NONE;
 	switch ( teamStr[0] )
 	{
 		case 'a':
@@ -432,7 +428,6 @@ luaL_Reg ClientGetters[] = {
 	GETTER( evos ),
 	GETTER( weapon ),
 	GETTER( health ),
-	GETTER( ping ),
 	GETTER( class ),
 	GETTER( stamina ),
 	GETTER( score ),

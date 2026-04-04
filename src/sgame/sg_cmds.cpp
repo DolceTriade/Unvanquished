@@ -1201,7 +1201,7 @@ void G_Say( gentity_t *ent, saymode_t mode, const char *chatText )
 	switch ( mode )
 	{
 		case SAY_ALL:
-			Lua::ExecChatHooks( ent, TEAM_ALL, chatText );
+			Lua::ExecChatHooks( ent, static_cast<team_t>( NUM_TEAMS ), chatText );
 			G_LogPrintf( "Say: %d \"%s^*\": ^2%s",
 			             ent ? ent->num() : -1,
 			             ent ? ent->client->pers.netname : "console", chatText );
