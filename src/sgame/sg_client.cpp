@@ -1257,8 +1257,6 @@ const char *ClientBotConnect( int clientNum, bool firstTime )
 		return userInfoError;
 	}
 
-	ent->r.svFlags |= SVF_BOT;
-
 	G_LogPrintf( "ClientConnect: %i [%s] (%s) \"%s^*\" \"%c%s%c^*\" [BOT]",
 	             clientNum, client->pers.ip.str[0] ? client->pers.ip.str : "127.0.0.1", client->pers.guid,
 	             client->pers.netname,
