@@ -3,6 +3,7 @@
 		<link type="text/rcss" href="/ui/shared/basics.rcss" />
 		<link type="text/rcss" href="/ui/shared/circlemenu.rcss" />
 		<link type="text/rcss" href="/ui/shared/infobox.rcss" />
+		<script src="lua/util.lua" />
 		<style>
 			body {
 				width: 100%;
@@ -166,7 +167,7 @@
 				circlemenu.inner_rml = CirclemenuSkeleton(#weapons)
 				for i=1,#weapons do
 					circlemenu.child_nodes[i+1].inner_rml = string.format(
-						'<button class="%s" onclick="WeaponClick(%d)" onmouseover="WeaponHover(document,%d)">%s<img src="/%s"/></button>',
+						'<button class="%s" onclick="WeaponClick(%d)" onmouseover="CirclemenuButtonHover(document, event, WeaponHover, %d)">%s<img src="/%s"/></button>',
 						weapons[i][5], i, i, AvailabilityIcon(weapons[i][5]), weapons[i][1])
 				end
 				document:GetElementById("weaponKeyboardHints").inner_rml = CirclemenuKeyboardHints(#weapons)
@@ -214,7 +215,7 @@
 				circlemenu.inner_rml = CirclemenuSkeleton(#upgrades)
 				for i=1,#upgrades do
 					circlemenu.child_nodes[i+1].inner_rml = string.format(
-						'<button class="%s" onclick="UpgradeClick(%d)" onmouseover="UpgradeHover(document,%d)">%s<img src="/%s"/></button>',
+						'<button class="%s" onclick="UpgradeClick(%d)" onmouseover="CirclemenuButtonHover(document, event, UpgradeHover, %d)">%s<img src="/%s"/></button>',
 						upgrades[i][5], i, i, AvailabilityIcon(upgrades[i][5]), upgrades[i][1])
 				end
 				document:GetElementById("upgradeKeyboardHints").inner_rml = CirclemenuKeyboardHints(#upgrades)
