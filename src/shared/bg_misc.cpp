@@ -29,6 +29,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "common/Common.h"
 #include "common/FileSystem.h"
 #include "shared/CommonProxies.h"
+#include "bg_attributes.h"
 #include "bg_public.h"
 #include "parse.h"
 
@@ -989,6 +990,8 @@ bool config_loaded = false;
 
 void BG_InitAllConfigs()
 {
+	BG_ResetGameplayToDefaults();
+
 	BG_InitBuildableAttributes();
 	BG_InitBuildableModelConfigs();
 	BG_InitClassAttributes();
@@ -999,6 +1002,8 @@ void BG_InitAllConfigs()
 	BG_InitBeaconAttributes();
 
 	BG_CheckConfigVars();
+	BG_CommitGameplayBaseline();
+	BG_CommitAttributeBaselines();
 
 	config_loaded = true;
 }

@@ -29,6 +29,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "common/Common.h"
 #include "cg_local.h"
 #include "common/cm/cm_public.h"
+#include "shared/bg_attributes.h"
 #include "cg_key_name.h"
 #include "shared/parse.h"
 #include "shared/navgen/navgen.h"
@@ -1363,6 +1364,17 @@ void CG_Init( int serverMessageNum, int clientNum, const WindowConfig& windowCon
 	// load configs after initializing particles and trails since it registers some
 	CG_UpdateLoadingStep( LOAD_CONFIGS );
 	BG_InitAllConfigs();
+	{
+		std::string error;
+		if ( !BG_ApplyGameplayConfig( CG_ConfigString( CS_GAMEPLAY ), &error ) )
+		{
+			Sys::Drop( "Failed to apply gameplay config: %s", error.c_str() );
+		}
+		if ( !BG_ApplyAttributeConfig( CG_ConfigString( CS_ATTRIBUTES ), &error ) )
+		{
+			Sys::Drop( "Failed to apply attribute config: %s", error.c_str() );
+		}
+	}
 	// parse the serverinfo only now because infos such as
 	// disabledEquipment wouldn't be parsed correctly before
 	// loading the configs

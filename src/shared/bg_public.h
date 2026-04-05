@@ -259,6 +259,8 @@ enum
   CS_WINNER, // string indicating round winner
   CS_SHADERSTATE,
   CS_CLIENTS_READY,
+  CS_GAMEPLAY,
+  CS_ATTRIBUTES,
 
   CS_MODELS,
   CS_SOUNDS = CS_MODELS + MAX_MODELS,

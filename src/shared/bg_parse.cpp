@@ -41,247 +41,6 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA	02110-1301	USA
 		break; \
 	}
 
-enum configVarType_t
-{
-	INTEGER,
-	FLOAT
-};
-
-struct configVar_t
-{
-	//The name is on top of the structure, this is useful for bsearch
-	const char *name;
-	configVarType_t type;
-	bool defined;
-	void *var;
-};
-
-//Definition of the config vars
-
-// Alien weapons
-
-int   ABUILDER_CLAW_DMG;
-float ABUILDER_CLAW_RANGE;
-float ABUILDER_CLAW_WIDTH;
-float ABUILDER_BLOB_SPEED;
-float ABUILDER_BLOB_SPEED_MOD;
-int   ABUILDER_BLOB_TIME;
-
-int   LEVEL0_BITE_DMG;
-float LEVEL0_BITE_RANGE;
-float LEVEL0_BITE_WIDTH;
-int   LEVEL0_BITE_REPEAT;
-
-int   LEVEL1_CLAW_DMG;
-float LEVEL1_CLAW_RANGE;
-float LEVEL1_CLAW_WIDTH;
-
-int   LEVEL2_CLAW_DMG;
-float LEVEL2_CLAW_RANGE;
-float LEVEL2_CLAW_U_RANGE;
-float LEVEL2_CLAW_WIDTH;
-int   LEVEL2_AREAZAP_DMG;
-float LEVEL2_AREAZAP_RANGE;
-float LEVEL2_AREAZAP_CHAIN_RANGE;
-float LEVEL2_AREAZAP_CHAIN_FALLOFF;
-float LEVEL2_AREAZAP_WIDTH;
-int   LEVEL2_AREAZAP_TIME;
-float LEVEL2_WALLJUMP_MAXSPEED;
-
-int   LEVEL3_CLAW_DMG;
-float LEVEL3_CLAW_RANGE;
-float LEVEL3_CLAW_UPG_RANGE;
-float LEVEL3_CLAW_WIDTH;
-int   LEVEL3_POUNCE_DMG;
-float LEVEL3_POUNCE_RANGE;
-float LEVEL3_POUNCE_UPG_RANGE;
-float LEVEL3_POUNCE_WIDTH;
-int   LEVEL3_POUNCE_TIME;
-int   LEVEL3_POUNCE_TIME_UPG;
-int   LEVEL3_POUNCE_TIME_MIN;
-int   LEVEL3_POUNCE_REPEAT;
-float LEVEL3_POUNCE_SPEED_MOD;
-int   LEVEL3_POUNCE_JUMP_MAG;
-int   LEVEL3_POUNCE_JUMP_MAG_UPG;
-float LEVEL3_BOUNCEBALL_SPEED;
-int   LEVEL3_BOUNCEBALL_REGEN;
-int   LEVEL3_BOUNCEBALL_REGEN_BOOSTER;
-int   LEVEL3_BOUNCEBALL_REGEN_CREEP;
-
-int   LEVEL4_CLAW_DMG;
-float LEVEL4_CLAW_RANGE;
-float LEVEL4_CLAW_WIDTH;
-float LEVEL4_CLAW_HEIGHT;
-int   LEVEL4_TRAMPLE_DMG;
-float LEVEL4_TRAMPLE_SPEED;
-int   LEVEL4_TRAMPLE_CHARGE_MIN;
-int   LEVEL4_TRAMPLE_CHARGE_MAX;
-int   LEVEL4_TRAMPLE_CHARGE_TRIGGER;
-int   LEVEL4_TRAMPLE_DURATION;
-int   LEVEL4_TRAMPLE_STOP_PENALTY;
-int   LEVEL4_TRAMPLE_REPEAT;
-
-int   MEDKIT_POISON_IMMUNITY_TIME;
-int   MEDKIT_STARTUP_TIME;
-int   MEDKIT_STARTUP_SPEED;
-
-int   BIOKIT_INTERVAL;
-float BIOKIT_MODIFIER;
-int   BIOKIT_STAMINA_REGEN;
-
-// Human Weapons
-
-int   BLASTER_SPEED;
-
-int   RIFLE_SPREAD;
-int   RIFLE_DMG;
-
-int   PAINSAW_DAMAGE;
-float PAINSAW_RANGE;
-float PAINSAW_WIDTH;
-float PAINSAW_HEIGHT;
-
-int   SHOTGUN_PELLETS;
-int   SHOTGUN_SPREAD;
-int   SHOTGUN_DMG;
-int   SHOTGUN_RANGE;
-
-int   LASGUN_DAMAGE;
-
-int   MDRIVER_DMG;
-
-int   CHAINGUN_SPREAD;
-int   CHAINGUN_DMG;
-
-int   FLAMER_SIZE;
-float FLAMER_SPEED;
-float FLAMER_LAG;
-float FLAMER_IGNITE_RADIUS;
-float FLAMER_IGNITE_CHANCE;
-float FLAMER_IGNITE_SPLCHANCE;
-
-int   PRIFLE_SPEED;
-
-int   LCANNON_DAMAGE;
-int   LCANNON_CHARGE_TIME_MAX;
-int   LCANNON_CHARGE_TIME_MIN;
-int   LCANNON_CHARGE_TIME_WARN;
-int   LCANNON_CHARGE_AMMO;
-
-// MUST BE ALPHABETICALLY SORTED!
-static configVar_t bg_configVars[] =
-{
-	{"u_biokit_interval", INTEGER, false, &BIOKIT_INTERVAL},
-	{"u_biokit_modifier", FLOAT, false, &BIOKIT_MODIFIER},
-	{"u_biokit_staminaRegen", INTEGER, false, &BIOKIT_STAMINA_REGEN},
-
-	{"u_medkit_poisonImmunityTime", INTEGER, false, &MEDKIT_POISON_IMMUNITY_TIME},
-	{"u_medkit_startupSpeed", INTEGER, false, &MEDKIT_STARTUP_SPEED},
-	{"u_medkit_startupTime", INTEGER, false, &MEDKIT_STARTUP_TIME},
-
-	{"w_abuild_blobSlowTime", INTEGER, false, &ABUILDER_BLOB_TIME},
-	{"w_abuild_blobSpeed", FLOAT, false, &ABUILDER_BLOB_SPEED},
-	{"w_abuild_blobSpeedMod", FLOAT, false, &ABUILDER_BLOB_SPEED_MOD},
-	{"w_abuild_clawDmg", INTEGER, false, &ABUILDER_CLAW_DMG},
-	{"w_abuild_clawRange", FLOAT, false, &ABUILDER_CLAW_RANGE},
-	{"w_abuild_clawWidth", FLOAT, false, &ABUILDER_CLAW_WIDTH},
-
-	{"w_blaster_speed", INTEGER, false, &BLASTER_SPEED },
-
-	{"w_chaingun_damage", INTEGER, false, &CHAINGUN_DMG },
-	{"w_chaingun_spread", INTEGER, false, &CHAINGUN_SPREAD },
-
-	{"w_flamer_igniteChance", FLOAT, false, &FLAMER_IGNITE_CHANCE },
-	{"w_flamer_igniteRadius", FLOAT, false, &FLAMER_IGNITE_RADIUS },
-	{"w_flamer_igniteSplChance", FLOAT, false, &FLAMER_IGNITE_SPLCHANCE },
-	{"w_flamer_lag", FLOAT, false, &FLAMER_LAG },
-	{"w_flamer_size", INTEGER, false, &FLAMER_SIZE },
-	{"w_flamer_speed", FLOAT, false, &FLAMER_SPEED },
-
-	{"w_lcannon_chargeAmmo", INTEGER, false, &LCANNON_CHARGE_AMMO },
-	{"w_lcannon_chargeTimeMax", INTEGER, false, &LCANNON_CHARGE_TIME_MAX },
-	{"w_lcannon_chargeTimeMin", INTEGER, false, &LCANNON_CHARGE_TIME_MIN },
-	{"w_lcannon_chargeTimeWarn", INTEGER, false, &LCANNON_CHARGE_TIME_WARN },
-	{"w_lcannon_damage", INTEGER, false, &LCANNON_DAMAGE },
-
-	{"w_level0_biteDmg", INTEGER, false, &LEVEL0_BITE_DMG},
-	{"w_level0_biteRange", FLOAT, false, &LEVEL0_BITE_RANGE},
-	{"w_level0_biteRepeat", INTEGER, false, &LEVEL0_BITE_REPEAT},
-	{"w_level0_biteWidth", FLOAT, false, &LEVEL0_BITE_WIDTH},
-
-	{"w_level1_clawDmg", INTEGER, false, &LEVEL1_CLAW_DMG},
-	{"w_level1_clawRange", FLOAT, false, &LEVEL1_CLAW_RANGE},
-	{"w_level1_clawWidth", FLOAT, false, &LEVEL1_CLAW_WIDTH},
-
-	{"w_level2upg_clawRange", FLOAT, false, &LEVEL2_CLAW_U_RANGE},
-	{"w_level2upg_zapChainFalloff", FLOAT, false, &LEVEL2_AREAZAP_CHAIN_FALLOFF},
-	{"w_level2upg_zapChainRange", FLOAT, false, &LEVEL2_AREAZAP_CHAIN_RANGE},
-	{"w_level2upg_zapDmg", INTEGER, false, &LEVEL2_AREAZAP_DMG},
-	{"w_level2upg_zapRange", FLOAT, false, &LEVEL2_AREAZAP_RANGE},
-	{"w_level2upg_zapTime", INTEGER, false, &LEVEL2_AREAZAP_TIME},
-	{"w_level2upg_zapWidth", FLOAT, false, &LEVEL2_AREAZAP_WIDTH},
-
-	{"w_level2_clawDmg", INTEGER, false, &LEVEL2_CLAW_DMG},
-	{"w_level2_clawRange", FLOAT, false, &LEVEL2_CLAW_RANGE},
-	{"w_level2_clawWidth", FLOAT, false, &LEVEL2_CLAW_WIDTH},
-	{"w_level2_maxWalljumpSpeed", FLOAT, false, &LEVEL2_WALLJUMP_MAXSPEED},
-
-	{"w_level3upg_ballRegen", INTEGER, false, &LEVEL3_BOUNCEBALL_REGEN},
-	{"w_level3upg_ballRegenBooster", INTEGER, false, &LEVEL3_BOUNCEBALL_REGEN_BOOSTER},
-	{"w_level3upg_ballRegenCreep", INTEGER, false, &LEVEL3_BOUNCEBALL_REGEN_CREEP},
-	{"w_level3upg_ballSpeed", FLOAT, false, &LEVEL3_BOUNCEBALL_SPEED},
-	{"w_level3upg_clawRange", FLOAT, false, &LEVEL3_CLAW_UPG_RANGE},
-	{"w_level3upg_pounceDuration", INTEGER, false, &LEVEL3_POUNCE_TIME_UPG},
-	{"w_level3upg_pounceJumpMagnitude", INTEGER, false, &LEVEL3_POUNCE_JUMP_MAG_UPG},
-	{"w_level3upg_pounceRange", FLOAT, false, &LEVEL3_POUNCE_UPG_RANGE},
-
-	{"w_level3_clawDmg", INTEGER, false, &LEVEL3_CLAW_DMG},
-	{"w_level3_clawRange", FLOAT, false, &LEVEL3_CLAW_RANGE},
-	{"w_level3_clawWidth", FLOAT, false, &LEVEL3_CLAW_WIDTH},
-	{"w_level3_pounceDmg", INTEGER, false, &LEVEL3_POUNCE_DMG},
-	{"w_level3_pounceDuration", INTEGER, false, &LEVEL3_POUNCE_TIME},
-	{"w_level3_pounceJumpMagnitude", INTEGER, false, &LEVEL3_POUNCE_JUMP_MAG},
-	{"w_level3_pounceRange", FLOAT, false, &LEVEL3_POUNCE_RANGE},
-	{"w_level3_pounceRepeat", INTEGER, false, &LEVEL3_POUNCE_REPEAT},
-	{"w_level3_pounceSpeedMod", FLOAT, false, &LEVEL3_POUNCE_SPEED_MOD},
-	{"w_level3_pounceTimeMin", INTEGER, false, &LEVEL3_POUNCE_TIME_MIN},
-	{"w_level3_pounceWidth", FLOAT, false, &LEVEL3_POUNCE_WIDTH},
-
-	{"w_level4_clawDmg", INTEGER, false, &LEVEL4_CLAW_DMG},
-	{"w_level4_clawHeight", FLOAT, false, &LEVEL4_CLAW_HEIGHT},
-	{"w_level4_clawRange", FLOAT, false, &LEVEL4_CLAW_RANGE},
-	{"w_level4_clawWidth", FLOAT, false, &LEVEL4_CLAW_WIDTH},
-	{"w_level4_trampleChargeMax", INTEGER, false, &LEVEL4_TRAMPLE_CHARGE_MAX},
-	{"w_level4_trampleChargeMin", INTEGER, false, &LEVEL4_TRAMPLE_CHARGE_MIN},
-	{"w_level4_trampleChargeTrigger", INTEGER, false, &LEVEL4_TRAMPLE_CHARGE_TRIGGER},
-	{"w_level4_trampleDmg", INTEGER, false, &LEVEL4_TRAMPLE_DMG},
-	{"w_level4_trampleDuration", INTEGER, false, &LEVEL4_TRAMPLE_DURATION},
-	{"w_level4_trampleRepeat", INTEGER, false, &LEVEL4_TRAMPLE_REPEAT},
-	{"w_level4_trampleSpeed", FLOAT, false, &LEVEL4_TRAMPLE_SPEED},
-	{"w_level4_trampleStopPenalty", INTEGER, false, &LEVEL4_TRAMPLE_STOP_PENALTY},
-
-	{"w_lgun_damage", INTEGER, false, &LASGUN_DAMAGE },
-
-	{"w_mdriver_damage", INTEGER, false, &MDRIVER_DMG },
-
-	{"w_prifle_speed", INTEGER, false, &PRIFLE_SPEED },
-
-	{"w_psaw_damage", INTEGER, false, &PAINSAW_DAMAGE },
-	{"w_psaw_height", FLOAT, false, &PAINSAW_HEIGHT },
-	{"w_psaw_range", FLOAT, false, &PAINSAW_RANGE },
-	{"w_psaw_width", FLOAT, false, &PAINSAW_WIDTH },
-
-	{"w_rifle_damage", INTEGER, false, &RIFLE_DMG },
-	{"w_rifle_spread", INTEGER, false, &RIFLE_SPREAD },
-
-	{"w_shotgun_damage", INTEGER, false, &SHOTGUN_DMG },
-	{"w_shotgun_pellets", INTEGER, false, &SHOTGUN_PELLETS },
-	{"w_shotgun_range", INTEGER, false, &SHOTGUN_RANGE },
-	{"w_shotgun_spread", INTEGER, false, &SHOTGUN_SPREAD },
-};
-
-static const size_t bg_numConfigVars = ARRAY_LEN( bg_configVars );
-
 /*
 ======================
 BG_ReadWholeFile
@@ -475,58 +234,6 @@ static trType_t ParseTrajectoryType( const char *token )
 	}
 }
 
-static int configVarComparator(const void* a, const void* b)
-{
-	const configVar_t *ca = (const configVar_t*) a;
-	const configVar_t *cb = (const configVar_t*) b;
-	return Q_stricmp(ca->name, cb->name);
-}
-
-static configVar_t* BG_FindConfigVar(const char *varName)
-{
-	return (configVar_t*) bsearch(&varName, bg_configVars, bg_numConfigVars, sizeof(configVar_t), configVarComparator);
-}
-
-static bool BG_ParseConfigVar(configVar_t *var, const char **text, const char *filename)
-{
-	const char *token = COM_Parse( text );
-
-	if( !*token )
-	{
-		Log::Warn( "%s expected argument for '%s'", filename, var->name );
-		return false;
-	}
-
-	if( var->type == INTEGER)
-	{
-		*((int*) var->var) = atoi( token );
-	}
-	else if( var->type == FLOAT)
-	{
-		*((float*) var->var) = atof( token );
-	}
-
-	var->defined = true;
-
-	return true;
-}
-
-bool BG_CheckConfigVars()
-{
-	int ok = true;
-
-	for( unsigned i = 0; i < bg_numConfigVars; i++)
-	{
-		if( !bg_configVars[i].defined )
-		{
-			ok = false;
-			Log::Warn( "config var %s was not defined", bg_configVars[i].name );
-		}
-	}
-
-	return ok;
-}
-
 /*
 ======================
 BG_ParseBuildableAttributeFile
@@ -540,7 +247,6 @@ void BG_ParseBuildableAttributeFile( const char *filename, buildableAttributes_t
 	const char *token;
 	char text_buffer[ 20000 ];
 	const char* text;
-	configVar_t* var;
 	int defined = 0;
 	enum
 	{
@@ -740,9 +446,8 @@ void BG_ParseBuildableAttributeFile( const char *filename, buildableAttributes_t
 		{
 			ba->dretchAttackable = true;
 		}
-		else if( (var = BG_FindConfigVar( va( "b_%s_%s", ba->name, token ) ) ) != nullptr )
+		else if ( BG_ParseConfigVar( va( "b_%s_%s", ba->name, token ), &text, filename ) )
 		{
-			BG_ParseConfigVar( var, &text, filename );
 		}
 		else
 		{
@@ -934,7 +639,6 @@ void BG_ParseClassAttributeFile( const char *filename, classAttributes_t *ca )
 	const char         *token = nullptr;
 	char         text_buffer[ 20000 ];
 	const char         *text;
-	configVar_t  *var;
 	int          defined = 0;
 
 	enum
@@ -1156,9 +860,8 @@ void BG_ParseClassAttributeFile( const char *filename, classAttributes_t *ca )
 			ca->unlockThreshold = atoi(token);
 			defined |= UNLOCKTHRESHOLD;
 		}
-		else if( (var = BG_FindConfigVar( va( "c_%s_%s", ca->name, token ) ) ) != nullptr )
+		else if ( BG_ParseConfigVar( va( "c_%s_%s", ca->name, token ), &text, filename ) )
 		{
-			BG_ParseConfigVar( var, &text, filename );
 		}
 		else if ( !Q_stricmp( token, "mass" ) )
 		{
@@ -1581,7 +1284,6 @@ void BG_ParseWeaponAttributeFile( const char *filename, weaponAttributes_t *wa )
 	const char *token;
 	char text_buffer[ 20000 ];
 	const char* text;
-	configVar_t* var;
 	int defined = 0;
 	enum
 	{
@@ -1739,9 +1441,8 @@ void BG_ParseWeaponAttributeFile( const char *filename, weaponAttributes_t *wa )
 			wa->unlockThreshold = atoi(token);
 			defined |= UNLOCKTHRESHOLD;
 		}
-		else if( (var = BG_FindConfigVar( va( "w_%s_%s", wa->name, token ) ) ) != nullptr )
+		else if ( BG_ParseConfigVar( va( "w_%s_%s", wa->name, token ), &text, filename ) )
 		{
-			BG_ParseConfigVar( var, &text, filename );
 		}
 		else
 		{
@@ -1775,7 +1476,6 @@ void BG_ParseUpgradeAttributeFile( const char *filename, upgradeAttributes_t *ua
 	const char *token;
 	char text_buffer[ 20000 ];
 	const char* text;
-	configVar_t* var;
 	int defined = 0;
 	enum
 	{
@@ -1873,9 +1573,8 @@ void BG_ParseUpgradeAttributeFile( const char *filename, upgradeAttributes_t *ua
 			ua->unlockThreshold = atoi(token);
 			defined |= UNLOCKTHRESHOLD;
 		}
-		else if( (var = BG_FindConfigVar( va( "u_%s_%s", ua->name, token ) ) ) != nullptr )
+		else if ( BG_ParseConfigVar( va( "u_%s_%s", ua->name, token ), &text, filename ) )
 		{
-			BG_ParseConfigVar( var, &text, filename );
 		}
 		else
 		{

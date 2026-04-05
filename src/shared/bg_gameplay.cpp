@@ -22,269 +22,469 @@ along with Unvanquished Source Code.  If not, see <http://www.gnu.org/licenses/>
 ===========================================================================
 */
 
-
 #include "common/Common.h"
 #include "bg_gameplay.h"
 
-/*
- * This file contains gameplay constants.
- *
- * Some of the values here have to be known both by cgame and sgame. Some are
- * not and are here instead of in cvars for legacy reasons. This file exists
- * because of those shared variables; see below for the rationale.
- *
- * Note fast-changing values that need to be transmitted to the client
- * typically live in playerState_t or entityState_t.
- *
- * ###
- * # Sharing a constant or near-constant value between sgame and cgame
- * ###
- *
- * A constant symbol defined here will be included in both binaries. This makes
- * the value available on both side and is a decent compromise between
- * compilation time and network usage. The values can't be modified, or the
- * change would not be transmitted to the other side.
- *
- * A value can be shared between cgame and sgame in three ways:
- * 1. Here, using a constant symbol that will be included in both VM files
- * 2. Using config files
- * 3. Using a SERVERINFO cvar
- *
- * This file has the upside of being simple, but doesn't allow runtime
- * modification, and needs a recompilation at every change.
- *
- * Config files are supposedly more practical for large scale edits, because of
- * readability. They also have a slight advantage over this file in that they
- * don't need a modder to recompile the game. This method also doesn't allow
- * runtime changes.
- * This method has downsides. The first downside is that one has to write the
- * parsing code in addition to doing what's needed for a symbol. This is a long
- * process. The second downside is that this requires you to deal with .cfg
- * file packaging.
- *
- * Cvars have the upside of allowing runtime edits. The process of adding one
- * is more complicated: after creating the cvar with the SERVERINFO, you must
- * parse it in cgame (see g_devolveMaxBaseDistance for an example).
- * Use this solution if you expect server admins to want to change this value.
- * This solution has downsides too. One is that large scale modifications are
- * pretty unpractical and one loses the ability to have proper tools such as
- * a text editor and git, or the ability to add moder-specific comments
- * explaining why the values were modified.
- */
+#include <iomanip>
+#include <limits>
+#include <locale>
+#include <sstream>
 
+#ifdef BUILD_SGAME
+#include "sgame/sg_local.h"
+#endif
 
+#define BG_GAMEPLAY_VAR(type, name, default_value, flags, alias) type name = default_value;
+#include "bg_gameplay.def"
+#undef BG_GAMEPLAY_VAR
 
-/*
- * Common constants for the build weapons for both teams.
- */
+namespace {
 
-const int   BUILDER_MAX_SHORT_DECONSTRUCT_CHARGE = 200;
-const int   BUILDER_LONG_DECONSTRUCT_CHARGE = 800;
+constexpr int GAMEPLAY_CONFIG_SCHEMA = 1;
 
-const float BUILDER_DECONSTRUCT_RANGE = 100;
+template<typename T>
+constexpr gameplayVarType_t GameplayType();
 
-/*
- * ALIEN buildables
- */
+template<>
+constexpr gameplayVarType_t GameplayType<int>()
+{
+	return GAMEPLAY_INTEGER;
+}
 
-const int   CREEP_BASESIZE = 700;
-const int   CREEP_TIMEOUT = 1000;
-const float CREEP_MODIFIER = 0.5f;
-const float CREEP_ARMOUR_MODIFIER = 0.75f;
-const int   CREEP_SCALEDOWN_TIME = 3000;
+template<>
+constexpr gameplayVarType_t GameplayType<float>()
+{
+	return GAMEPLAY_FLOAT;
+}
 
-const float BARRICADE_SHRINKPROP = 0.25f;
-const int   BARRICADE_SHRINKTIMEOUT = 500;
+struct gameplayVarState_t
+{
+	gameplayVarInfo_t info;
+	gameplayValue_t baseline;
+	gameplayValue_t overrideValue;
+	bool overridePresent;
+	bool configDefined;
+};
 
-const int   BOOST_TIME = 20000;
-const int   BOOST_WARN_TIME = 15000;
-const int   BOOST_REPEAT_ANIM = 2000;
+gameplayVarState_t gameplayVars[] =
+{
+#define BG_GAMEPLAY_VAR(type, name, default_value, flags, alias) \
+	{ { #name, alias, GameplayType<type>(), flags, &name }, {}, {}, false, alias == nullptr },
+#include "bg_gameplay.def"
+#undef BG_GAMEPLAY_VAR
+};
 
-const float ACIDTUBE_RANGE = 300.0f;
+constexpr size_t numGameplayVars = ARRAY_LEN( gameplayVars );
 
-const float SPIKER_SENSE_RANGE = 250.0f;
+void SetError( std::string* error, Str::StringRef message )
+{
+	if ( error )
+	{
+		*error = message;
+	}
+}
 
-const float TRAPPER_RANGE = 400.0f;
+float CanonicalizeFloat( float value )
+{
+	std::ostringstream stream;
+	stream.imbue( std::locale::classic() );
+	stream << std::setprecision( std::numeric_limits<float>::max_digits10 ) << value;
 
-const float HIVE_SENSE_RANGE = 500.0f;
-const float HIVE_SPEED = 320.0f;
+	std::istringstream parse( stream.str() );
+	parse.imbue( std::locale::classic() );
 
-const int   LOCKBLOB_REPEAT = 1000;
-const float LOCKBLOB_RANGE = 400.0f;
-const float LOCKBLOB_SPEED = 500.0f;
-const int   LOCKBLOB_LOCKTIME = 5000;
-const float LOCKBLOB_DOT = 0.85f;
+	float canonical = value;
+	if ( !( parse >> canonical ) )
+	{
+		Sys::Drop( "failed to canonicalize gameplay float" );
+	}
 
-/*
- * ALIEN misc
- */
+	return canonical;
+}
 
-const float ALIENSENSE_RANGE = 1500.0f;
-const float ALIENSENSE_BORDER_FRAC = 0.2f;
+gameplayValue_t ReadCurrentValue( const gameplayVarState_t& state )
+{
+	gameplayValue_t value{};
+	if ( state.info.type == GAMEPLAY_INTEGER )
+	{
+		value.integer = *static_cast<int*>( state.info.storage );
+	}
+	else
+	{
+		value.number = *static_cast<float*>( state.info.storage );
+	}
+	return value;
+}
 
-const float REGEN_BOOSTER_RANGE = 200.0f;
-const float REGEN_TEAMMATE_RANGE = 300.0f;
+void WriteCurrentValue( gameplayVarState_t& state, gameplayValue_t value )
+{
+	if ( state.info.type == GAMEPLAY_INTEGER )
+	{
+		*static_cast<int*>( state.info.storage ) = value.integer;
+	}
+	else
+	{
+		*static_cast<float*>( state.info.storage ) = value.number;
+	}
+}
 
-const int   ALIEN_SPAWN_REPEAT_TIME = 10000;
+bool ValuesEqual( const gameplayVarState_t& state, gameplayValue_t lhs, gameplayValue_t rhs )
+{
+	if ( state.info.type == GAMEPLAY_INTEGER )
+	{
+		return lhs.integer == rhs.integer;
+	}
+	return lhs.number == rhs.number;
+}
 
-const int   ALIEN_CLIENT_REGEN_WAIT = 2000;
-const int   ALIEN_BUILDABLE_REGEN_WAIT = 2000;
+void RecomputeDerivedValues()
+{
+	AVG_FALL_DISTANCE = static_cast<int>( ( MIN_FALL_DISTANCE + MAX_FALL_DISTANCE ) / 2.0f );
+	JETPACK_FUEL_IGNITE = JETPACK_FUEL_MAX / 20.0f;
+	JETPACK_FUEL_LOW = JETPACK_FUEL_MAX / 5.0f;
+	JETPACK_FUEL_STOP = JETPACK_FUEL_RESTORE * 150.0f;
+	JETPACK_FUEL_REFUEL = JETPACK_FUEL_MAX - JETPACK_FUEL_USAGE * 1000.0f;
+}
 
-const float ALIEN_REGEN_NOCREEP_MIN = 0.5f;
+bool ParseGameplayValue( const gameplayVarState_t& state, const char* token, gameplayValue_t& value )
+{
+	if ( state.info.type == GAMEPLAY_INTEGER )
+	{
+		value.integer = atoi( token );
+		return true;
+	}
 
-const int   ALIEN_MAX_CREDITS = 2000;
-const int   ALIEN_TK_SUICIDE_PENALTY = 150;
+	value.number = atof( token );
+	return true;
+}
 
-const int   LEVEL1_POUNCE_DISTANCE = 300;
-const float LEVEL1_POUNCE_MINPITCH = M_PI / 12.0f;
-const int   LEVEL1_POUNCE_COOLDOWN = 2000;
-const int   LEVEL1_WALLPOUNCE_MAGNITUDE = 600;
-const int   LEVEL1_WALLPOUNCE_COOLDOWN = 1200;
-const int   LEVEL1_SIDEPOUNCE_MAGNITUDE = 400;
-const float LEVEL1_SIDEPOUNCE_DIR_Z = 0.4f;
-const int   LEVEL1_SIDEPOUNCE_COOLDOWN = 750;
-const int   LEVEL1_SLOW_TIME = 1000;
-const float LEVEL1_SLOW_MOD = 0.75f;
+void RefreshOverrideState( gameplayVarState_t& state )
+{
+	if ( state.info.flags & GAMEPLAY_DERIVED )
+	{
+		state.overridePresent = false;
+		return;
+	}
 
-/*
- * HUMAN weapons
- */
+	gameplayValue_t current = ReadCurrentValue( state );
+	if ( ValuesEqual( state, current, state.baseline ) )
+	{
+		state.overridePresent = false;
+		return;
+	}
 
-const float FLAMER_DAMAGE_MAXDST_MOD = 0.5f;
-const float FLAMER_SPLASH_MINDST_MOD = 0.5f;
-const float FLAMER_LEAVE_FIRE_CHANCE = 0.2f;
+	state.overrideValue = current;
+	state.overridePresent = true;
+}
 
-const int   PRIFLE_DAMAGE_FULL_TIME = 0;
-const int   PRIFLE_DAMAGE_HALF_LIFE = 0;
+}  // namespace
 
-const int   LCANNON_DAMAGE_FULL_TIME = 0;
-const int   LCANNON_DAMAGE_HALF_LIFE = 0;
+size_t BG_NumGameplayVars()
+{
+	return numGameplayVars;
+}
 
-const int   HBUILD_HEALRATE = 10;
+const gameplayVarInfo_t* BG_GameplayVar( size_t index )
+{
+	return index < numGameplayVars ? &gameplayVars[ index ].info : nullptr;
+}
 
-const float UNSTABILIZED_CHAINGUN_JITTER_SCALE = 1.36363636;
-const float UNSTABILIZED_CHAINGUN_JITTER_PITCH_BIAS = -0.681818182;
-const float STABILIZED_CHAINGUN_JITTER_SCALE = 0.0852272727;
-const float STABILIZED_CHAINGUN_JITTER_PITCH_BIAS = -0.0426136364;
+int BG_FindGameplayVarByName( const char* name )
+{
+	for ( size_t i = 0; i < numGameplayVars; ++i )
+	{
+		if ( !Q_stricmp( gameplayVars[ i ].info.name, name ) )
+		{
+			return i;
+		}
+	}
 
-/*
- * HUMAN upgrades
- */
+	return -1;
+}
 
-const float RADAR_RANGE = 1000.0f;
+bool BG_CheckConfigVars()
+{
+	bool ok = true;
 
-/*
- * HUMAN buildables
- */
+	for ( gameplayVarState_t& state : gameplayVars )
+	{
+		if ( state.info.alias && !state.configDefined )
+		{
+			ok = false;
+			Log::Warn( "config var %s was not defined", state.info.alias );
+		}
+	}
 
-const int   MGTURRET_ATTACK_PERIOD = 125;
-const float MGTURRET_RANGE = 350;
-const int   MGTURRET_SPREAD = 200;
+	return ok;
+}
 
-const float ROCKETPOD_RANGE = 1300;
-const int   ROCKETPOD_ATTACK_PERIOD = 1000;
+void BG_ResetGameplayToDefaults()
+{
+#define BG_GAMEPLAY_VAR(type, name, default_value, flags, alias) name = default_value;
+#include "bg_gameplay.def"
+#undef BG_GAMEPLAY_VAR
 
-const float ROCKET_TURN_ANGLE = 8.0f;
+	for ( gameplayVarState_t& state : gameplayVars )
+	{
+		state.overridePresent = false;
+		state.configDefined = state.info.alias == nullptr;
+	}
 
-/*
- * HUMAN misc
- */
+	RecomputeDerivedValues();
+}
 
-const float HUMAN_JOG_MODIFIER = 1.0f;
-const float HUMAN_BACK_MODIFIER = 0.8f;
-const float HUMAN_SIDE_MODIFIER = 0.9f;
-const float HUMAN_SLIDE_FRICTION_MODIFIER = 0.05f;
-const float HUMAN_SLIDE_THRESHOLD = 400.0f;
+void BG_CommitGameplayBaseline()
+{
+	RecomputeDerivedValues();
 
-const int   STAMINA_MAX = 30000;
-const int   STAMINA_MEDISTAT_RESTORE = 450;
-const int   STAMINA_LEVEL1SLOW_TAKE = 6;
+	for ( gameplayVarState_t& state : gameplayVars )
+	{
+		state.baseline = ReadCurrentValue( state );
+		state.overridePresent = false;
+	}
+}
 
-const int   HUMAN_SPAWN_REPEAT_TIME = 10000;
+bool BG_ParseConfigVar( const char* varName, const char** text, const char* filename )
+{
+	for ( gameplayVarState_t& state : gameplayVars )
+	{
+		if ( state.info.alias && !Q_stricmp( state.info.alias, varName ) )
+		{
+			const char* token = COM_Parse( text );
+			if ( !*token )
+			{
+				Log::Warn( "%s expected argument for '%s'", filename, varName );
+				return false;
+			}
 
-const int   HUMAN_BUILDABLE_REGEN_WAIT = 5000;
+			gameplayValue_t value{};
+			ParseGameplayValue( state, token, value );
+			WriteCurrentValue( state, value );
+			state.configDefined = true;
+			return true;
+		}
+	}
 
-const int   HUMAN_MAX_CREDITS = 2000;
-const int   HUMAN_TK_SUICIDE_PENALTY = 150;
+	return false;
+}
 
-const int   HUMAN_AMMO_REFILL_PERIOD = 2000;
+bool BG_SetGameplayInt( size_t index, int value, bool updateOverride, std::string* error )
+{
+	if ( index >= numGameplayVars )
+	{
+		SetError( error, "invalid gameplay variable index" );
+		return false;
+	}
 
-const float JETPACK_TARGETSPEED = 350.0f;
-const float JETPACK_ACCELERATION = 3.0f;
-const float JETPACK_JUMPMAG_REDUCTION = 0.25f;
-const int   JETPACK_FUEL_MAX = 30000;
-const int   JETPACK_FUEL_USAGE = 6;
-const int   JETPACK_FUEL_PER_DMG = 300;
-const int   JETPACK_FUEL_RESTORE = 3;
-const float JETPACK_FUEL_IGNITE = JETPACK_FUEL_MAX / 20;
-const float JETPACK_FUEL_LOW = JETPACK_FUEL_MAX / 5;
-const float JETPACK_FUEL_STOP = JETPACK_FUEL_RESTORE * 150;
-const float JETPACK_FUEL_REFUEL = JETPACK_FUEL_MAX - JETPACK_FUEL_USAGE * 1000;
+	gameplayVarState_t& state = gameplayVars[ index ];
+	if ( state.info.type != GAMEPLAY_INTEGER )
+	{
+		SetError( error, "gameplay variable expects a float" );
+		return false;
+	}
 
-/*
- * Misc
- */
+	if ( state.info.flags & GAMEPLAY_DERIVED )
+	{
+		SetError( error, "gameplay variable is derived and read-only" );
+		return false;
+	}
 
-const float ENTITY_USE_RANGE = 128.0f;
+	gameplayValue_t gameplayValue{};
+	gameplayValue.integer = value;
+	WriteCurrentValue( state, gameplayValue );
+	RecomputeDerivedValues();
+	if ( updateOverride )
+	{
+		RefreshOverrideState( state );
+	}
+	return true;
+}
 
-// fire
-const float FIRE_MIN_DISTANCE = 20.0f;
-const float FIRE_DAMAGE_RADIUS = 60.0f;
+bool BG_SetGameplayFloat( size_t index, float value, bool updateOverride, std::string* error )
+{
+	if ( index >= numGameplayVars )
+	{
+		SetError( error, "invalid gameplay variable index" );
+		return false;
+	}
 
-// fall distance
-const float MIN_FALL_DISTANCE = 30.0f;
-const float MAX_FALL_DISTANCE = 120.0f;
-const int   AVG_FALL_DISTANCE = (MIN_FALL_DISTANCE + MAX_FALL_DISTANCE ) / 2.0f;
+	gameplayVarState_t& state = gameplayVars[ index ];
+	if ( state.info.type != GAMEPLAY_FLOAT )
+	{
+		SetError( error, "gameplay variable expects an integer" );
+		return false;
+	}
 
-// impact and weight damage
-const float IMPACTDMG_JOULE_TO_DAMAGE = 0.002f;
-const float WEIGHTDMG_DMG_MODIFIER = 0.25f;
-const int   WEIGHTDMG_DPS_THRESHOLD = 10;
-const int   WEIGHTDMG_REPEAT = 200;
+	if ( state.info.flags & GAMEPLAY_DERIVED )
+	{
+		SetError( error, "gameplay variable is derived and read-only" );
+		return false;
+	}
 
-// buildable explosion
-const int   HUMAN_DETONATION_DELAY = 4000;
-const float DETONATION_DELAY_RAND_RANGE = 0.25f;
+	gameplayValue_t gameplayValue{};
+	gameplayValue.number = CanonicalizeFloat( value );
+	WriteCurrentValue( state, gameplayValue );
+	RecomputeDerivedValues();
+	if ( updateOverride )
+	{
+		RefreshOverrideState( state );
+	}
+	return true;
+}
 
-// buildable limits
-const float HUMAN_BUILDDELAY_MOD = 0.6f;
-const float ALIEN_BUILDDELAY_MOD = 0.6f;
+bool BG_ResetGameplayValue( size_t index, bool updateOverride, std::string* error )
+{
+	if ( index >= numGameplayVars )
+	{
+		SetError( error, "invalid gameplay variable index" );
+		return false;
+	}
 
-// base attack warnings
-const int   ATTACKWARN_PRIMARY_PERIOD = 7500;
-const int   ATTACKWARN_NEARBY_PERIOD = 15000;
+	gameplayVarState_t& state = gameplayVars[ index ];
+	if ( state.info.flags & GAMEPLAY_DERIVED )
+	{
+		SetError( error, "gameplay variable is derived and read-only" );
+		return false;
+	}
 
-// score
-const float SCORE_PER_CREDIT = 0.02f;
-const float SCORE_PER_MOMENTUM = 1.0f;
-const int   HUMAN_BUILDER_SCOREINC = 50;
-const int   ALIEN_BUILDER_SCOREINC = 50;
+	WriteCurrentValue( state, state.baseline );
+	RecomputeDerivedValues();
+	if ( updateOverride )
+	{
+		state.overridePresent = false;
+	}
+	return true;
+}
 
-// funds (values are in credits, 1 evo = 100 credits)
-const int   CREDITS_PER_EVO = 100;
-const int   PLAYER_BASE_VALUE = 200;
-const float PLAYER_PRICE_TO_VALUE = 0.5f;
-const int   DEFAULT_FREEKILL_PERIOD = 120;
+void BG_ResetGameplayOverrides()
+{
+	for ( gameplayVarState_t& state : gameplayVars )
+	{
+		WriteCurrentValue( state, state.baseline );
+		state.overridePresent = false;
+	}
+	RecomputeDerivedValues();
+}
 
-// resources
-const float RGS_RANGE = 1000.0f;
-const int   DEFAULT_BP_INITIAL_BUDGET = 80;
-const int   DEFAULT_BP_BUDGET_PER_MINER = 50;
-const int   DEFAULT_BP_RECOVERY_INITIAL_RATE = 16;
-const int   DEFAULT_BP_RECOVERY_RATE_HALF_LIFE = 10;
+std::string BG_BuildGameplayConfig()
+{
+	std::ostringstream config;
+	config.imbue( std::locale::classic() );
+	config << std::setprecision( std::numeric_limits<float>::max_digits10 );
 
-// momentum
-const float MOMENTUM_MAX = 300.0f;
-const float MOMENTUM_PER_CREDIT = 0.01f;
-const int   DEFAULT_MOMENTUM_HALF_LIFE = 5;
-const int   DEFAULT_CONF_REWARD_DOUBLE_TIME = 30;
-const int   DEFAULT_UNLOCKABLE_MIN_TIME = 30;
-const float DEFAULT_MOMENTUM_BASE_MOD = 0.7f;
-const float DEFAULT_MOMENTUM_KILL_MOD = 1.3f;
-const float DEFAULT_MOMENTUM_BUILD_MOD = 0.6f;
-const float DEFAULT_MOMENTUM_DECON_MOD = 1.0f;
-const float DEFAULT_MOMENTUM_DESTROY_MOD = 0.8f;
-const int   MAIN_STRUCTURE_MOMENTUM_VALUE = 20;
-const int   MINER_MOMENTUM_VALUE = 10;
+	size_t overrideCount = 0;
+	for ( const gameplayVarState_t& state : gameplayVars )
+	{
+		if ( state.overridePresent )
+		{
+			overrideCount++;
+		}
+	}
 
-const float BUILDABLE_START_HEALTH_FRAC = 0.25f;
+	config << GAMEPLAY_CONFIG_SCHEMA << ' ' << numGameplayVars << ' ' << overrideCount;
+
+	for ( size_t i = 0; i < numGameplayVars; ++i )
+	{
+		const gameplayVarState_t& state = gameplayVars[ i ];
+		if ( !state.overridePresent )
+		{
+			continue;
+		}
+
+		config << ' ' << i << ' ';
+		if ( state.info.type == GAMEPLAY_INTEGER )
+		{
+			config << state.overrideValue.integer;
+		}
+		else
+		{
+			config << state.overrideValue.number;
+		}
+	}
+
+	return config.str();
+}
+
+bool BG_ApplyGameplayConfig( const char* config, std::string* error )
+{
+	BG_ResetGameplayOverrides();
+
+	if ( !config || !*config )
+	{
+		return true;
+	}
+
+	std::istringstream stream( config );
+	stream.imbue( std::locale::classic() );
+	int schema = 0;
+	size_t fieldCount = 0;
+	size_t overrideCount = 0;
+
+	if ( !( stream >> schema >> fieldCount >> overrideCount ) )
+	{
+		SetError( error, "malformed gameplay config" );
+		return false;
+	}
+
+	if ( schema != GAMEPLAY_CONFIG_SCHEMA )
+	{
+		SetError( error, "unsupported gameplay config schema" );
+		return false;
+	}
+
+	if ( fieldCount != numGameplayVars )
+	{
+		SetError( error, "gameplay config field count mismatch" );
+		return false;
+	}
+
+	for ( size_t i = 0; i < overrideCount; ++i )
+	{
+		size_t index = 0;
+		if ( !( stream >> index ) || index >= numGameplayVars )
+		{
+			SetError( error, "invalid gameplay config index" );
+			return false;
+		}
+
+		gameplayVarState_t& state = gameplayVars[ index ];
+		gameplayValue_t value{};
+
+		if ( state.info.type == GAMEPLAY_INTEGER )
+		{
+			if ( !( stream >> value.integer ) )
+			{
+				SetError( error, "malformed gameplay integer override" );
+				return false;
+			}
+		}
+		else
+		{
+			if ( !( stream >> value.number ) )
+			{
+				SetError( error, "malformed gameplay float override" );
+				return false;
+			}
+		}
+
+		WriteCurrentValue( state, value );
+		state.overrideValue = value;
+		state.overridePresent = true;
+	}
+
+	RecomputeDerivedValues();
+	return true;
+}
+
+#ifdef BUILD_SGAME
+void BG_PublishGameplayConfig()
+{
+	const std::string config = BG_BuildGameplayConfig();
+	if ( config.size() >= BIG_INFO_STRING )
+	{
+		Sys::Drop( "gameplay config too large to publish (%zu bytes, max %zu)",
+		           config.size(), BIG_INFO_STRING - 1 );
+	}
+	trap_SetConfigstring( CS_GAMEPLAY, config.c_str() );
+}
+#endif
