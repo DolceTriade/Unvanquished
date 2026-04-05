@@ -3744,7 +3744,7 @@ static void PM_Weapon()
 	}
 
 	// Charging up a Lucifer Cannon
-	pm->ps->eFlags &= ~EF_WARN_CHARGE;
+	pm->ps->eFlags &= ~( EF_WARN_CHARGE | EF_LCANNON_CHARGING );
 
 	if ( pm->ps->weapon == WP_LUCIFER_CANNON )
 	{
@@ -3765,6 +3765,11 @@ static void PM_Weapon()
 				pm->ps->weaponCharge = pm->ps->ammo * LCANNON_CHARGE_TIME_MAX /
 				                             LCANNON_CHARGE_AMMO;
 			}
+		}
+
+		if ( pm->ps->weaponCharge > 0 )
+		{
+			pm->ps->eFlags |= EF_LCANNON_CHARGING;
 		}
 
 		// Set overcharging flag so other players can hear the warning beep
