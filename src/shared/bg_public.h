@@ -550,6 +550,8 @@ enum persEnum_t
 #define EF_MOVER_STOP       BIT(18) // will push otherwise
 #define EF_CONNECTION       BIT(19) // draw a connection trouble sprite
 
+// overlaps with EF_BC_BASE_OUTPOST!
+#define EF_LCANNON_CHARGING BIT(20) // Lucifer Cannon primary is charging
 // overlaps with EF_BC_DYING!
 #define EF_TYPING           BIT(21) // player is writing a message
 
