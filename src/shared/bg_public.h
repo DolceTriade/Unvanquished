@@ -259,6 +259,8 @@ enum
   CS_BP_VAMPIRE,
   CS_GAMEPLAY_CVARS,
   CS_CLIENTS_READY,
+  CS_GAMEPLAY,
+  CS_ATTRIBUTES,
 
   // Everything before CS_PLAYERS gets a CG_ConfigStringModified(n) event generated in CG_Init
 

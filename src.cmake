@@ -64,6 +64,8 @@ set(TINYGETTEXTLIST
 
 set(GAMESHAREDLIST
     ${GAMELOGIC_DIR}/shared/bg_alloc.cpp
+    ${GAMELOGIC_DIR}/shared/bg_attributes.h
+    ${GAMELOGIC_DIR}/shared/bg_attributes.cpp
     ${GAMELOGIC_DIR}/shared/bg_gameplay.h
     ${GAMELOGIC_DIR}/shared/bg_gameplay.cpp
     ${GAMELOGIC_DIR}/shared/bg_lua.h
@@ -90,6 +92,8 @@ set(GAMESHAREDLIST
     ${GAMELOGIC_DIR}/shared/lua/Utils.cpp
     ${GAMELOGIC_DIR}/shared/lua/LuaLib.h
     ${GAMELOGIC_DIR}/shared/lua/LuaLib.inl
+    ${GAMELOGIC_DIR}/shared/lua/Gameplay.h
+    ${GAMELOGIC_DIR}/shared/lua/Gameplay.cpp
     ${GAMELOGIC_DIR}/shared/lua/Weapons.h
     ${GAMELOGIC_DIR}/shared/lua/Weapons.cpp
     ${GAMELOGIC_DIR}/shared/lua/Buildables.h
@@ -98,6 +102,10 @@ set(GAMESHAREDLIST
     ${GAMELOGIC_DIR}/shared/lua/Classes.cpp
     ${GAMELOGIC_DIR}/shared/lua/Upgrades.h
     ${GAMELOGIC_DIR}/shared/lua/Upgrades.cpp
+    ${GAMELOGIC_DIR}/shared/lua/Missiles.h
+    ${GAMELOGIC_DIR}/shared/lua/Missiles.cpp
+    ${GAMELOGIC_DIR}/shared/lua/Beacons.h
+    ${GAMELOGIC_DIR}/shared/lua/Beacons.cpp
     ${GAMELOGIC_DIR}/shared/lua/Timer.cpp
     ${GAMELOGIC_DIR}/shared/lua/Cmd.cpp
     ${GAMELOGIC_DIR}/shared/lua/Cvar.cpp

@@ -33,6 +33,7 @@ Maryland 20850 USA.
 */
 #include "common/Common.h"
 #include "shared/lua/Weapons.h"
+#include "shared/bg_attributes.h"
 #include "shared/lua/Utils.h"
 
 namespace Shared {
@@ -40,7 +41,49 @@ namespace Lua {
 
 #define GETTER(name) { #name, Get##name }
 
+namespace {
+
+#define ATTR_INT(struct_type, lua_name, member) { { lua_name, BG_ATTR_INTEGER }, offsetof( struct_type, member ) }
+#define ATTR_FLOAT(struct_type, lua_name, member) { { lua_name, BG_ATTR_FLOAT }, offsetof( struct_type, member ) }
+#define ATTR_BOOL(struct_type, lua_name, member) { { lua_name, BG_ATTR_BOOL }, offsetof( struct_type, member ) }
+
+const bgAttributeTrackedField_t weaponAttributeFields[] =
+{
+	ATTR_INT( weaponAttributes_t, "price", price ),
+	ATTR_INT( weaponAttributes_t, "unlock_threshold", unlockThreshold ),
+	ATTR_INT( weaponAttributes_t, "slots", slots ),
+	ATTR_INT( weaponAttributes_t, "ammo", maxAmmo ),
+	ATTR_INT( weaponAttributes_t, "clips", maxClips ),
+	ATTR_BOOL( weaponAttributes_t, "infinite_ammo", infiniteAmmo ),
+	ATTR_BOOL( weaponAttributes_t, "energy", usesEnergy ),
+	ATTR_INT( weaponAttributes_t, "repeat_rate1", repeatRate1 ),
+	ATTR_INT( weaponAttributes_t, "repeat_rate2", repeatRate2 ),
+	ATTR_INT( weaponAttributes_t, "repeat_rate3", repeatRate3 ),
+	ATTR_INT( weaponAttributes_t, "reload_time", reloadTime ),
+	ATTR_BOOL( weaponAttributes_t, "alt_mode", hasAltMode ),
+	ATTR_BOOL( weaponAttributes_t, "zoom", canZoom ),
+	ATTR_BOOL( weaponAttributes_t, "purchasable", purchasable ),
+	ATTR_BOOL( weaponAttributes_t, "long_ranged", longRanged ),
+};
+
+#undef ATTR_INT
+#undef ATTR_FLOAT
+#undef ATTR_BOOL
+
+} // namespace
+
+const bgAttributeTrackedField_t* WeaponAttributeFields()
+{
+	return weaponAttributeFields;
+}
+
+size_t NumWeaponAttributeFields()
+{
+	return ARRAY_LEN( weaponAttributeFields );
+}
+
 WeaponProxy::WeaponProxy( int weapon ) :
+	weapon( weapon ),
 	attributes( BG_Weapon( weapon ) ) {}
 
 #define GET_FUNC( var, type ) \
@@ -78,10 +121,50 @@ GET_FUNC( purchasable, boolean )
 GET_FUNC2( long_ranged, proxy->attributes->longRanged, boolean )
 GET_FUNC2( team, BG_TeamName( proxy->attributes->team ), string )
 
+#define SET_INT(name, field_name) \
+static int Set##name( lua_State* L ) \
+{ \
+	WeaponProxy* proxy = LuaLib<WeaponProxy>::check( L, 1 ); \
+	return proxy ? SetAttributeInt( L, BG_ATTR_WEAPON, proxy->weapon - 1, "weapon", field_name ) : 0; \
+}
+
+#define SET_BOOL(name, field_name) \
+static int Set##name( lua_State* L ) \
+{ \
+	WeaponProxy* proxy = LuaLib<WeaponProxy>::check( L, 1 ); \
+	return proxy ? SetAttributeBool( L, BG_ATTR_WEAPON, proxy->weapon - 1, "weapon", field_name ) : 0; \
+}
+
+SET_INT(price, "price")
+SET_INT(unlock_threshold, "unlock_threshold")
+SET_INT(slots, "slots")
+SET_INT(ammo, "ammo")
+SET_INT(clips, "clips")
+SET_INT(repeat_rate1, "repeat_rate1")
+SET_INT(repeat_rate2, "repeat_rate2")
+SET_INT(repeat_rate3, "repeat_rate3")
+SET_INT(reload_time, "reload_time")
+SET_BOOL(infinite_ammo, "infinite_ammo")
+SET_BOOL(energy, "energy")
+SET_BOOL(alt_mode, "alt_mode")
+SET_BOOL(zoom, "zoom")
+SET_BOOL(purchasable, "purchasable")
+SET_BOOL(long_ranged, "long_ranged")
+
+#undef SET_INT
+#undef SET_BOOL
+
+static int Methodreset( lua_State* L, WeaponProxy* proxy )
+{
+	const char* fieldName = luaL_checkstring( L, 1 );
+	return ResetAttribute( L, BG_ATTR_WEAPON, proxy->weapon - 1, "weapon", fieldName );
+}
+
 template<> void ExtraInit<WeaponProxy>( lua_State* /*L*/, int /*metatable_index*/ ) {}
 
 RegType<WeaponProxy> WeaponProxyMethods[] =
 {
+	{ "reset", Methodreset },
 	{ nullptr, nullptr },
 };
 
@@ -111,6 +194,21 @@ luaL_Reg WeaponProxyGetters[] =
 
 luaL_Reg WeaponProxySetters[] =
 {
+	{ "price", Setprice },
+	{ "unlock_threshold", Setunlock_threshold },
+	{ "slots", Setslots },
+	{ "ammo", Setammo },
+	{ "clips", Setclips },
+	{ "infinite_ammo", Setinfinite_ammo },
+	{ "energy", Setenergy },
+	{ "repeat_rate1", Setrepeat_rate1 },
+	{ "repeat_rate2", Setrepeat_rate2 },
+	{ "repeat_rate3", Setrepeat_rate3 },
+	{ "reload_time", Setreload_time },
+	{ "alt_mode", Setalt_mode },
+	{ "zoom", Setzoom },
+	{ "purchasable", Setpurchasable },
+	{ "long_ranged", Setlong_ranged },
 	{ nullptr, nullptr },
 };
 
@@ -126,6 +224,29 @@ int Weapons::index( lua_State* L )
 		return 1;
 	}
 	return 0;
+}
+
+int Weapons::reset( lua_State* L, Weapons* /*self*/ )
+{
+	const char* weaponName = luaL_checkstring( L, 1 );
+	const char* fieldName = luaL_checkstring( L, 2 );
+	int objectIndex = BG_FindAttributeObject( BG_ATTR_WEAPON, weaponName );
+	int field = BG_FindAttributeField( BG_ATTR_WEAPON, fieldName );
+	if ( objectIndex < 0 )
+	{
+		return luaL_error( L, "unknown weapon '%s'", weaponName );
+	}
+	if ( field < 0 )
+	{
+		return luaL_error( L, "unknown weapon field '%s'", fieldName );
+	}
+
+	return ResetAttribute( L, BG_ATTR_WEAPON, objectIndex, "weapon", fieldName );
+}
+
+int Weapons::reset_all( lua_State* L, Weapons* /*self*/ )
+{
+	return ResetAttributeFamily( L, BG_ATTR_WEAPON, "weapon" );
 }
 
 int Weapons::pairs( lua_State* L )
@@ -159,6 +280,8 @@ template<> void ExtraInit<Weapons>( lua_State* L, int metatable_index )
 
 RegType<Weapons> WeaponsMethods[] =
 {
+	{ "reset", Weapons::reset },
+	{ "reset_all", Weapons::reset_all },
 	{ nullptr, nullptr },
 };
 

@@ -33,15 +33,47 @@ Maryland 20850 USA.
 */
 
 #include "shared/lua/Upgrades.h"
+#include "shared/bg_attributes.h"
 #include "shared/lua/Utils.h"
 
 namespace Shared {
 namespace Lua {
 
-
 #define GETTER(name) { #name, Get##name }
 
+namespace {
+
+#define ATTR_INT(struct_type, lua_name, member) { { lua_name, BG_ATTR_INTEGER }, offsetof( struct_type, member ) }
+#define ATTR_FLOAT(struct_type, lua_name, member) { { lua_name, BG_ATTR_FLOAT }, offsetof( struct_type, member ) }
+#define ATTR_BOOL(struct_type, lua_name, member) { { lua_name, BG_ATTR_BOOL }, offsetof( struct_type, member ) }
+
+const bgAttributeTrackedField_t upgradeAttributeFields[] =
+{
+	ATTR_INT( upgradeAttributes_t, "price", price ),
+	ATTR_INT( upgradeAttributes_t, "unlock_threshold", unlockThreshold ),
+	ATTR_INT( upgradeAttributes_t, "slots", slots ),
+	ATTR_BOOL( upgradeAttributes_t, "purchasable", purchasable ),
+	ATTR_BOOL( upgradeAttributes_t, "usable", usable ),
+};
+
+#undef ATTR_INT
+#undef ATTR_FLOAT
+#undef ATTR_BOOL
+
+} // namespace
+
+const bgAttributeTrackedField_t* UpgradeAttributeFields()
+{
+	return upgradeAttributeFields;
+}
+
+size_t NumUpgradeAttributeFields()
+{
+	return ARRAY_LEN( upgradeAttributeFields );
+}
+
 UpgradeProxy::UpgradeProxy( int upgrade ) :
+	upgrade( upgrade ),
 	attributes( BG_Upgrade( upgrade ) ) {}
 
 #define GET_FUNC( var, type ) \
@@ -70,10 +102,40 @@ GET_FUNC( purchasable, boolean )
 GET_FUNC( usable, boolean )
 GET_FUNC2( team, BG_TeamName( proxy->attributes->team ), string )
 
+#define SET_INT(name, field_name) \
+static int Set##name( lua_State* L ) \
+{ \
+	UpgradeProxy* proxy = LuaLib<UpgradeProxy>::check( L, 1 ); \
+	return proxy ? SetAttributeInt( L, BG_ATTR_UPGRADE, proxy->upgrade - 1, "upgrade", field_name ) : 0; \
+}
+
+#define SET_BOOL(name, field_name) \
+static int Set##name( lua_State* L ) \
+{ \
+	UpgradeProxy* proxy = LuaLib<UpgradeProxy>::check( L, 1 ); \
+	return proxy ? SetAttributeBool( L, BG_ATTR_UPGRADE, proxy->upgrade - 1, "upgrade", field_name ) : 0; \
+}
+
+SET_INT(price, "price")
+SET_INT(unlock_threshold, "unlock_threshold")
+SET_INT(slots, "slots")
+SET_BOOL(purchasable, "purchasable")
+SET_BOOL(usable, "usable")
+
+#undef SET_INT
+#undef SET_BOOL
+
+static int Methodreset( lua_State* L, UpgradeProxy* proxy )
+{
+	const char* fieldName = luaL_checkstring( L, 1 );
+	return ResetAttribute( L, BG_ATTR_UPGRADE, proxy->upgrade - 1, "upgrade", fieldName );
+}
+
 template<> void ExtraInit<UpgradeProxy>( lua_State* /*L*/, int /*metatable_index*/ ) {}
 
 RegType<UpgradeProxy> UpgradeProxyMethods[] =
 {
+	{ "reset", Methodreset },
 	{ nullptr, nullptr },
 };
 
@@ -94,6 +156,11 @@ luaL_Reg UpgradeProxyGetters[] =
 
 luaL_Reg UpgradeProxySetters[] =
 {
+	{ "price", Setprice },
+	{ "unlock_threshold", Setunlock_threshold },
+	{ "slots", Setslots },
+	{ "purchasable", Setpurchasable },
+	{ "usable", Setusable },
 	{ nullptr, nullptr },
 };
 
@@ -109,6 +176,29 @@ int Upgrades::index( lua_State* L )
 		return 1;
 	}
 	return 0;
+}
+
+int Upgrades::reset( lua_State* L, Upgrades* /*self*/ )
+{
+	const char* upgradeName = luaL_checkstring( L, 1 );
+	const char* fieldName = luaL_checkstring( L, 2 );
+	int objectIndex = BG_FindAttributeObject( BG_ATTR_UPGRADE, upgradeName );
+	int field = BG_FindAttributeField( BG_ATTR_UPGRADE, fieldName );
+	if ( objectIndex < 0 )
+	{
+		return luaL_error( L, "unknown upgrade '%s'", upgradeName );
+	}
+	if ( field < 0 )
+	{
+		return luaL_error( L, "unknown upgrade field '%s'", fieldName );
+	}
+
+	return ResetAttribute( L, BG_ATTR_UPGRADE, objectIndex, "upgrade", fieldName );
+}
+
+int Upgrades::reset_all( lua_State* L, Upgrades* /*self*/ )
+{
+	return ResetAttributeFamily( L, BG_ATTR_UPGRADE, "upgrade" );
 }
 
 int Upgrades::pairs( lua_State* L )
@@ -142,6 +232,8 @@ template<> void ExtraInit<Upgrades>( lua_State* L, int metatable_index )
 
 RegType<Upgrades> UpgradesMethods[] =
 {
+	{ "reset", Upgrades::reset },
+	{ "reset_all", Upgrades::reset_all },
 	{ nullptr, nullptr },
 };
 
