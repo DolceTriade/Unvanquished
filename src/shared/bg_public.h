@@ -269,7 +269,6 @@ enum
 
   CS_MUSIC = CS_PLAYERS + MAX_CLIENTS,
   CS_MESSAGE, // from the map worldspawn's message field
-
   CS_MODELS,
   CS_SOUNDS = CS_MODELS + MAX_MODELS,
   CS_SHADERS = CS_SOUNDS + MAX_SOUNDS,
