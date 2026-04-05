@@ -762,6 +762,7 @@ struct centity_t
 
 	int            trailTime; // so missile trails can handle dropped initial packets
 	int            miscTime;
+	int            lcannonChargeStartTime;
 	int            snapShotTime; // last time this entity was found in a snapshot
 
 	playerEntity_t pe;
