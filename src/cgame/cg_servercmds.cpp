@@ -30,6 +30,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "common/Common.h"
 #include "cg_local.h"
+#include "shared/bg_attributes.h"
 #include "shared/CommonProxies.h"
 
 static void ParsePmoveParams() {
@@ -285,6 +286,22 @@ void CG_ConfigStringModified( int num )
 	else if ( num == CS_LEVEL_START_TIME )
 	{
 		cgs.levelStartTime = atoi( str );
+	}
+	else if ( num == CS_GAMEPLAY )
+	{
+		std::string error;
+		if ( !BG_ApplyGameplayConfig( str, &error ) )
+		{
+			Sys::Drop( "Failed to apply gameplay config: %s", error.c_str() );
+		}
+	}
+	else if ( num == CS_ATTRIBUTES )
+	{
+		std::string error;
+		if ( !BG_ApplyAttributeConfig( str, &error ) )
+		{
+			Sys::Drop( "Failed to apply attribute config: %s", error.c_str() );
+		}
 	}
 	else if ( num >= CS_VOTE_TIME && num < CS_VOTE_TIME + NUM_TEAMS )
 	{

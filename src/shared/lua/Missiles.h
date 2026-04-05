@@ -2,7 +2,7 @@
 ===========================================================================
 
 Unvanquished GPL Source Code
-Copyright (C) 2024 Unvanquished Developers
+Copyright (C) 2026 Unvanquished Developers
 
 This file is part of the Unvanquished GPL Source Code (Unvanquished Source Code).
 
@@ -19,20 +19,10 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with Unvanquished Source Code.  If not, see <http://www.gnu.org/licenses/>.
 
-In addition, the Unvanquished Source Code is also subject to certain additional terms.
-You should have received a copy of these additional terms immediately following the
-terms and conditions of the GNU General Public License which accompanied the Unvanquished
-Source Code.  If not, please request a copy in writing from id Software at the address
-below.
-
-If you have questions concerning this license or the applicable additional terms, you
-may contact in writing id Software LLC, c/o ZeniMax Media Inc., Suite 120, Rockville,
-Maryland 20850 USA.
-
 ===========================================================================
 */
-#ifndef SHARED_LUA_WEAPONS_H_
-#define SHARED_LUA_WEAPONS_H_
+#ifndef SHARED_LUA_MISSILES_H_
+#define SHARED_LUA_MISSILES_H_
 
 #include "common/Common.h"
 #include "shared/bg_attributes.h"
@@ -43,33 +33,33 @@ Maryland 20850 USA.
 namespace Shared {
 namespace Lua {
 
-struct WeaponProxy
+struct MissileProxy
 {
-	WeaponProxy( int weapon );
+	MissileProxy( int missile );
 
-	int weapon;
-	const weaponAttributes_t* attributes;
+	int missile;
+	const missileAttributes_t* attributes;
 };
 
-struct Weapons
+struct Missiles
 {
 	static int index( lua_State* L );
 	static int pairs( lua_State* L );
-	static int reset( lua_State* L, Weapons* self );
-	static int reset_all( lua_State* L, Weapons* self );
+	static int reset( lua_State* L, Missiles* self );
+	static int reset_all( lua_State* L, Missiles* self );
 
-	static std::vector<WeaponProxy> weapons;
+	static std::vector<MissileProxy> missiles;
 };
 
-const bgAttributeTrackedField_t* WeaponAttributeFields();
-size_t NumWeaponAttributeFields();
+const bgAttributeTrackedField_t* MissileAttributeFields();
+size_t NumMissileAttributeFields();
 
 template<>
-void ExtraInit<Weapons>( lua_State* L, int metatable_index );
+void ExtraInit<Missiles>( lua_State* L, int metatable_index );
 template<>
-void ExtraInit<WeaponProxy>( lua_State* L, int metatable_index );
+void ExtraInit<MissileProxy>( lua_State* L, int metatable_index );
 
-}  // namespace Lua
-}  // namespace Shared
+} // namespace Lua
+} // namespace Shared
 
-#endif  // SHARED_LUA_WEAPONS_H_
+#endif // SHARED_LUA_MISSILES_H_

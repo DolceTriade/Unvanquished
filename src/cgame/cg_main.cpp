@@ -29,6 +29,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "common/Common.h"
 #include "cg_local.h"
 #include "common/cm/cm_public.h"
+#include "shared/bg_attributes.h"
 #include "cg_key_name.h"
 #include "shared/parse.h"
 #include "shared/navgen/navgen.h"
@@ -865,7 +866,7 @@ static void CG_RegisterGraphics()
 	cgs.media.sphericalCone240Model = trap_R_RegisterModel( "models/generic/sphericalCone240.md3" );
 
 	cgs.media.plainColorShader = trap_R_RegisterShader("gfx/colors/plain", RSF_DEFAULT);
-	
+
 	if ( cg_rangeMarkerDrawFrontline.Get() || cg_rangeMarkerDrawIntersection.Get() )
 	{
 		CG_RegisterBinaryShaders();
@@ -892,7 +893,7 @@ static void CG_RegisterGraphics()
 	trap_R_RegisterShader( "gfx/feedback/vsay/follow", (RegisterShaderFlags_t) ( RSF_2D | RSF_FITSCREEN ) );
 	trap_R_RegisterShader( "gfx/feedback/vsay/no", (RegisterShaderFlags_t) ( RSF_2D | RSF_FITSCREEN ) );
 	trap_R_RegisterShader( "gfx/feedback/vsay/yes", (RegisterShaderFlags_t) ( RSF_2D | RSF_FITSCREEN ) );
-	
+
 	// register the inline models
 	cgs.numInlineModels = CM_NumInlineModels();
 
@@ -1328,6 +1329,17 @@ void CG_Init( int serverMessageNum, int clientNum, const WindowConfig& windowCon
 	// load configs after initializing particles and trails since it registers some
 	CG_UpdateLoadingStep( LOAD_CONFIGS );
 	BG_InitAllConfigs();
+	{
+		std::string error;
+		if ( !BG_ApplyGameplayConfig( CG_ConfigString( CS_GAMEPLAY ), &error ) )
+		{
+			Sys::Drop( "Failed to apply gameplay config: %s", error.c_str() );
+		}
+		if ( !BG_ApplyAttributeConfig( CG_ConfigString( CS_ATTRIBUTES ), &error ) )
+		{
+			Sys::Drop( "Failed to apply attribute config: %s", error.c_str() );
+		}
+	}
 
 	CG_UpdateLoadingStep( LOAD_SOUNDS );
 	CG_RegisterSounds();
