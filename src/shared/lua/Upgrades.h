@@ -35,6 +35,7 @@ Maryland 20850 USA.
 #define SHARED_LUA_UPGRADES_H_
 
 #include "common/Common.h"
+#include "shared/bg_attributes.h"
 #include "shared/bg_lua.h"
 #include "shared/bg_public.h"
 #include "shared/lua/LuaLib.h"
@@ -46,6 +47,7 @@ struct UpgradeProxy
 {
 	UpgradeProxy( int upgrade );
 
+	int upgrade;
 	const upgradeAttributes_t* attributes;
 };
 
@@ -53,9 +55,14 @@ struct Upgrades
 {
 	static int index( lua_State* L );
 	static int pairs( lua_State* L );
+	static int reset( lua_State* L, Upgrades* self );
+	static int reset_all( lua_State* L, Upgrades* self );
 
 	static std::vector<UpgradeProxy> upgrades;
 };
+
+const bgAttributeTrackedField_t* UpgradeAttributeFields();
+size_t NumUpgradeAttributeFields();
 
 template<>
 void ExtraInit<Upgrades>( lua_State* L, int metatable_index );

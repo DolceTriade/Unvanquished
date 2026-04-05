@@ -35,6 +35,7 @@ Maryland 20850 USA.
 #define SHARED_LUA_CLASSES_H_
 
 #include "common/Common.h"
+#include "shared/bg_attributes.h"
 #include "shared/bg_lua.h"
 #include "shared/bg_public.h"
 #include "shared/lua/LuaLib.h"
@@ -46,6 +47,7 @@ struct ClassProxy
 {
 	ClassProxy( int clazz );
 
+	int clazz;
 	const classAttributes_t* attributes;
 };
 
@@ -53,9 +55,14 @@ struct Classes
 {
 	static int index( lua_State* L );
 	static int pairs( lua_State* L );
+	static int reset( lua_State* L, Classes* self );
+	static int reset_all( lua_State* L, Classes* self );
 
 	static std::vector<ClassProxy> classes;
 };
+
+const bgAttributeTrackedField_t* ClassAttributeFields();
+size_t NumClassAttributeFields();
 
 template<>
 void ExtraInit<Classes>( lua_State* /*L*/, int /*metatable_index*/ );

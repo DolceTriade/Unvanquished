@@ -37,8 +37,10 @@ Maryland 20850 USA.
 #include "shared/lua/Weapons.h"
 #include "shared/lua/Classes.h"
 #include "shared/lua/Upgrades.h"
+#include "shared/lua/Missiles.h"
+#include "shared/lua/Beacons.h"
+#include "shared/lua/Gameplay.h"
 #include "shared/lua/register_lua_extensions.h"
-#include "common/Log.h"
 
 
 namespace Shared {
@@ -48,6 +50,8 @@ static Weapons weapons;
 static Buildables buildables;
 static Classes classes;
 static Upgrades upgrades;
+static Missiles missiles;
+static Beacons beacons;
 
 class UnvGlobal
 {
@@ -75,6 +79,24 @@ public:
 			LuaLib<Classes>::push( L, &classes );
 			return 1;
 	}
+
+	static int GetGameplay( lua_State* L )
+	{
+		LuaLib<Gameplay>::push( L, &gameplay );
+		return 1;
+	}
+
+	static int GetMissiles( lua_State* L )
+	{
+		LuaLib<Missiles>::push( L, &missiles );
+		return 1;
+	}
+
+	static int GetBeacons( lua_State* L )
+	{
+		LuaLib<Beacons>::push( L, &beacons );
+		return 1;
+	}
 };
 
 
@@ -93,6 +115,9 @@ luaL_Reg UnvGlobalGetters[] =
 	{ "upgrades", UnvGlobal::GetUpgrades },
 	{ "buildables", UnvGlobal::GetBuildables },
 	{ "classes", UnvGlobal::GetClasses },
+	{ "gameplay", UnvGlobal::GetGameplay },
+	{ "missiles", UnvGlobal::GetMissiles },
+	{ "beacons", UnvGlobal::GetBeacons },
 
     { nullptr, nullptr },
 };
@@ -124,6 +149,11 @@ void BG_InitializeLuaConstants( lua_State* L )
 	LuaLib< ClassProxy >::Register( L );
 	LuaLib< Upgrades >::Register( L );
 	LuaLib< UpgradeProxy >::Register( L );
+	LuaLib< Missiles >::Register( L );
+	LuaLib< MissileProxy >::Register( L );
+	LuaLib< Beacons >::Register( L );
+	LuaLib< BeaconProxy >::Register( L );
+	LuaLib< Gameplay >::Register( L );
 	LuaLib< UnvGlobal>::push( L, &global );
 	lua_setglobal( L, "Unv" );
 }

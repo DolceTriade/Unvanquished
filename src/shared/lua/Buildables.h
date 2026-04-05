@@ -35,6 +35,7 @@ Maryland 20850 USA.
 #define SHARED_LUA_BUILDABLES_H_
 
 #include "common/Common.h"
+#include "shared/bg_attributes.h"
 #include "shared/bg_lua.h"
 #include "shared/bg_public.h"
 #include "shared/lua/LuaLib.h"
@@ -46,6 +47,7 @@ struct BuildableProxy
 {
 	BuildableProxy( int buildable );
 
+	int buildable;
 	const buildableAttributes_t* attributes;
 };
 
@@ -53,9 +55,14 @@ struct Buildables
 {
 	static int index( lua_State* L );
 	static int pairs( lua_State* L );
+	static int reset( lua_State* L, Buildables* self );
+	static int reset_all( lua_State* L, Buildables* self );
 
 	static std::vector<BuildableProxy> buildables;
 };
+
+const bgAttributeTrackedField_t* BuildableAttributeFields();
+size_t NumBuildableAttributeFields();
 
 template<>
 void ExtraInit<Buildables>( lua_State* L, int metatable_index );

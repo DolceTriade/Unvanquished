@@ -33,15 +33,50 @@ Maryland 20850 USA.
 */
 
 #include "shared/lua/Buildables.h"
+#include "shared/bg_attributes.h"
 #include "shared/lua/Utils.h"
 
 namespace Shared {
 namespace Lua {
 
-
 #define GETTER(name) { #name, Get##name }
 
+namespace {
+
+#define ATTR_INT(struct_type, lua_name, member) { { lua_name, BG_ATTR_INTEGER }, offsetof( struct_type, member ) }
+#define ATTR_FLOAT(struct_type, lua_name, member) { { lua_name, BG_ATTR_FLOAT }, offsetof( struct_type, member ) }
+#define ATTR_BOOL(struct_type, lua_name, member) { { lua_name, BG_ATTR_BOOL }, offsetof( struct_type, member ) }
+
+const bgAttributeTrackedField_t buildableAttributeFields[] =
+{
+	ATTR_INT( buildableAttributes_t, "build_points", buildPoints ),
+	ATTR_INT( buildableAttributes_t, "unlock_threshold", unlockThreshold ),
+	ATTR_INT( buildableAttributes_t, "health", health ),
+	ATTR_INT( buildableAttributes_t, "regen_rate", regenRate ),
+	ATTR_INT( buildableAttributes_t, "splash_damage", splashDamage ),
+	ATTR_INT( buildableAttributes_t, "splash_radius", splashRadius ),
+	ATTR_INT( buildableAttributes_t, "build_time", buildTime ),
+	ATTR_BOOL( buildableAttributes_t, "usable", usable ),
+};
+
+#undef ATTR_INT
+#undef ATTR_FLOAT
+#undef ATTR_BOOL
+
+} // namespace
+
+const bgAttributeTrackedField_t* BuildableAttributeFields()
+{
+	return buildableAttributeFields;
+}
+
+size_t NumBuildableAttributeFields()
+{
+	return ARRAY_LEN( buildableAttributeFields );
+}
+
 BuildableProxy::BuildableProxy( int buildable ) :
+	buildable( buildable ),
 	attributes( BG_Buildable( buildable ) ) {}
 
 #define GET_FUNC( var, type ) \
@@ -75,10 +110,43 @@ GET_FUNC2( build_time, proxy->attributes->buildTime, integer )
 GET_FUNC( usable, boolean )
 GET_FUNC2( team, BG_TeamName( proxy->attributes->team ), string )
 
+#define SET_INT(name, field_name) \
+static int Set##name( lua_State* L ) \
+{ \
+	BuildableProxy* proxy = LuaLib<BuildableProxy>::check( L, 1 ); \
+	return proxy ? SetAttributeInt( L, BG_ATTR_BUILDABLE, proxy->buildable - 1, "buildable", field_name ) : 0; \
+}
+
+#define SET_BOOL(name, field_name) \
+static int Set##name( lua_State* L ) \
+{ \
+	BuildableProxy* proxy = LuaLib<BuildableProxy>::check( L, 1 ); \
+	return proxy ? SetAttributeBool( L, BG_ATTR_BUILDABLE, proxy->buildable - 1, "buildable", field_name ) : 0; \
+}
+
+SET_INT(build_points, "build_points")
+SET_INT(unlock_threshold, "unlock_threshold")
+SET_INT(health, "health")
+SET_INT(regen_rate, "regen_rate")
+SET_INT(splash_damage, "splash_damage")
+SET_INT(splash_radius, "splash_radius")
+SET_INT(build_time, "build_time")
+SET_BOOL(usable, "usable")
+
+#undef SET_INT
+#undef SET_BOOL
+
+static int Methodreset( lua_State* L, BuildableProxy* proxy )
+{
+	const char* fieldName = luaL_checkstring( L, 1 );
+	return ResetAttribute( L, BG_ATTR_BUILDABLE, proxy->buildable - 1, "buildable", fieldName );
+}
+
 template<> void ExtraInit<BuildableProxy>( lua_State* /*L*/, int /*metatable_index*/ ) {}
 
 RegType<BuildableProxy> BuildableProxyMethods[] =
 {
+	{ "reset", Methodreset },
 	{ nullptr, nullptr },
 };
 
@@ -104,6 +172,14 @@ luaL_Reg BuildableProxyGetters[] =
 
 luaL_Reg BuildableProxySetters[] =
 {
+	{ "build_points", Setbuild_points },
+	{ "unlock_threshold", Setunlock_threshold },
+	{ "health", Sethealth },
+	{ "regen_rate", Setregen_rate },
+	{ "splash_damage", Setsplash_damage },
+	{ "splash_radius", Setsplash_radius },
+	{ "build_time", Setbuild_time },
+	{ "usable", Setusable },
 	{ nullptr, nullptr },
 };
 LUACORETYPEDEFINE(BuildableProxy)
@@ -133,6 +209,29 @@ int Buildables::pairs( lua_State* L )
 	});
 }
 
+int Buildables::reset( lua_State* L, Buildables* /*self*/ )
+{
+	const char* buildableName = luaL_checkstring( L, 1 );
+	const char* fieldName = luaL_checkstring( L, 2 );
+	int objectIndex = BG_FindAttributeObject( BG_ATTR_BUILDABLE, buildableName );
+	int field = BG_FindAttributeField( BG_ATTR_BUILDABLE, fieldName );
+	if ( objectIndex < 0 )
+	{
+		return luaL_error( L, "unknown buildable '%s'", buildableName );
+	}
+	if ( field < 0 )
+	{
+		return luaL_error( L, "unknown buildable field '%s'", fieldName );
+	}
+
+	return ResetAttribute( L, BG_ATTR_BUILDABLE, objectIndex, "buildable", fieldName );
+}
+
+int Buildables::reset_all( lua_State* L, Buildables* /*self*/ )
+{
+	return ResetAttributeFamily( L, BG_ATTR_BUILDABLE, "buildable" );
+}
+
 std::vector<BuildableProxy> Buildables::buildables;
 
 template<> void ExtraInit<Buildables>( lua_State* L, int metatable_index )
@@ -151,6 +250,8 @@ template<> void ExtraInit<Buildables>( lua_State* L, int metatable_index )
 
 RegType<Buildables> BuildablesMethods[] =
 {
+	{ "reset", Buildables::reset },
+	{ "reset_all", Buildables::reset_all },
 	{ nullptr, nullptr },
 };
 

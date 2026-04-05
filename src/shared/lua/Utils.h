@@ -35,6 +35,7 @@ Maryland 20850 USA.
 #define SHARED_LUA_UTILS_H_
 
 #include "common/Common.h"
+#include "shared/bg_attributes.h"
 #include "shared/bg_public.h"
 #include "shared/bg_lua.h"
 
@@ -49,6 +50,12 @@ void PushVec3(lua_State* L, const vec3_t vec);
 
 // Convert a lua table into a vec3.
 bool CheckVec3(lua_State* L, int pos, vec3_t vec);
+
+int SetAttributeInt(lua_State* L, bgAttributeFamily_t family, size_t objectIndex, const char* ownerName, const char* fieldName, int valueIndex = 2);
+int SetAttributeFloat(lua_State* L, bgAttributeFamily_t family, size_t objectIndex, const char* ownerName, const char* fieldName, int valueIndex = 2);
+int SetAttributeBool(lua_State* L, bgAttributeFamily_t family, size_t objectIndex, const char* ownerName, const char* fieldName, int valueIndex = 2);
+int ResetAttribute(lua_State* L, bgAttributeFamily_t family, size_t objectIndex, const char* ownerName, const char* fieldName);
+int ResetAttributeFamily(lua_State* L, bgAttributeFamily_t family, const char* ownerName);
 
 int CreatePairsHelper(lua_State* L, std::function<int(lua_State*, size_t&)> next_funcmake);
 

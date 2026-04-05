@@ -32,6 +32,7 @@ Maryland 20850 USA.
 ===========================================================================
 */
 #include "shared/lua/Classes.h"
+#include "shared/bg_attributes.h"
 #include "shared/lua/Utils.h"
 
 namespace Shared {
@@ -39,7 +40,41 @@ namespace Lua {
 
 #define GETTER(name) { #name, Get##name }
 
+namespace {
+
+#define ATTR_INT(struct_type, lua_name, member) { { lua_name, BG_ATTR_INTEGER }, offsetof( struct_type, member ) }
+#define ATTR_FLOAT(struct_type, lua_name, member) { { lua_name, BG_ATTR_FLOAT }, offsetof( struct_type, member ) }
+#define ATTR_BOOL(struct_type, lua_name, member) { { lua_name, BG_ATTR_BOOL }, offsetof( struct_type, member ) }
+
+const bgAttributeTrackedField_t classAttributeFields[] =
+{
+	ATTR_INT( classAttributes_t, "unlock_threshold", unlockThreshold ),
+	ATTR_INT( classAttributes_t, "health", health ),
+	ATTR_FLOAT( classAttributes_t, "regen_rate", regenRate ),
+	ATTR_FLOAT( classAttributes_t, "speed", speed ),
+	ATTR_INT( classAttributes_t, "mass", mass ),
+	ATTR_FLOAT( classAttributes_t, "jump_magnitude", jumpMagnitude ),
+	ATTR_INT( classAttributes_t, "price", price ),
+};
+
+#undef ATTR_INT
+#undef ATTR_FLOAT
+#undef ATTR_BOOL
+
+} // namespace
+
+const bgAttributeTrackedField_t* ClassAttributeFields()
+{
+	return classAttributeFields;
+}
+
+size_t NumClassAttributeFields()
+{
+	return ARRAY_LEN( classAttributeFields );
+}
+
 ClassProxy::ClassProxy( int clazz ) :
+	clazz( clazz ),
 	attributes( BG_Class( clazz ) ) {}
 
 #define GET_FUNC( var, type ) \
@@ -64,17 +99,49 @@ GET_FUNC( icon, string )
 GET_FUNC2( fov_cvar, proxy->attributes->fovCvar, string )
 GET_FUNC2( unlock_threshold, proxy->attributes->unlockThreshold, integer )
 GET_FUNC( health, integer )
-GET_FUNC2( regen_rate, proxy->attributes->regenRate, integer )
-GET_FUNC( speed, integer )
+GET_FUNC2( regen_rate, proxy->attributes->regenRate, number )
+GET_FUNC( speed, number )
 GET_FUNC( mass, integer )
-GET_FUNC2( jump_magnitude, proxy->attributes->jumpMagnitude, integer )
+GET_FUNC2( jump_magnitude, proxy->attributes->jumpMagnitude, number )
 GET_FUNC( price, integer )
 GET_FUNC2( team, BG_TeamName( proxy->attributes->team ), string )
+
+#define SET_INT(name, field_name) \
+static int Set##name( lua_State* L ) \
+{ \
+	ClassProxy* proxy = LuaLib<ClassProxy>::check( L, 1 ); \
+	return proxy ? SetAttributeInt( L, BG_ATTR_CLASS, proxy->clazz - 1, "class", field_name ) : 0; \
+}
+
+#define SET_FLOAT(name, field_name) \
+static int Set##name( lua_State* L ) \
+{ \
+	ClassProxy* proxy = LuaLib<ClassProxy>::check( L, 1 ); \
+	return proxy ? SetAttributeFloat( L, BG_ATTR_CLASS, proxy->clazz - 1, "class", field_name ) : 0; \
+}
+
+SET_INT(unlock_threshold, "unlock_threshold")
+SET_INT(health, "health")
+SET_FLOAT(regen_rate, "regen_rate")
+SET_FLOAT(speed, "speed")
+SET_INT(mass, "mass")
+SET_FLOAT(jump_magnitude, "jump_magnitude")
+SET_INT(price, "price")
+
+#undef SET_INT
+#undef SET_FLOAT
+
+static int Methodreset( lua_State* L, ClassProxy* proxy )
+{
+	const char* fieldName = luaL_checkstring( L, 1 );
+	return ResetAttribute( L, BG_ATTR_CLASS, proxy->clazz - 1, "class", fieldName );
+}
 
 template<> void ExtraInit<ClassProxy>( lua_State* /*L*/, int /*metatable_index*/ ) {}
 
 RegType<ClassProxy> ClassProxyMethods[] =
 {
+	{ "reset", Methodreset },
 	{ nullptr, nullptr },
 };
 
@@ -98,6 +165,13 @@ luaL_Reg ClassProxyGetters[] =
 
 luaL_Reg ClassProxySetters[] =
 {
+	{ "unlock_threshold", Setunlock_threshold },
+	{ "health", Sethealth },
+	{ "regen_rate", Setregen_rate },
+	{ "speed", Setspeed },
+	{ "mass", Setmass },
+	{ "jump_magnitude", Setjump_magnitude },
+	{ "price", Setprice },
 	{ nullptr, nullptr },
 };
 
@@ -113,6 +187,29 @@ int Classes::index( lua_State* L )
 		return 1;
 	}
 	return 0;
+}
+
+int Classes::reset( lua_State* L, Classes* /*self*/ )
+{
+	const char* className = luaL_checkstring( L, 1 );
+	const char* fieldName = luaL_checkstring( L, 2 );
+	int objectIndex = BG_FindAttributeObject( BG_ATTR_CLASS, className );
+	int field = BG_FindAttributeField( BG_ATTR_CLASS, fieldName );
+	if ( objectIndex < 0 )
+	{
+		return luaL_error( L, "unknown class '%s'", className );
+	}
+	if ( field < 0 )
+	{
+		return luaL_error( L, "unknown class field '%s'", fieldName );
+	}
+
+	return ResetAttribute( L, BG_ATTR_CLASS, objectIndex, "class", fieldName );
+}
+
+int Classes::reset_all( lua_State* L, Classes* /*self*/ )
+{
+	return ResetAttributeFamily( L, BG_ATTR_CLASS, "class" );
 }
 
 int Classes::pairs( lua_State* L )
@@ -146,6 +243,8 @@ template<> void ExtraInit<Classes>( lua_State* L, int metatable_index )
 
 RegType<Classes> ClassesMethods[] =
 {
+	{ "reset", Classes::reset },
+	{ "reset_all", Classes::reset_all },
 	{ nullptr, nullptr },
 };
 

@@ -35,6 +35,7 @@ Maryland 20850 USA.
 #define SHARED_LUA_WEAPONS_H_
 
 #include "common/Common.h"
+#include "shared/bg_attributes.h"
 #include "shared/bg_lua.h"
 #include "shared/bg_public.h"
 #include "shared/lua/LuaLib.h"
@@ -46,6 +47,7 @@ struct WeaponProxy
 {
 	WeaponProxy( int weapon );
 
+	int weapon;
 	const weaponAttributes_t* attributes;
 };
 
@@ -53,9 +55,14 @@ struct Weapons
 {
 	static int index( lua_State* L );
 	static int pairs( lua_State* L );
+	static int reset( lua_State* L, Weapons* self );
+	static int reset_all( lua_State* L, Weapons* self );
 
 	static std::vector<WeaponProxy> weapons;
 };
+
+const bgAttributeTrackedField_t* WeaponAttributeFields();
+size_t NumWeaponAttributeFields();
 
 template<>
 void ExtraInit<Weapons>( lua_State* L, int metatable_index );

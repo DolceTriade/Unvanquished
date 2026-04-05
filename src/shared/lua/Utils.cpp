@@ -33,6 +33,7 @@ Maryland 20850 USA.
 */
 #include "shared/lua/Utils.h"
 
+#include "shared/bg_attributes.h"
 #include "shared/bg_public.h"
 
 namespace Shared {
@@ -86,6 +87,114 @@ bool CheckVec3(lua_State* L, int pos, vec3_t vec)
 		}
 	}
 	return true;
+}
+
+int SetAttributeInt( lua_State* L, bgAttributeFamily_t family, size_t objectIndex, const char* ownerName, const char* fieldName, int valueIndex )
+{
+#ifndef BUILD_SGAME
+	(void) family;
+	(void) objectIndex;
+	(void) fieldName;
+	(void) valueIndex;
+	return luaL_error( L, "%s attributes are read-only on the client", ownerName );
+#else
+	std::string error;
+	const int field = BG_FindAttributeField( family, fieldName );
+	if ( !lua_isinteger( L, valueIndex ) )
+	{
+		return luaL_error( L, "%s field '%s' expects an integer", ownerName, fieldName );
+	}
+	if ( !BG_SetAttributeInt( family, objectIndex, field, lua_tointeger( L, valueIndex ), true, &error ) )
+	{
+		return luaL_error( L, "%s", error.c_str() );
+	}
+	BG_PublishAttributeConfig();
+	return 0;
+#endif
+}
+
+int SetAttributeFloat( lua_State* L, bgAttributeFamily_t family, size_t objectIndex, const char* ownerName, const char* fieldName, int valueIndex )
+{
+#ifndef BUILD_SGAME
+	(void) family;
+	(void) objectIndex;
+	(void) fieldName;
+	(void) valueIndex;
+	return luaL_error( L, "%s attributes are read-only on the client", ownerName );
+#else
+	std::string error;
+	const int field = BG_FindAttributeField( family, fieldName );
+	if ( !lua_isnumber( L, valueIndex ) )
+	{
+		return luaL_error( L, "%s field '%s' expects a number", ownerName, fieldName );
+	}
+	if ( !BG_SetAttributeFloat( family, objectIndex, field, lua_tonumber( L, valueIndex ), true, &error ) )
+	{
+		return luaL_error( L, "%s", error.c_str() );
+	}
+	BG_PublishAttributeConfig();
+	return 0;
+#endif
+}
+
+int SetAttributeBool( lua_State* L, bgAttributeFamily_t family, size_t objectIndex, const char* ownerName, const char* fieldName, int valueIndex )
+{
+#ifndef BUILD_SGAME
+	(void) family;
+	(void) objectIndex;
+	(void) fieldName;
+	(void) valueIndex;
+	return luaL_error( L, "%s attributes are read-only on the client", ownerName );
+#else
+	std::string error;
+	const int field = BG_FindAttributeField( family, fieldName );
+	if ( !lua_isboolean( L, valueIndex ) )
+	{
+		return luaL_error( L, "%s field '%s' expects a boolean", ownerName, fieldName );
+	}
+	if ( !BG_SetAttributeBool( family, objectIndex, field, lua_toboolean( L, valueIndex ) != 0, true, &error ) )
+	{
+		return luaL_error( L, "%s", error.c_str() );
+	}
+	BG_PublishAttributeConfig();
+	return 0;
+#endif
+}
+
+int ResetAttribute( lua_State* L, bgAttributeFamily_t family, size_t objectIndex, const char* ownerName, const char* fieldName )
+{
+	const int field = BG_FindAttributeField( family, fieldName );
+	if ( field < 0 )
+	{
+		return luaL_error( L, "unknown %s field '%s'", ownerName, fieldName );
+	}
+
+#ifndef BUILD_SGAME
+	(void) objectIndex;
+	return luaL_error( L, "%s attributes are read-only on the client", ownerName );
+#else
+	std::string error;
+	if ( !BG_ResetAttributeValue( family, objectIndex, field, true, &error ) )
+	{
+		return luaL_error( L, "%s", error.c_str() );
+	}
+	BG_PublishAttributeConfig();
+	return 0;
+#endif
+}
+
+int ResetAttributeFamily( lua_State* L, bgAttributeFamily_t family, const char* ownerName )
+{
+#ifndef BUILD_SGAME
+	(void) family;
+	return luaL_error( L, "%s attributes are read-only on the client", ownerName );
+#else
+	(void) L;
+	(void) ownerName;
+	BG_ResetAttributeFamilyOverrides( family );
+	BG_PublishAttributeConfig();
+	return 0;
+#endif
 }
 
 namespace {
