@@ -32,6 +32,66 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "EntityCache.h"
 
+static float CG_LCannonChargeFraction( int chargeByte )
+{
+	if ( chargeByte <= 0 )
+	{
+		return 0.0f;
+	}
+
+	return Math::Clamp( chargeByte / 255.0f, 0.0f, 1.0f );
+}
+
+static Cvar::Cvar<float> cg_luciOrbScale( "cg_luciOrbScale", "multiplier for luci orb", Cvar::CHEAT, 52.0f );
+static Cvar::Cvar<float> cg_luciOrbScale3rdPerson( "cg_luciOrbScale3rdPerson", "multiplier for luci orb", Cvar::CHEAT, 20.0f );
+
+static void CG_AddLcannonChargeOrb( int attachmentEntityID, const char *tagName,
+                                    int chargeByte, int renderfx, float scale, std::vector<refEntity_t>& ents)
+{
+	float fraction = CG_LCannonChargeFraction( chargeByte );
+
+	if ( fraction <= 0.0f )
+	{
+		return;
+	}
+
+	refEntity_t orb{};
+	orb.reType = refEntityType_t::RT_SPRITE;
+	orb.radius = fraction * scale;
+	orb.customShader = BG_Missile( MIS_LCANNON )->sprite;
+	orb.renderfx = renderfx;
+	orb.shaderRGBA = Color::Color( 1.0f, 0.55f + 0.20f * fraction, 0.18f, 0.30f + 0.45f * fraction );
+	CG_PositionEntityOnTag( &orb, attachmentEntityID, tagName );
+	VectorMA( orb.origin, 12.0f + 20.0f * fraction, orb.axis[ 0 ], orb.origin );
+	VectorCopy( orb.origin, orb.oldorigin );
+	ents.push_back(orb);
+
+	trap_R_AddLightToScene( orb.origin, 45.0f + 120.0f * fraction, 1.0f,
+	                        1.0f, 0.5f + 0.15f * fraction, 0.15f, 0 );
+}
+
+static float CG_LCannonChargeFractionForCent( centity_t *cent, const playerState_t *ps )
+{
+	if ( ps && ps->weapon == WP_LUCIFER_CANNON && ps->weaponCharge > 0 )
+	{
+		return Math::Clamp( (float) ps->weaponCharge / LCANNON_CHARGE_TIME_MAX, 0.0f, 1.0f );
+	}
+
+	if ( !( cent->currentState.eFlags & EF_LCANNON_CHARGING ) )
+	{
+		cent->lcannonChargeStartTime = 0;
+		return 0.0f;
+	}
+
+	if ( cent->lcannonChargeStartTime <= 0 )
+	{
+		cent->lcannonChargeStartTime = cg.time;
+	}
+
+	return Math::Clamp( (float) ( cg.time - cent->lcannonChargeStartTime ) / LCANNON_CHARGE_TIME_MAX,
+	                    0.0f, 1.0f );
+}
+
 /*
 =================
 CG_RegisterUpgrade
@@ -1336,6 +1396,7 @@ void CG_AddPlayerWeapon( refEntity_t* parent, playerState_t* ps, centity_t* cent
 	}
 
 	weaponInfo_t* weapon = &cg_weapons[ weaponNum ];
+	int gunAttachmentEntityID = -1;
 
 	if ( !weapon->registered )
 	{
@@ -1454,6 +1515,7 @@ void CG_AddPlayerWeapon( refEntity_t* parent, playerState_t* ps, centity_t* cent
 		}
 
 		ents.push_back( gun );
+		gunAttachmentEntityID = ents.size() - 1;
 
 		if ( !ps )
 		{
@@ -1504,7 +1566,7 @@ void CG_AddPlayerWeapon( refEntity_t* parent, playerState_t* ps, centity_t* cent
 			}
 			else
 			{
-				CG_SetAttachmentTag( &cent->muzzlePS->attachment, cent, weaponAttachmentEntityID + 1, gun.hModel, "tag_flash" );
+				CG_SetAttachmentTag( &cent->muzzlePS->attachment, cent, gunAttachmentEntityID, gun.hModel, "tag_flash" );
 				CG_AttachmentPoint( &cent->muzzlePS->attachment, cent->muzzle );
 			}
 		}
@@ -1514,6 +1576,24 @@ void CG_AddPlayerWeapon( refEntity_t* parent, playerState_t* ps, centity_t* cent
 		{
 			CG_DestroyParticleSystem( &cent->muzzlePS );
 		}
+	}
+
+	if ( weaponNum == WP_LUCIFER_CANNON &&
+	     !( cent->currentState.eFlags & EF_DEAD ) )
+	{
+		float chargeFraction = CG_LCannonChargeFractionForCent( cent, ps );
+		int lcannonCharge = Math::Clamp( (int) std::round( chargeFraction * 255.0f ), 0, 255 );
+
+		if ( lcannonCharge > 0 && !noGunModel )
+		{
+			CG_AddLcannonChargeOrb( gunAttachmentEntityID, "tag_flash",
+				                        lcannonCharge, parent->renderfx, ps == nullptr || cg_thirdPerson.Get() ? cg_luciOrbScale3rdPerson.Get() : cg_luciOrbScale.Get() , ents );
+		}
+	}
+
+	if ( weaponNum != WP_LUCIFER_CANNON && cent->lcannonChargeStartTime > 0 )
+	{
+		cent->lcannonChargeStartTime = 0;
 	}
 
 	// add the flash
@@ -1561,7 +1641,7 @@ void CG_AddPlayerWeapon( refEntity_t* parent, playerState_t* ps, centity_t* cent
 		}
 		else
 		{
-			CG_PositionRotatedEntityOnTag( &flash, weaponAttachmentEntityID + 1, "tag_flash" );
+			CG_PositionRotatedEntityOnTag( &flash, gunAttachmentEntityID, "tag_flash" );
 		}
 	}
 
@@ -1580,7 +1660,7 @@ void CG_AddPlayerWeapon( refEntity_t* parent, playerState_t* ps, centity_t* cent
 				}
 				else
 				{
-					CG_SetAttachmentTag( &cent->muzzlePS->attachment, cent, weaponAttachmentEntityID + 1, gun.hModel, "tag_flash" );
+					CG_SetAttachmentTag( &cent->muzzlePS->attachment, cent, gunAttachmentEntityID, gun.hModel, "tag_flash" );
 				}
 
 				CG_SetAttachmentCent( &cent->muzzlePS->attachment, cent );
