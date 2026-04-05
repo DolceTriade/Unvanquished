@@ -2,7 +2,7 @@
 ===========================================================================
 
 Unvanquished GPL Source Code
-Copyright (C) 2024 Unvanquished Developers
+Copyright (C) 2026 Unvanquished Developers
 
 This file is part of the Unvanquished GPL Source Code (Unvanquished Source Code).
 
@@ -19,20 +19,10 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with Unvanquished Source Code.  If not, see <http://www.gnu.org/licenses/>.
 
-In addition, the Unvanquished Source Code is also subject to certain additional terms.
-You should have received a copy of these additional terms immediately following the
-terms and conditions of the GNU General Public License which accompanied the Unvanquished
-Source Code.  If not, please request a copy in writing from id Software at the address
-below.
-
-If you have questions concerning this license or the applicable additional terms, you
-may contact in writing id Software LLC, c/o ZeniMax Media Inc., Suite 120, Rockville,
-Maryland 20850 USA.
-
 ===========================================================================
 */
-#ifndef SHARED_LUA_WEAPONS_H_
-#define SHARED_LUA_WEAPONS_H_
+#ifndef SHARED_LUA_BEACONS_H_
+#define SHARED_LUA_BEACONS_H_
 
 #include "common/Common.h"
 #include "shared/bg_attributes.h"
@@ -43,33 +33,33 @@ Maryland 20850 USA.
 namespace Shared {
 namespace Lua {
 
-struct WeaponProxy
+struct BeaconProxy
 {
-	WeaponProxy( int weapon );
+	BeaconProxy( int beacon );
 
-	int weapon;
-	const weaponAttributes_t* attributes;
+	int beacon;
+	const beaconAttributes_t* attributes;
 };
 
-struct Weapons
+struct Beacons
 {
 	static int index( lua_State* L );
 	static int pairs( lua_State* L );
-	static int reset( lua_State* L, Weapons* self );
-	static int reset_all( lua_State* L, Weapons* self );
+	static int reset( lua_State* L, Beacons* self );
+	static int reset_all( lua_State* L, Beacons* self );
 
-	static std::vector<WeaponProxy> weapons;
+	static std::vector<BeaconProxy> beacons;
 };
 
-const bgAttributeTrackedField_t* WeaponAttributeFields();
-size_t NumWeaponAttributeFields();
+const bgAttributeTrackedField_t* BeaconAttributeFields();
+size_t NumBeaconAttributeFields();
 
 template<>
-void ExtraInit<Weapons>( lua_State* L, int metatable_index );
+void ExtraInit<Beacons>( lua_State* L, int metatable_index );
 template<>
-void ExtraInit<WeaponProxy>( lua_State* L, int metatable_index );
+void ExtraInit<BeaconProxy>( lua_State* L, int metatable_index );
 
-}  // namespace Lua
-}  // namespace Shared
+} // namespace Lua
+} // namespace Shared
 
-#endif  // SHARED_LUA_WEAPONS_H_
+#endif // SHARED_LUA_BEACONS_H_

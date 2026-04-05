@@ -31,45 +31,26 @@ Maryland 20850 USA.
 
 ===========================================================================
 */
-#ifndef SHARED_LUA_WEAPONS_H_
-#define SHARED_LUA_WEAPONS_H_
+#ifndef SHARED_LUA_GAMEPLAY_H_
+#define SHARED_LUA_GAMEPLAY_H_
 
 #include "common/Common.h"
-#include "shared/bg_attributes.h"
 #include "shared/bg_lua.h"
-#include "shared/bg_public.h"
 #include "shared/lua/LuaLib.h"
 
 namespace Shared {
 namespace Lua {
 
-struct WeaponProxy
-{
-	WeaponProxy( int weapon );
+struct Gameplay {};
 
-	int weapon;
-	const weaponAttributes_t* attributes;
-};
-
-struct Weapons
-{
-	static int index( lua_State* L );
-	static int pairs( lua_State* L );
-	static int reset( lua_State* L, Weapons* self );
-	static int reset_all( lua_State* L, Weapons* self );
-
-	static std::vector<WeaponProxy> weapons;
-};
-
-const bgAttributeTrackedField_t* WeaponAttributeFields();
-size_t NumWeaponAttributeFields();
+extern Gameplay gameplay;
 
 template<>
-void ExtraInit<Weapons>( lua_State* L, int metatable_index );
-template<>
-void ExtraInit<WeaponProxy>( lua_State* L, int metatable_index );
+void ExtraInit<Gameplay>( lua_State* L, int metatable_index );
 
-}  // namespace Lua
-}  // namespace Shared
+LUACORETYPEDECLARE(Gameplay)
 
-#endif  // SHARED_LUA_WEAPONS_H_
+} // namespace Lua
+} // namespace Shared
+
+#endif  // SHARED_LUA_GAMEPLAY_H_
