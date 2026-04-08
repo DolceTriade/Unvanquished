@@ -2661,6 +2661,13 @@ void CG_HandleWeaponHitEntity( entityState_t *es, vec3_t origin )
 		if ( weapon == WP_MASS_DRIVER )
 		{
 			centity_t *attacker = ( attackerNum == cg.predictedPlayerState.clientNum ) ? &cg.predictedPlayerEntity : &cg_entities[ attackerNum ];
+
+			if ( CG_IsTrailSystemValid( &attacker->muzzleTS ) )
+			{
+				CG_DestroyTrailSystem( attacker->muzzleTS );
+				attacker->muzzleTS = nullptr;
+			}
+
 			attacker->muzzleTS = CG_SpawnNewTrailSystem( cgs.media.mdriverTS );
 			if ( !attacker->muzzleTS ) return;
 			attacker->muzzleTSDeathTime = cg.time + cg_teslaTrailTime.Get();
@@ -2719,6 +2726,13 @@ void CG_HandleWeaponHitWall( entityState_t *es, vec3_t origin )
 		if ( weapon == WP_MASS_DRIVER )
 		{
 			centity_t *attacker = ( attackerNum == cg.predictedPlayerState.clientNum ) ? &cg.predictedPlayerEntity : &cg_entities[ attackerNum ];
+
+			if ( CG_IsTrailSystemValid( &attacker->muzzleTS ) )
+			{
+				CG_DestroyTrailSystem( attacker->muzzleTS );
+				attacker->muzzleTS = nullptr;
+			}
+
 			attacker->muzzleTS = CG_SpawnNewTrailSystem( cgs.media.mdriverTS );
 			if ( !attacker->muzzleTS ) return;
 			attacker->muzzleTSDeathTime = cg.time + cg_teslaTrailTime.Get();
