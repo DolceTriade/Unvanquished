@@ -272,7 +272,7 @@ int RegisterShutdownHook( lua_State* L )
 	if ( lua_isfunction( L, 1 ) )
 	{
 		int ref = luaL_ref( L, LUA_REGISTRYINDEX );
-		buildableSpawnedHooks.emplace_back( L, ref );
+		shutdownHooks.emplace_back( L, ref );
 	}
 	return 0;
 }
