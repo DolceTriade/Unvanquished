@@ -45,6 +45,7 @@ Maryland 20850 USA.
 #include "sgame/lua/Hooks.h"
 #include "sgame/lua/Command.h"
 #include "sgame/lua/Votes.h"
+#include "sgame/lua/Workflow.h"
 
 namespace {
 
@@ -55,6 +56,7 @@ using Shared::Lua::CheckVec3;
 static Lua::Entity entity;
 static Lua::Level level;
 static Lua::Hooks hooks;
+static Lua::Workflow workflow;
 
 /// SGame global to access SGame related fields.
 // Accessed via the sgame global.
@@ -91,6 +93,15 @@ class SGameGlobal
 	static int GetHooks( lua_State* L )
 	{
 		LuaLib<Lua::Hooks>::push( L, &hooks );
+		return 1;
+	}
+
+	/// Get the workflow object used to run workflows.
+	// @field workflow Get object used to start, wait, and signal workflows.
+	// @see workflow
+	static int GetWorkflow( lua_State* L )
+	{
+		LuaLib<Lua::Workflow>::push( L, &workflow );
 		return 1;
 	}
 
@@ -206,6 +217,7 @@ luaL_Reg SGameGlobalGetters[] = {
 	{ "entity", SGameGlobal::GetEntity },
 	{ "level", SGameGlobal::GetLevel },
 	{ "hooks", SGameGlobal::GetHooks },
+	{ "workflow", SGameGlobal::GetWorkflow },
 
 	{ nullptr, nullptr },
 };
@@ -231,6 +243,7 @@ void InitializeSGameGlobal( lua_State* L )
 	LuaLib<TeamProxy>::Register( L );
 	LuaLib<Buildable>::Register( L );
 	LuaLib<Hooks>::Register( L );
+	LuaLib<Workflow>::Register( L );
 
 	LuaLib<SGameGlobal>::push( L, &sgame );
 	lua_setglobal( L, "sgame" );
