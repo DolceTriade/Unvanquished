@@ -34,6 +34,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "common/FileSystem.h"
 #include "lua/Interpreter.h"
 #include "lua/Hooks.h"
+#include "lua/Workflow.h"
 #include "shared/bg_attributes.h"
 #include "shared/lua/register_lua_extensions.h"
 
@@ -2460,6 +2461,7 @@ void G_RunFrame( int levelTime )
 
 	// Run Lua timers, if any...
 	Shared::Lua::UpdateTimers( levelTime );
+	Lua::Workflow::Frame( Lua::State() );
 
 	G_PrepareEntityNetCode();
 
