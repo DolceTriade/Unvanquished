@@ -44,4 +44,4 @@ int RegisterVote( lua_State* L );
 
 }  // namespace Lua
 
-#endif  // LUA_COMMAND_H_
+#endif  // LUA_VOTES_H_
