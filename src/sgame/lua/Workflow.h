@@ -2,7 +2,7 @@
 ===========================================================================
 
 Unvanquished GPL Source Code
-Copyright (C) 2024 Unvanquished Developers
+Copyright (C) 2026 Unvanquished Developers
 
 This file is part of the Unvanquished GPL Source Code (Unvanquished Source Code).
 
@@ -31,17 +31,21 @@ Maryland 20850 USA.
 
 ===========================================================================
 */
-#ifndef LUA_VOTES_H_
-#define LUA_VOTES_H_
+#ifndef LUA_WORKFLOW_H_
+#define LUA_WORKFLOW_H_
 
 #include "sgame/sg_local.h"
 
 #include "shared/bg_lua.h"
 
-namespace Lua {
+namespace Lua
+{
 
-int RegisterVote( lua_State* L );
+struct Workflow
+{
+	static void Frame( lua_State *L );
+};
 
 }  // namespace Lua
 
-#endif  // LUA_VOTES_H_
+#endif  // LUA_WORKFLOW_H_
