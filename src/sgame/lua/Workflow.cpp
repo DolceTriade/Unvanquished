@@ -489,7 +489,6 @@ int WorkflowWaitMs( lua_State *L )
 // @see signal
 int WorkflowWaitSignal( lua_State *L )
 {
-	int nargs = lua_gettop( L );
 	const char *signal = nullptr;
 	signal = luaL_checkstring( L, 1 );
 
