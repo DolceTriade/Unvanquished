@@ -59,6 +59,27 @@ static std::vector<LuaHook> gameEndHooks;
 static std::vector<LuaHook> buildableSpawnedHooks;
 static std::vector<LuaHook> shutdownHooks;
 
+void ClearHooks( lua_State* L, std::vector<LuaHook>& hooks )
+{
+	for ( const auto& hook : hooks )
+	{
+		luaL_unref( L, LUA_REGISTRYINDEX, hook.second );
+	}
+
+	hooks.clear();
+}
+
+void ClearAllHooks( lua_State* L )
+{
+	ClearHooks( L, chatHooks );
+	ClearHooks( L, clientConnectHooks );
+	ClearHooks( L, teamChangeHooks );
+	ClearHooks( L, playerSpawnHooks );
+	ClearHooks( L, gameEndHooks );
+	ClearHooks( L, buildableSpawnedHooks );
+	ClearHooks( L, shutdownHooks );
+}
+
 /// Install a callback that will be called for every chat message.
 // The callback should be  function(EntityProxy, team, message).
 // where team = 'alien', 'human', '&lt;team&gt;' (for all chat)
@@ -312,7 +333,7 @@ LUACORETYPEDEFINE( ::Lua::Hooks )
 template <>
 void ExtraInit<::Lua::Hooks>( lua_State* L, int metatable_index )
 {
-    ::Lua::chatHooks.clear();
+	::Lua::ClearAllHooks( L );
 	lua_pushcfunction( L, ::Lua::RegisterChatHook );
 	lua_setfield( L, metatable_index - 1, "RegisterChatHook" );
 	lua_pushcfunction( L, ::Lua::RegisterClientConnectHook );
