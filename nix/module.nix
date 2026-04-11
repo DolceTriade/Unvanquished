@@ -44,20 +44,24 @@
       ++ optional (server.extraConfig != "") server.extraConfig
     );
 
-  mkPakPathArgs = server:
-    concatMapStringsSep " " (path: "-pakpath ${escapeShellArg (toString path)}") server.pakPaths;
-
-  mkDaemonArgs = server:
-    concatMapStringsSep " " escapeShellArg server.daemonArgs;
-
-  mkGameArgs = server:
-    concatMapStringsSep " " escapeShellArg (
-      ["+exec server.cfg"] ++ server.gameArgs
-    );
-
   mkServerService = name: server: let
     configFile = pkgs.writeText "unvanquished-${name}-server.cfg" (renderServerConfig name server);
     stateDir = server.stateDir;
+    screenBin = "${server.screenPackage}/bin/screen";
+    sessionName = server.screenSessionName;
+    serverCommand = concatMapStringsSep " " escapeShellArg (
+      [
+        "${server.package}/bin/daemonded"
+        "-homepath"
+        stateDir
+        "-libpath"
+        "${server.package}/bin"
+      ]
+      ++ lib.concatMap (path: ["-pakpath" path]) server.pakPaths
+      ++ server.daemonArgs
+      ++ ["+exec" "server.cfg"]
+      ++ server.gameArgs
+    );
   in {
     description = "Unvanquished dedicated server (${name})";
     wantedBy = ["multi-user.target"];
@@ -69,23 +73,31 @@
       install -d -m 0750 -o ${server.user} -g ${server.group} ${escapeShellArg "${stateDir}/config"}
       install -d -m 0750 -o ${server.user} -g ${server.group} ${escapeShellArg "${stateDir}/pkg"}
       install -m 0640 -o ${server.user} -g ${server.group} ${configFile} ${escapeShellArg "${stateDir}/config/server.cfg"}
+
+      if ${screenBin} -S ${escapeShellArg sessionName} -Q select . >/dev/null 2>&1; then
+        ${screenBin} -S ${escapeShellArg sessionName} -X quit
+        sleep 1
+      fi
     '';
 
     serviceConfig = {
-      Type = "simple";
+      Type = "forking";
       User = server.user;
       Group = server.group;
+      Environment = "HOME=${stateDir}";
       WorkingDirectory = stateDir;
-      Restart = "on-failure";
+      Restart = "always";
       RestartSec = 5;
-      KillSignal = "SIGINT";
+      TimeoutStopSec = 15;
       ExecStart = ''
-        ${server.package}/bin/daemonded \
-          -homepath ${escapeShellArg stateDir} \
-          -libpath ${escapeShellArg "${server.package}/bin"} \
-          ${mkPakPathArgs server} \
-          ${mkDaemonArgs server} \
-          ${mkGameArgs server}
+        ${screenBin} -U -DmS ${escapeShellArg sessionName} \
+          bash -lc ${escapeShellArg "exec ${serverCommand}"}
+      '';
+      ExecStop = ''
+        ${screenBin} -S ${escapeShellArg sessionName} -p 0 -X stuff ${escapeShellArg "quit$(printf '\r')"}
+      '';
+      ExecStopPost = ''
+        ${screenBin} -S ${escapeShellArg sessionName} -X quit >/dev/null 2>&1 || true
       '';
     };
   };
@@ -103,6 +115,19 @@ in {
             default = self.packages.${pkgs.system}.server;
             defaultText = literalExpression "self.packages.\${pkgs.system}.server";
             description = "Unvanquished server package to run.";
+          };
+
+          screenPackage = mkOption {
+            type = types.package;
+            default = pkgs.screen;
+            defaultText = literalExpression "pkgs.screen";
+            description = "GNU Screen package used to host the interactive server console.";
+          };
+
+          screenSessionName = mkOption {
+            type = types.str;
+            default = "unvanquished-${name}";
+            description = "Name of the detached Screen session for this instance.";
           };
 
           user = mkOption {
@@ -190,21 +215,6 @@ in {
 
   config = mkMerge [
     (mkIf (enabledServers != {}) {
-      users.groups = mkMerge (
-        builtins.map (group: lib.setAttrByPath [group] (mkDefault {})) enabledGroups
-      );
-
-      users.users = mkMerge (
-        builtins.map (user:
-          lib.setAttrByPath [user] {
-            isSystemUser = true;
-            group = (lib.findFirst (server: server.user == user) null (attrValues enabledServers)).group;
-            home = "/var/empty";
-            createHome = false;
-          })
-        enabledUsers
-      );
-
       systemd.services =
         lib.mapAttrs'
         (name: server: nameValuePair "unvanquished-server-${name}" (mkServerService name server))
