@@ -16,5 +16,13 @@
         import ./nix {
           inherit self system nixpkgs flake-utils;
         }
-    );
+    )
+    // {
+      nixosModules = {
+        unvanquished = import ./nix/module.nix {
+          inherit self;
+        };
+        default = self.nixosModules.unvanquished;
+      };
+    };
 }
