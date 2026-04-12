@@ -68,7 +68,7 @@
         "-DBUILD_CGAME=OFF"
         "-DBUILD_SGAME=OFF"
         "-DBUILD_GAME_NACL=OFF"
-        "-DUSE_BREAKPAD=ON"
+        "-DUSE_BREAKPAD=OFF"
         "-DUSE_CPP23=OFF"
         "-DUSE_EXTERNAL_DEPS=OFF"
         "-DUSE_EXTERNAL_DEPS_LIBS=OFF"
