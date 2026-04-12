@@ -56,6 +56,8 @@ Maryland 20850 USA.
 #include "rocketConditionalElement.h"
 #include "rocketColorInput.h"
 #include "rocketCvarInlineElement.h"
+#include "rocketDonutProgress.h"
+#include "rocketProgressElement.h"
 #include <RmlUi/Debugger.h>
 #include "lua/register_lua_extensions.h"
 #include "shared/lua/register_lua_extensions.h"
@@ -362,6 +364,8 @@ Cvar::Cvar<bool> cg_circleMenusCaptureMouse(
 	Cvar::NONE, true);
 
 Rml::PropertyId UnvPropertyId::Orientation;
+Rml::PropertyId UnvPropertyId::InnerRadius;
+Rml::PropertyId UnvPropertyId::OuterRadius;
 
 // TODO
 // cvar_t *cg_draw2D;
@@ -390,6 +394,14 @@ void Rocket_Init()
 	UnvPropertyId::Orientation = Rml::StyleSheetSpecification::RegisterProperty("orientation", "left", false, true)
 		.AddParser("keyword", "left, right, up, down")
 		.GetId();
+	UnvPropertyId::OuterRadius =
+		Rml::StyleSheetSpecification::RegisterProperty( "outerRadius", "0", false, true )
+			.AddParser( "length" )
+			.GetId();
+	UnvPropertyId::InnerRadius =
+		Rml::StyleSheetSpecification::RegisterProperty( "innerRadius", "0", false, true )
+			.AddParser( "length" )
+			.GetId();
 
 	// Set backup font
 	Rml::GetFontEngineInterface()->LoadFontFace( "fonts/unifont.ttf", /*fallback_face=*/true, Rml::Style::FontWeight::Normal );
@@ -425,6 +437,8 @@ void Rocket_Init()
 	RegisterElement<RocketConditionalElement>( "if" );
 	RegisterElement<RocketColorInput>( "colorinput" );
 	RegisterElement<RocketCvarInlineElement>( "inlinecvar" );
+	RegisterElement<RocketDonutProgress>( "donutprogress" );
+	RegisterElement<RocketProgressElement>( "progresselement" );
 
 	whiteShader = trap_R_RegisterShader( "gfx/colors/white", RSF_2D );
 
