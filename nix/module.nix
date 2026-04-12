@@ -96,13 +96,11 @@
     '';
 
     serviceConfig = {
-      Type = "forking";
+      Type = "oneshot";
       User = server.user;
       Group = server.group;
-      Environment = "HOME=${stateDir}";
       WorkingDirectory = "/";
-      Restart = "always";
-      RestartSec = 5;
+      RemainAfterExit = true;
       TimeoutStopSec = 15;
       ExecStart = startScript;
       ExecStop = stopScript;
