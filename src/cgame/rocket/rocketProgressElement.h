@@ -66,14 +66,26 @@ class RocketProgressElement : public Rml::Element
 
 	void OnUpdate() override
 	{
+<<<<<<< HEAD
 		auto child = GetChild( 0 );
 		if ( !source_.empty() && child && !targetAttribute_.empty() )
+=======
+		if ( !child_ )
+		{
+			child_ = GetChild( 0 );
+		}
+		if ( !source_.empty() && child_ && !targetAttribute_.empty() )
+>>>>>>> b7fedce76 (rmlui: Add donut progress and make loading screen use it)
 		{
 			float newValue = CG_Rocket_ProgressBarValue( source_.c_str() );
 
 			if ( newValue != value_ )
 			{
+<<<<<<< HEAD
 				child->SetAttribute( targetAttribute_, newValue );
+=======
+				child_->SetAttribute( targetAttribute_, newValue );
+>>>>>>> b7fedce76 (rmlui: Add donut progress and make loading screen use it)
 				value_ = newValue;
 			}
 		}
@@ -82,6 +94,10 @@ class RocketProgressElement : public Rml::Element
 
    private:
 	float value_;  // current value
+<<<<<<< HEAD
+=======
+	Rml::Element *child_;
+>>>>>>> b7fedce76 (rmlui: Add donut progress and make loading screen use it)
 	Rml::String source_;
 	Rml::String targetAttribute_;
 };
