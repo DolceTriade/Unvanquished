@@ -68,7 +68,11 @@
         bash -lc ${escapeShellArg "exec ${serverCommand}"}
     '';
     stopScript = pkgs.writeShellScript "unvanquished-${name}-stop" ''
-      exec ${screenBin} -S ${escapeShellArg sessionName} -p 0 -X stuff $'quit\r'
+      if ${screenBin} -S ${escapeShellArg sessionName} -Q select . >/dev/null 2>&1; then
+        exec ${screenBin} -S ${escapeShellArg sessionName} -p 0 -X stuff $'quit\r'
+      fi
+
+      exit 0
     '';
     cleanupScript = pkgs.writeShellScript "unvanquished-${name}-cleanup" ''
       ${screenBin} -S ${escapeShellArg sessionName} -X quit >/dev/null 2>&1 || true
