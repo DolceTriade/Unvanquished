@@ -85,6 +85,8 @@ bool CG_AnyMenuOpen();
 
 struct UnvPropertyId {
 	static Rml::PropertyId Orientation;
+	static Rml::PropertyId InnerRadius;
+	static Rml::PropertyId OuterRadius;
 };
 
 template <typename T>
