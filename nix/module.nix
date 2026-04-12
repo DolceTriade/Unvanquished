@@ -49,23 +49,16 @@
     stateDir = server.stateDir;
     screenBin = "${server.screenPackage}/bin/screen";
     sessionName = server.screenSessionName;
-    serverCommand = concatMapStringsSep " " escapeShellArg (
-      [
-        "${server.package}/bin/daemonded"
-        "-homepath"
-        stateDir
-        "-libpath"
-        "${server.package}/bin"
-      ]
-      ++ lib.concatMap (path: ["-pakpath" path]) server.pakPaths
-      ++ server.daemonArgs
-      ++ ["+exec" "server.cfg"]
-      ++ server.gameArgs
-    );
     startScript = pkgs.writeShellScript "unvanquished-${name}-start" ''
       cd ${escapeShellArg stateDir}
       exec ${screenBin} -U -DmS ${escapeShellArg sessionName} \
-        bash -lc ${escapeShellArg "exec ${serverCommand}"}
+        ${escapeShellArg "${server.package}/bin/daemonded"} \
+        -homepath ${escapeShellArg stateDir} \
+        -libpath ${escapeShellArg "${server.package}/bin"} \
+        ${concatMapStringsSep " \\\n        " (path: "-pakpath ${escapeShellArg path}") server.pakPaths} \
+        ${concatMapStringsSep " \\\n        " escapeShellArg server.daemonArgs} \
+        +exec server.cfg \
+        ${concatMapStringsSep " \\\n        " escapeShellArg server.gameArgs}
     '';
     stopScript = pkgs.writeShellScript "unvanquished-${name}-stop" ''
       if ${screenBin} -S ${escapeShellArg sessionName} -Q select . >/dev/null 2>&1; then
@@ -96,11 +89,12 @@
     '';
 
     serviceConfig = {
-      Type = "oneshot";
+      Type = "simple";
       User = server.user;
       Group = server.group;
       WorkingDirectory = "/";
-      RemainAfterExit = true;
+      Restart = "on-failure";
+      RestartSec = 5;
       TimeoutStopSec = 15;
       ExecStart = startScript;
       ExecStop = stopScript;
