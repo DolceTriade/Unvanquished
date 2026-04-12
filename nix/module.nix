@@ -63,6 +63,7 @@
       ++ server.gameArgs
     );
     startScript = pkgs.writeShellScript "unvanquished-${name}-start" ''
+      cd ${escapeShellArg stateDir}
       exec ${screenBin} -U -DmS ${escapeShellArg sessionName} \
         bash -lc ${escapeShellArg "exec ${serverCommand}"}
     '';
@@ -95,7 +96,7 @@
       User = server.user;
       Group = server.group;
       Environment = "HOME=${stateDir}";
-      WorkingDirectory = stateDir;
+      WorkingDirectory = "/";
       Restart = "always";
       RestartSec = 5;
       TimeoutStopSec = 15;
