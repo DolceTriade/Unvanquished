@@ -62,6 +62,16 @@
       ++ ["+exec" "server.cfg"]
       ++ server.gameArgs
     );
+    startScript = pkgs.writeShellScript "unvanquished-${name}-start" ''
+      exec ${screenBin} -U -DmS ${escapeShellArg sessionName} \
+        bash -lc ${escapeShellArg "exec ${serverCommand}"}
+    '';
+    stopScript = pkgs.writeShellScript "unvanquished-${name}-stop" ''
+      exec ${screenBin} -S ${escapeShellArg sessionName} -p 0 -X stuff $'quit\r'
+    '';
+    cleanupScript = pkgs.writeShellScript "unvanquished-${name}-cleanup" ''
+      ${screenBin} -S ${escapeShellArg sessionName} -X quit >/dev/null 2>&1 || true
+    '';
   in {
     description = "Unvanquished dedicated server (${name})";
     wantedBy = ["multi-user.target"];
@@ -89,16 +99,9 @@
       Restart = "always";
       RestartSec = 5;
       TimeoutStopSec = 15;
-      ExecStart = ''
-        ${screenBin} -U -DmS ${escapeShellArg sessionName} \
-          bash -lc ${escapeShellArg "exec ${serverCommand}"}
-      '';
-      ExecStop = ''
-        ${screenBin} -S ${escapeShellArg sessionName} -p 0 -X stuff ${escapeShellArg "quit$(printf '\r')"}
-      '';
-      ExecStopPost = ''
-        ${screenBin} -S ${escapeShellArg sessionName} -X quit >/dev/null 2>&1 || true
-      '';
+      ExecStart = startScript;
+      ExecStop = stopScript;
+      ExecStopPost = cleanupScript;
     };
   };
 in {
