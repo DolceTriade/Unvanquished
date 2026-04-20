@@ -219,6 +219,7 @@ set(SGAMELIST
     ${GAMELOGIC_DIR}/sgame/sg_bot_util.h
     ${GAMELOGIC_DIR}/sgame/sg_buildable.cpp
     ${GAMELOGIC_DIR}/sgame/sg_buildpoints.cpp
+    ${GAMELOGIC_DIR}/sgame/sg_overload.cpp
     ${GAMELOGIC_DIR}/sgame/sg_client.cpp
     ${GAMELOGIC_DIR}/sgame/sg_cmds.cpp
     ${GAMELOGIC_DIR}/sgame/sg_cm_world.cpp

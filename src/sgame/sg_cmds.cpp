@@ -2244,6 +2244,98 @@ static void Cmd_Class_f( gentity_t *ent )
 	}
 }
 
+static bool G_NearOverloadTerminal( gentity_t *ent )
+{
+	team_t team = (team_t) ent->client->pers.team;
+	gentity_t* mainBuildable = G_MainBuildable( team );
+
+	return mainBuildable &&
+	       mainBuildable->spawned &&
+	       Entities::IsAlive( mainBuildable ) &&
+	       G_Distance( ent, mainBuildable ) <= ENTITY_USE_RANGE;
+}
+
+static void Cmd_Donate_f( gentity_t *ent )
+{
+	char arg[ MAX_TOKEN_CHARS ];
+	int amount;
+
+	if ( !G_NearOverloadTerminal( ent ) )
+	{
+		trap_SendServerCommand( ent->num(),
+		                        va( "print_tr %s",
+		                            QQ( N_("You must be near your team's main structure to donate.") ) ) );
+		return;
+	}
+
+	if ( trap_Argc() < 2 )
+	{
+		trap_SendServerCommand( ent->num(),
+		                        va( "print_tr %s",
+		                            QQ( N_("usage: /donate <amount|all>") ) ) );
+		return;
+	}
+
+	trap_Argv( 1, arg, sizeof( arg ) );
+	if ( !Q_stricmp( arg, "all" ) )
+	{
+		amount = ent->client->pers.credit;
+	}
+	else
+	{
+		amount = atoi( arg );
+	}
+
+	if ( !G_OverloadDonate( ent, amount ) )
+	{
+		trap_SendServerCommand( ent->num(),
+		                        va( "print_tr %s",
+		                            QQ( N_("Donation failed.") ) ) );
+		return;
+	}
+
+	trap_SendServerCommand( ent->num(),
+	                        va( "print_tr %s %d",
+	                            QQ( N_("Donated $1$ credits to the team bank.") ),
+	                            amount ) );
+}
+
+static void Cmd_TeamBuy_f( gentity_t *ent )
+{
+	char arg[ MAX_TOKEN_CHARS ];
+
+	if ( !G_NearOverloadTerminal( ent ) )
+	{
+		trap_SendServerCommand( ent->num(),
+		                        va( "print_tr %s",
+		                            QQ( N_("You must be near your team's main structure to buy Overload upgrades.") ) ) );
+		return;
+	}
+
+	if ( trap_Argc() < 2 )
+	{
+		trap_SendServerCommand( ent->num(),
+		                        va( "print_tr %s",
+		                            QQ( N_("usage: /teambuy <bp_25|multiplier|tier_1>") ) ) );
+		return;
+	}
+
+	trap_Argv( 1, arg, sizeof( arg ) );
+	if ( !G_OverloadPurchase( ent, arg ) )
+	{
+		trap_SendServerCommand( ent->num(),
+		                        va( "print_tr %s %s",
+		                            QQ( N_("Team purchase failed: $1$") ),
+		                            Quote( arg ) ) );
+		return;
+	}
+
+	trap_SendServerCommand( ent->num(),
+	                        va( "print_tr %s %s",
+	                            QQ( N_("Team purchase completed: $1$") ),
+	                            Quote( arg ) ) );
+}
+
 static void Cmd_Deconstruct_f( gentity_t *ent )
 {
 	// Check for valid build weapon.
@@ -4285,6 +4377,7 @@ static const commands_t cmds[] =
 	{ "damage",          CMD_CHEAT | CMD_ALIVE,               Cmd_Damage_f           },
 	{ "deconstruct",     CMD_TEAM | CMD_ALIVE,                Cmd_Deconstruct_f      },
 	{ "devteam",         CMD_CHEAT,                           Cmd_Devteam_f          },
+	{ "donate",          CMD_TEAM | CMD_ALIVE,                Cmd_Donate_f           },
 	{ "follow",          CMD_SPEC,                            Cmd_Follow_f           },
 	{ "follownext",      CMD_SPEC,                            Cmd_FollowCycle_f      },
 	{ "followprev",      CMD_SPEC,                            Cmd_FollowCycle_f      },
@@ -4318,6 +4411,7 @@ static const commands_t cmds[] =
 	{ "setviewpos",      CMD_CHEAT_TEAM,                      Cmd_SetViewpos_f       },
 	{ "tactic",          CMD_TEAM,                            Cmd_Tactic_f           },
 	{ "team",            0,                                   Cmd_Team_f             },
+	{ "teambuy",         CMD_TEAM | CMD_ALIVE,                Cmd_TeamBuy_f          },
 	{ "teamstatus",      CMD_TEAM,                            Cmd_TeamStatus_f       },
 	{ "teamvote",        CMD_TEAM | CMD_INTERMISSION,         Cmd_Vote_f             },
 	{ "unignore",        0,                                   Cmd_Ignore_f           },

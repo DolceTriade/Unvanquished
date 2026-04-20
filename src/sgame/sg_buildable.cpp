@@ -370,118 +370,18 @@ static void HArmoury_Use( gentity_t *self, gentity_t*, gentity_t *activator )
 }
 
 /**
- * @brief Orders buildables that were pre-selected for power down to make good a budget deficit.
- * @todo Add const to parameters once there is a const variant of Entity::Get.
- */
-static bool CompareBuildablesForPowerSaving(Entity* a, Entity* b)
-{
-	if (!a) return false;
-	if (!b) return true;
-
-	const BuildableComponent* aC = a->Get<BuildableComponent>();
-	const BuildableComponent* bC = b->Get<BuildableComponent>();
-
-	// Prefer the marked buildable.
-	if ( aC->MarkedForDeconstruction() && !bC->MarkedForDeconstruction()) return true;
-	if (!aC->MarkedForDeconstruction() &&  bC->MarkedForDeconstruction()) return false;
-
-	// If both are marked, prefer the one marked last.
-	if (aC->MarkedForDeconstruction() && bC->MarkedForDeconstruction()) {
-		return (aC->GetMarkTime() > bC->GetMarkTime());
-	}
-
-	// Prefer the buildable further away from the base.
-	// Note that this function is supposed to be used only when there is a base, since otherwise
-	// every structure that can shut down did so already.
-	return (G_DistanceToBase(a->oldEnt) > G_DistanceToBase(b->oldEnt));
-}
-
-/**
- * @brief Set the power state of both team's buildables based on budget deficits.
+ * @brief Set the power state of both team's buildables based only on main-structure support.
  */
 void G_UpdateBuildablePowerStates()
 {
-	gentity_t* activeMainBuildable;
-
 	for (team_t team = TEAM_NONE; (team = G_IterateTeams(team)); ) {
-		std::vector<Entity*> poweredBuildables;
-		std::vector<Entity*> unpoweredBuildables;
-		int unpoweredBuildableTotal = 0;
-		activeMainBuildable = G_ActiveMainBuildable(team);
+		gentity_t* activeMainBuildable = G_ActiveMainBuildable(team);
 
 		ForEntities<BuildableComponent>([&](Entity& entity, BuildableComponent& buildableComponent) {
 			if (G_Team(entity.oldEnt) != team) return;
-
-			// Never shut down the main buildable or miners.
-			if (entity.Get<MainBuildableComponent>()) return;
-			if (entity.Get<MiningComponent>()) return;
-
-			// Never shut down spawns.
-			// TODO: Refer to a SpawnerComponent here.
-			if (entity.Get<TelenodeComponent>() || entity.Get<EggComponent>()) return;
-
-			// Power off all buildables if there is no main buildable.
-			if (!activeMainBuildable) {
-				buildableComponent.SetPowerState(false);
-				return;
-			}
-
-			if (g_BPVampire.Get()) {
-				buildableComponent.SetPowerState(true);
-				return;
-			}
-
-			// In order to make good a deficit, don't shut down buildables that have no cost.
-			if (BG_Buildable(entity.oldEnt->s.modelindex)->buildPoints <= 0) return;
-			if (!entity.oldEnt->powered) {
-				unpoweredBuildables.push_back(&entity);
-				unpoweredBuildableTotal += BG_Buildable(entity.oldEnt->s.modelindex)->buildPoints;
-			} else {
-				poweredBuildables.push_back(&entity);
-			}
+			if ( entity.Get<MainBuildableComponent>() ) return;
+			buildableComponent.SetPowerState( activeMainBuildable != nullptr );
 		});
-
-		// If there is no active main buildable, all buildables that can shut down already did so.
-		if (!activeMainBuildable) continue;
-
-		// Positive deficit means that we are over, and negative means we have a surplus.
-		int deficit = level.team[team].spentBudget - (int)level.team[team].totalBudget - unpoweredBuildableTotal;
-
-		// Exactly at our limit. Nothing else to do.
-		if (deficit == 0) continue;
-
-		// We have surplus bp, but nothing else to power on, so we're done here.
-		if (deficit < 0 && unpoweredBuildables.empty()) continue;
-
-		// Uh oh...start powering stuff down.
-		if (deficit > 0) {
-			std::sort(poweredBuildables.begin(), poweredBuildables.end(), CompareBuildablesForPowerSaving);
-			for(Entity* entity : poweredBuildables) {
-				entity->Get<BuildableComponent>()->SetPowerState(false);
-
-				// Dying buildables have already substracted their share from the spent budget pool.
-				if (entity->Get<HealthComponent>()->Alive()) {
-					deficit -= BG_Buildable(entity->oldEnt->s.modelindex)->buildPoints;
-				}
-
-				if (deficit <= 0) break;
-			}
-		} else if (deficit < 0) {
-			// Make our deficit positive for ease of calculation.
-			int surplus = -deficit;
-			std::sort(unpoweredBuildables.begin(), unpoweredBuildables.end(), CompareBuildablesForPowerSaving);
-			for (auto it = unpoweredBuildables.rbegin(); it != unpoweredBuildables.rend(); ++it) {
-				int buildableCost = BG_Buildable((*it)->oldEnt->s.modelindex)->buildPoints;
-
-				// not cheap enough
-				if (surplus < buildableCost) continue;
-				// don't switch on unpowered buildables on destruction
-				if (!(*it)->Get<HealthComponent>()->Alive()) continue;
-
-				(*it)->Get<BuildableComponent>()->SetPowerState(true);
-				surplus -= buildableCost;
-			}
-		}
 	}
 }
 
@@ -773,10 +673,10 @@ void G_Deconstruct( gentity_t *self, gentity_t *deconner, meansOfDeath_t deconTy
 
 	const buildableAttributes_t *attr = BG_Buildable( self->s.modelindex );
 
-	// return some build points immediately
+	// Consumable BP refunds only the surviving fraction of the structure.
 	int immediateRefund = G_BuildableDeconValue( self );
-	int queuedRefund    = attr->buildPoints - immediateRefund;
-	G_FreeBudget( self->buildableTeam, immediateRefund, queuedRefund );
+	G_RemoveBudget( self->buildableTeam, attr->buildPoints );
+	G_FreeBudget( self->buildableTeam, immediateRefund, 0 );
 
 	// remove momentum
 	G_RemoveMomentumForDecon( self, deconner );
@@ -1071,14 +971,6 @@ static itemBuildError_t PrepareBuildableReplacement( buildable_t buildable, vec3
 		cost -= G_BuildableDeconValue( level.markedBuildables[ entNum ] );
 	}
 
-	// It's preferrable to replace marked buildings first with BP vampire
-	if ( !g_BPVampire.Get() ) {
-		// check if we can already afford the new buildable
-		if ( G_GetFreeBudget( attr->team ) >= cost ) {
-			return IBE_NONE;
-		}
-	}
-
 	// build a list of additional buildables that can be deconstructed
 	listLen = 0;
 
@@ -1125,7 +1017,7 @@ static itemBuildError_t PrepareBuildableReplacement( buildable_t buildable, vec3
 	// sort the list
 	qsort( list, listLen, sizeof( gentity_t* ), CompareBuildablesForRemoval );
 
-	// set buildables for deconstruction until we can pay for the new buildable
+	// Always consume eligible marked buildables before falling back to free BP.
 	for ( entNum = 0; entNum < listLen; entNum++ )
 	{
 		ent = list[ entNum ];
@@ -1134,18 +1026,12 @@ static itemBuildError_t PrepareBuildableReplacement( buildable_t buildable, vec3
 
 		cost -= G_BuildableDeconValue( ent );
 
-		// check if we have enough resources now
-		if ( Math::Clamp( G_GetFreeBudget( attr->team ), 0, std::numeric_limits<int>::max() ) >= cost )
-		{
-			return IBE_NONE;
-		}
 	}
 
-	// Check if we can afford the new buildable with BP vampire if we don't have enough BP marked
-	if ( g_BPVampire.Get() ) {
-		if ( G_GetFreeBudget( attr->team ) >= cost ) {
-			return IBE_NONE;
-		}
+	// check if we can now afford the new buildable with the marked replacements applied
+	if ( G_GetFreeBudget( attr->team ) >= cost )
+	{
+		return IBE_NONE;
 	}
 
 	// we don't have enough resources
@@ -1255,6 +1141,10 @@ itemBuildError_t G_CanBuild( gentity_t *ent, buildable_t buildable, int /*distan
 	if ( ( replacementError = PrepareBuildableReplacement( buildable, origin ) ) != IBE_NONE )
 	{
 		reason = replacementError;
+	}
+	else if ( buildable == BA_H_DRILL || buildable == BA_A_LEECH )
+	{
+		reason = IBE_DISABLED;
 	}
 	else if ( ent->client->pers.team == TEAM_ALIENS )
 	{
@@ -1371,23 +1261,6 @@ itemBuildError_t G_CanBuild( gentity_t *ent, buildable_t buildable, int /*distan
 	if ( reason != IBE_NONE )
 	{
 		level.numBuildablesForRemoval = 0;
-	}
-
-	int max_miners = g_maxMiners.Get();
-	if ( max_miners >= 0 && ( buildable == BA_H_DRILL || buildable == BA_A_LEECH ) )
-	{
-		int miners = 0;
-		ForEntities<MiningComponent> ( [&](Entity& entity, MiningComponent& )
-		{
-			if ( Entities::IsAlive(entity) && G_OnSameTeam( entity.oldEnt, ent ) )
-			{
-				miners++;
-			}
-		});
-		if ( miners >= max_miners )
-		{
-			return ent->client->pers.team == TEAM_HUMANS ? IBE_NOMOREDRILLS : IBE_NOMORELEECHES;
-		}
 	}
 
 	return reason;
@@ -2222,10 +2095,8 @@ buildLog_t *G_BuildLogNew( gentity_t *actor, buildFate_t fate )
 	log->fate = fate;
 	log->actor = actor && actor->client ? actor->client->pers.namelog : nullptr;
 
-	if ( g_BPVampire.Get() ) {
-		log->humanBP = level.team[ TEAM_HUMANS ].totalBudget;
-		log->alienBP = level.team[ TEAM_ALIENS ].totalBudget;
-	}
+	log->humanBP = level.team[ TEAM_HUMANS ].totalBudget;
+	log->alienBP = level.team[ TEAM_ALIENS ].totalBudget;
 
 	return log;
 }
@@ -2394,10 +2265,9 @@ void G_BuildLogRevert( int id )
 		}
 	}
 
-	if ( g_BPVampire.Get() && log != nullptr ) {
+	if ( log != nullptr ) {
 		level.team[ TEAM_HUMANS ].totalBudget = log->humanBP;
 		level.team[ TEAM_ALIENS ].totalBudget = log->alienBP;
-
 	}
 
 	for ( int team = TEAM_NONE + 1; team < NUM_TEAMS; ++team )

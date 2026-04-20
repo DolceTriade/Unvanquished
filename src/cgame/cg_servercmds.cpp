@@ -91,33 +91,6 @@ static void CG_ParseScores()
 	cg.scoreInvalidated = true;
 }
 
-/*
-=================
-CG_BPVampire
-
-=================
-*/
-static void CG_BPVampire()
-{
-	int bpA, bpH;
-
-	if ( 2 == sscanf( CG_ConfigString( CS_BP_VAMPIRE ), "%d %d", &bpA, &bpH ) )
-	{
-		cg.bpVampireTime = cg.time;
-
-		cg.bpVampireOld[ TEAM_HUMANS ] = cg.bpVampire[ TEAM_HUMANS ];
-		cg.bpVampireOld[ TEAM_ALIENS ] = cg.bpVampire[ TEAM_ALIENS ];
-
-		cg.bpVampire[ TEAM_HUMANS ] = bpH;
-		cg.bpVampire[ TEAM_ALIENS ] = bpA;
-	}
-	else
-	{
-		// Off. String should be empty
-		cg.bpVampireTime = 0;
-	}
-}
-
 static void CG_PrintBPMessage_f()
 {
 	// cg.bpMessage = TranslateText_Internal( false, 1 ); // Fuck do you mean it's not found?
@@ -380,10 +353,6 @@ void CG_ConfigStringModified( int num )
 	else if ( num == CS_SHADERSTATE )
 	{
 		CG_ShaderStateChanged();
-	}
-	else if ( num == CS_BP_VAMPIRE )
-	{
-		CG_BPVampire();
 	}
 }
 

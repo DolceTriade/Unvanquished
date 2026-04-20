@@ -172,45 +172,7 @@ static void CheckStatusKnowledge( unlockableType_t type, int itemNum )
 
 static float UnlockToLockThreshold( float unlockThreshold )
 {
-	float momentumHalfLife = 0.0f;
-	float unlockableMinTime  = 0.0f;
-
-	// maintain cache
-	static float lastMomentumHalfLife = 0.0f;
-	static float lastunlockableMinTime  = 0.0f;
-	static float lastMod                = 0.0f;
-
-	// retrieve relevant settings
-#ifdef BUILD_SGAME
-	momentumHalfLife = g_momentumHalfLife.Get();
-	unlockableMinTime  = g_unlockableMinTime.Get();
-#endif
-#ifdef BUILD_CGAME
-	momentumHalfLife = cgs.momentumHalfLife;
-	unlockableMinTime  = cgs.unlockableMinTime;
-#endif
-
-	// a half life time of 0 means there is no decrease, so we don't need to alter thresholds
-	if ( momentumHalfLife <= 0.0f )
-	{
-		return unlockThreshold;
-	}
-
-	// do cache lookup
-	if ( lastMomentumHalfLife == momentumHalfLife &&
-	     lastunlockableMinTime  == unlockableMinTime  &&
-	     lastMod > 0.0f )
-	{
-		return lastMod * unlockThreshold;
-	}
-
-	lastMomentumHalfLife = momentumHalfLife;
-	lastunlockableMinTime  = unlockableMinTime;
-
-	// ln(2) ~= 0.6931472
-	lastMod = exp( -0.6931472f * ( unlockableMinTime / ( momentumHalfLife * 60.0f ) ) );
-
-	return lastMod * unlockThreshold;
+	return unlockThreshold;
 }
 
 // ----------
@@ -509,7 +471,7 @@ static void UpdateUnlockablesMask()
 void G_UpdateUnlockables()
 {
 	int              itemNum = 0, unlockableNum, unlockThreshold;
-	float            momentum;
+	int              progress;
 	unlockable_t     *unlockable;
 	int              unlockableType = 0;
 	team_t           team;
@@ -553,7 +515,7 @@ void G_UpdateUnlockables()
 		}
 
 		unlockThreshold = std::max( unlockThreshold, 0 );
-		momentum = level.team[ team ].momentum;
+		progress = G_OverloadProgressValue( team );
 
 		unlockable->type            = unlockableType;
 		unlockable->num             = itemNum;
@@ -564,8 +526,8 @@ void G_UpdateUnlockables()
 
 		// calculate the item's locking state
 		unlockable->unlocked = (
-		    !unlockThreshold || momentum >= unlockThreshold ||
-		    ( unlockable->unlocked && momentum >= unlockable->lockThreshold )
+		    !unlockThreshold || progress >= unlockThreshold ||
+		    ( unlockable->unlocked && progress >= unlockable->lockThreshold )
 		);
 
 		itemNum++;
