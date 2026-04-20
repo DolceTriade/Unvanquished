@@ -68,6 +68,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #define CGAME_CHAR_HEIGHT              48
 
 #define MAX_MINIMAP_ZONES              32
+#define NON_BUILDABLE_USABLE_ENTITY    -1
 
 enum footstep_t
 {

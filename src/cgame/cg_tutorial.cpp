@@ -334,6 +334,30 @@ static void CG_HumanCkitText( std::string& text, playerState_t *ps )
 	CG_BuilderText( text, ps );
 }
 
+static void CG_UsableEntityText( std::string& text )
+{
+	switch ( cg.nearUsableBuildable )
+	{
+		case BA_H_ARMOURY:
+			text += va( _( "Press %s to buy equipment upgrades at the Armoury." ), CG_KeyNameForCommand( "+activate" ) );
+			text += '\n';
+			break;
+
+		case NON_BUILDABLE_USABLE_ENTITY:
+			text += va( _( "Press %s to use this." ), CG_KeyNameForCommand( "+activate" ) );
+			text += '\n';
+			break;
+
+		case BA_NONE:
+			break;
+
+		default:
+			text += va( _( "Press %s to use the %s." ), CG_KeyNameForCommand( "+activate" ), _( BG_Buildable( cg.nearUsableBuildable )->humanName ) );
+			text += '\n';
+			break;
+	}
+}
+
 /*
 ===============
 CG_HumanText
@@ -439,22 +463,6 @@ static void CG_HumanText( std::string& text, playerState_t *ps )
 		text += COLOR_ALARM;
 		text += va( _( "Press %s to use your Medkit." ), CG_KeyNameForCommand( "itemact medkit" ) );
 		text += '\n';
-	}
-
-	switch ( cg.nearUsableBuildable )
-	{
-		case BA_H_ARMOURY:
-			text += va( _( "Press %s to buy equipment upgrades at the Armoury." ), CG_KeyNameForCommand( "+activate" ) );
-			text += '\n';
-			break;
-
-		case BA_NONE:
-			break;
-
-		default:
-			text += va( _( "Press %s to use the %s." ), CG_KeyNameForCommand( "+activate" ), _( BG_Buildable( cg.nearUsableBuildable )->humanName ) );
-			text += '\n';
-			break;
 	}
 
 	text += va( _( "Press %s and any direction to sprint." ), CG_KeyNameForCommand( "+sprint" ) );
@@ -590,10 +598,15 @@ const std::string& CG_TutorialText()
 					break;
 			}
 
+			CG_UsableEntityText( text );
+
 			if ( ps->persistant[ PERS_TEAM ] == TEAM_ALIENS )
 			{
-				text += va( _( "Press %s to evolve." ), CG_KeyNameForCommand( "+activate" ) );
-				text += '\n';
+				if ( cg.nearUsableBuildable == BA_NONE )
+				{
+					text += va( _( "Press %s to evolve." ), CG_KeyNameForCommand( "+activate" ) );
+					text += '\n';
+				}
 				text += va( _( "Press %s to show the bot tactic menu." ), CG_KeyNameForCommand( "botTacticMenu" ) );
 				text += '\n';
 			}
