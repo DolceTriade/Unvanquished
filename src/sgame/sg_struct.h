@@ -32,6 +32,7 @@ struct botMemory_t;
 
 #define MAX_NAMELOG_NAMES 5
 #define MAX_NAMELOG_ADDRS 5
+#define MAX_OVERLOAD_PURCHASES 16
 
 using unnamed_t = signed int;
 struct namelog_t
@@ -62,6 +63,19 @@ struct namelog_t
 };
 
 class Entity;
+
+struct TeamEconomyState
+{
+	int   bankBalance;
+	int   progress;
+	int   milestone;
+	int   tier;
+	int   bpPurchased;
+	int   multiplierLevel;
+	float rewardMultiplier;
+	int   repeatCounts[ MAX_OVERLOAD_PURCHASES ];
+	bool  ownedPurchases[ MAX_OVERLOAD_PURCHASES ];
+};
 
 // Replacement for gentity_t* that can detect the case where an entity has been recycled.
 // operator bool checks that the entity is non-null and has not been freed since the reference
@@ -660,10 +674,10 @@ struct level_locals_t
 		float            totalBudget; // Read access always rounds towards zero.
 		int              spentBudget;
 		int              queuedBudget;
-		int              vampireBudgetSurplus;
 		spawnQueue_t     spawnQueue;
 		bool             locked;
 		float            momentum;
+		TeamEconomyState economy;
 		int              layoutBuildPoints;
 		int              botFillTeamSize;
 		int              botFillSkillLevel;

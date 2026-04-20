@@ -109,16 +109,22 @@ void              G_BuildableTouchTriggers( gentity_t *ent );
 void ABarricade_Shrink( gentity_t *self, bool shrink );
 
 // sg_buildpoints
-float             G_RGSPredictEfficiencyDelta(vec3_t origin, team_t team);
 void              G_UpdateBuildPointBudgets();
 void              G_RecoverBuildPoints();
 int               G_GetFreeBudget(team_t team);
 int               G_GetMarkedBudget(team_t team);
 int               G_GetSpendableBudget(team_t team);
+int               G_GetEffectiveBudget(team_t team, int replacementCount = 0, gentity_t *const *replacementList = nullptr);
 void              G_FreeBudget(team_t team, int immediateAmount , int queuedAmount);
 void              G_SpendBudget(team_t team, int amount);
+void              G_RemoveBudget(team_t team, int amount);
 int               G_BuildableDeconValue(gentity_t *ent);
 void              G_GetTotalBuildableValues(int *buildableValuesByTeam);
+void              G_InitOverloadEconomy();
+float             G_OverloadRewardMultiplier( team_t team );
+int               G_OverloadProgressValue( team_t team );
+bool              G_OverloadDonate( gentity_t *ent, int amount );
+bool              G_OverloadPurchase( gentity_t *ent, Str::StringRef purchaseName );
 
 // sg_client.c
 void              G_AddCreditToClient( gclient_t *client, short credit, bool cap );
@@ -190,7 +196,6 @@ void              G_AddMomentumToScore( gentity_t *self, float momentum );
 void              G_LogDestruction( gentity_t *self, gentity_t *actor, int mod );
 void              G_InitDamageLocations();
 void              G_PlayerDie( gentity_t *self, gentity_t *inflictor, gentity_t *attacker, int mod );
-void G_AnnounceStolenBP();
 
 // sg_momentum.c
 void              G_DecreaseMomentum();

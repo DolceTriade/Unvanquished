@@ -130,25 +130,6 @@ Cvar::Callback<Cvar::Cvar<int>> g_BPInitialBudgetAliens(
 		[](int) {
 			G_UpdateBuildPointBudgets();
 		});
-Cvar::Callback<Cvar::Cvar<int>> g_buildPointBudgetPerMiner(
-		"g_BPBudgetPerMiner",
-		"Budget per Miner",
-		Cvar::NONE,
-		DEFAULT_BP_BUDGET_PER_MINER,
-		[](int) {
-			G_UpdateBuildPointBudgets();
-		});
-Cvar::Cvar<int> g_buildPointRecoveryInitialRate(
-		"g_BPRecoveryInitialRate",
-		"The initial speed at which BP will be recovered (in BP per minute)",
-		Cvar::NONE,
-		DEFAULT_BP_RECOVERY_INITIAL_RATE);
-Cvar::Cvar<int> g_buildPointRecoveryRateHalfLife(
-		"g_BPRecoveryRateHalfLife",
-		"The duration one will wait before BP recovery gets twice as slow (in minutes)",
-		Cvar::NONE,
-		DEFAULT_BP_RECOVERY_RATE_HALF_LIFE);
-
 Cvar::Range<Cvar::Cvar<int>> g_debugMomentum("g_debugMomentum", "momentum debug level", Cvar::NONE, 0, 0, 2);
 Cvar::Cvar<float> g_momentumHalfLife("g_momentumHalfLife", "minutes for momentum to decrease 50%", Cvar::NONE, DEFAULT_MOMENTUM_HALF_LIFE);
 Cvar::Cvar<float> g_momentumRewardDoubleTime("g_momentumRewardDoubleTime", "some momentum rewards double after x minutes", Cvar::NONE, DEFAULT_CONF_REWARD_DOUBLE_TIME);
@@ -198,8 +179,6 @@ Cvar::Callback<Cvar::Cvar<bool>> g_indestructibleBuildables(
 Cvar::Cvar<float> g_alienOffCreepRegenHalfLife("g_alienOffCreepRegenHalfLife", "half-life in seconds for decay of creep's healing bonus", Cvar::NONE, 0);
 
 Cvar::Cvar<int> g_teamImbalanceWarnings("g_teamImbalanceWarnings", "send 'Teams are imbalanced' messages every x seconds if >0", Cvar::NONE, 0);
-Cvar::Cvar<int> g_freeFundPeriod("g_freeFundPeriod", "every x seconds, players get funds for nothing", Cvar::NONE, DEFAULT_FREEKILL_PERIOD);
-Cvar::Cvar<int> g_freeFundMax("g_freeFundMax", "Maximum extra money to give scaled with momentum in addition to the 200. (Aliens get num/200)", Cvar::NONE, 800);
 // int instead of bool for now to avoid changing the serverinfo format
 Cvar::Range<Cvar::Cvar<int>> g_unlagged("g_unlagged", "whether latency compensation is enabled", Cvar::SERVERINFO, 1, 0, 1);
 Cvar::Cvar<std::string> g_disabledVoteCalls(
@@ -664,6 +643,8 @@ void G_InitGame( int levelTime, int randomSeed, bool inClient )
 	level.voices = BG_VoiceInit();
 	BG_PrintVoices( level.voices, g_debugVoices.Get() );
 
+	G_InitOverloadEconomy();
+
 	// Spend build points for layout buildables.
 	for (team_t team = TEAM_NONE; (team = G_IterateTeams(team)); ) {
 		G_SpendBudget(team, level.team[team].layoutBuildPoints);
@@ -684,7 +665,7 @@ void G_InitGame( int levelTime, int randomSeed, bool inClient )
 
 	G_notify_sensor_start();
 
-	// Initialize build point counts for the intial layout.
+	// Ensure the consumable BP state matches the initial layout.
 	G_UpdateBuildPointBudgets();
 
 	// Initialize Lua
@@ -1712,7 +1693,6 @@ static void G_LogGameplayStats( int state )
 			             "#\n"
 			             "# g_momentumHalfLife:        %4g\n"
 			             "# g_initialBuildPoints:      %4i\n"
-			             "# g_budgetPerMiner:          %4i\n"
 			             "#\n"
 			             "#  1  2  3    4    5    6    7    8    9   10   11   12   13   14   15   16\n"
 			             "#  T #A #H AMom HMom ---- ATBP HTBP AUBP HUBP ABRV HBRV ACre HCre AVal HVal\n"
@@ -1723,8 +1703,7 @@ static void G_LogGameplayStats( int state )
 			             t.tm_hour, t.tm_min, t.tm_sec,
 			             LOG_GAMEPLAY_STATS_VERSION,
 			             g_momentumHalfLife.Get(),
-			             g_buildPointInitialBudget.Get(),
-			             g_buildPointBudgetPerMiner.Get() );
+			             g_buildPointInitialBudget.Get() );
 
 			break;
 		}
@@ -2233,30 +2212,12 @@ static void G_TransmitGameplayCvars()
 	AddCvar( g_devolveMaxBaseDistance );
 	AddCvar( g_momentumHalfLife );
 	AddCvar( g_unlockableMinTime );
-	AddCvar( g_buildPointBudgetPerMiner );
-	AddCvar( g_buildPointRecoveryInitialRate );
-	AddCvar( g_buildPointRecoveryRateHalfLife );
 
 	Info_SetValueForKey( info, "g_disabledEquipment", Cvar::GetValue( "g_disabledEquipment" ).c_str(), true );
 	Info_SetValueForKey( info, "g_disabledClasses", Cvar::GetValue( "g_disabledClasses" ).c_str(), true );
 	Info_SetValueForKey( info, "g_disabledBuildables", Cvar::GetValue( "g_disabledBuildables" ).c_str(), true );
 
 	trap_SetConfigstring( CS_GAMEPLAY_CVARS, info );
-}
-
-static void G_TransmitBPVampire()
-{
-	if ( g_BPVampire.Get() )
-	{
-		std::string string = Str::Format( "%d %d",
-			static_cast<int>( level.team[ TEAM_ALIENS ].totalBudget ),
-			static_cast<int>( level.team[ TEAM_HUMANS ].totalBudget ) );
-		trap_SetConfigstring( CS_BP_VAMPIRE, string.c_str() );
-	}
-	else
-	{
-		trap_SetConfigstring( CS_BP_VAMPIRE, "" );
-	}
 }
 
 /*
@@ -2466,8 +2427,6 @@ void G_RunFrame( int levelTime )
 	// Power down buildables if there is a budget deficit.
 	G_UpdateBuildablePowerStates();
 
-	G_AnnounceStolenBP();
-
 	G_DecreaseMomentum();
 	G_CalculateAvgPlayers();
 	G_SpawnClients( TEAM_ALIENS );
@@ -2505,7 +2464,6 @@ void G_RunFrame( int levelTime )
 
 	// update some configstrings
 	G_TransmitGameplayCvars();
-	G_TransmitBPVampire();
 }
 
 void G_PrepareEntityNetCode() {

@@ -87,11 +87,6 @@ extern Cvar::Cvar<int> g_fillBotsTeamVotesPercent;
 extern  Cvar::Callback<Cvar::Cvar<int>> g_buildPointInitialBudget;
 extern  Cvar::Callback<Cvar::Cvar<int>> g_BPInitialBudgetHumans;
 extern  Cvar::Callback<Cvar::Cvar<int>> g_BPInitialBudgetAliens;
-extern  Cvar::Callback<Cvar::Cvar<int>> g_buildPointBudgetPerMiner;
-extern  Cvar::Cvar<int> g_buildPointRecoveryInitialRate;
-extern  Cvar::Cvar<int> g_buildPointRecoveryRateHalfLife;
-extern  Cvar::Cvar<bool> g_BPVampire;
-extern  Cvar::Cvar<float> g_BPVampireFactor;
 
 extern Cvar::Range<Cvar::Cvar<int>> g_debugMomentum;
 extern Cvar::Cvar<float> g_momentumHalfLife;
@@ -110,8 +105,6 @@ extern Cvar::Callback<Cvar::Cvar<bool>> g_indestructibleBuildables;
 extern Cvar::Cvar<float> g_alienOffCreepRegenHalfLife;
 
 extern Cvar::Cvar<int> g_teamImbalanceWarnings;
-extern Cvar::Cvar<int> g_freeFundPeriod;
-extern Cvar::Cvar<int> g_freeFundMax;
 
 extern Cvar::Range<Cvar::Cvar<int>> g_unlagged;
 
