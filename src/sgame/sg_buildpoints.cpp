@@ -26,122 +26,7 @@ along with Unvanquished. If not, see <http://www.gnu.org/licenses/>.
 #include "sg_local.h"
 #include "CBSE.h"
 
-static Log::Logger buildpointLogger("sgame.buildpoints");
-
-/**
- * @brief Predict the efficiency loss of an existing miner if another one is constructed closeby.
- * @return Efficiency loss as negative value.
- */
-static float RGSPredictEfficiencyLoss(Entity& miner, vec3_t newMinerOrigin) {
-	float distance               = Distance(miner.oldEnt->s.origin, newMinerOrigin);
-	float oldPredictedEfficiency = miner.Get<MiningComponent>()->Efficiency(true);
-	float newPredictedEfficiency = oldPredictedEfficiency * MiningComponent::InterferenceMod(distance);
-	float efficiencyLoss         = newPredictedEfficiency - oldPredictedEfficiency;
-
-	buildpointLogger.Debug("Predicted efficiency loss of existing miner: %f - %f = %f.",
-	                       oldPredictedEfficiency, newPredictedEfficiency, efficiencyLoss);
-
-	return efficiencyLoss;
-}
-
-/**
- * @brief Predict the total efficiency gain for a team when a miner is constructed at a given point.
- * @return Predicted efficiency delta in percent points.
- * @todo Consider RGS set for deconstruction.
- */
-float G_RGSPredictEfficiencyDelta(vec3_t origin, team_t team) {
-	float delta = MiningComponent::FindEfficiencies(team, VEC2GLM(origin), nullptr).predicted;
-
-	buildpointLogger.Debug("Predicted efficiency of new miner itself: %f.", delta);
-
-	ForEntities<MiningComponent>([&] (Entity& miner, MiningComponent&) {
-		if (G_Team(miner.oldEnt) != team) return;
-
-		delta += RGSPredictEfficiencyLoss(miner, origin);
-	});
-
-	buildpointLogger.Debug("Predicted efficiency delta: %f. Build point delta: %f.", delta,
-	                       delta * g_buildPointBudgetPerMiner.Get());
-
-	return delta;
-}
-
-/**
- * @brief Calculate the build point budgets for both teams.
- */
-
-void G_UpdateBPVampire( int client ) // -1 to update everyone
-{
-	if ( !g_BPVampire.Get() )
-	{
-		return;
-	}
-
-	trap_SendServerCommand( client, va( "bpvampire %d %d", static_cast<int>( level.team[ TEAM_HUMANS ].totalBudget ), static_cast<int>( level.team[ TEAM_ALIENS ].totalBudget ) ) );
-}
-
-void G_UpdateBuildPointBudgets() {
-	int abp = g_BPInitialBudgetAliens.Get();
-	int hbp = g_BPInitialBudgetHumans.Get();
-	for (team_t team = TEAM_NONE; (team = G_IterateTeams(team)); ) {
-		if ( team == TEAM_ALIENS && abp >= 0 )
-		{
-			level.team[team].totalBudget = abp;
-		}
-		else if ( team == TEAM_HUMANS && hbp >= 0 )
-		{
-			level.team[team].totalBudget = hbp;
-		}
-		else
-		{
-			level.team[team].totalBudget = g_buildPointInitialBudget.Get();
-		}
-		if ( g_BPVampire.Get() )
-		{
-			level.team[ team ].totalBudget += level.team[ team ].vampireBudgetSurplus;
-		}
-	}
-
-	ForEntities<MiningComponent>([&] (Entity& entity, MiningComponent& miningComponent) {
-		float halfLife = std::pow(2.0f, static_cast<float>(miningComponent.TimeBuilt()) /
-	                            (60000.0f * g_buildPointRecoveryRateHalfLife.Get()));
-		float minerBP = g_buildPointBudgetPerMiner.Get() / halfLife;
-		level.team[G_Team(entity.oldEnt)].totalBudget += miningComponent.Efficiency() *
-		                                                 minerBP;
-	});
-	G_UpdateBPVampire( -1 );
-}
-
 void G_RecoverBuildPoints() {
-	static int nextBuildPoint[NUM_TEAMS] = {0};
-
-	float rate = g_buildPointRecoveryInitialRate.Get() /
-	             std::pow(2.0f, (float)level.matchTime /
-	                            (60000.0f * g_buildPointRecoveryRateHalfLife.Get()));
-	float interval = 60000.0f / rate;
-
-	// The interval grows exponentially, so check for an excessively large value which could cause overflow.
-	// The maximum allowed game time is 0x70000000 (7 << 28); limit interval to 1 << 27.
-	if (interval > 0x1.0p27f) return;
-
-	int nextBuildPointTime = level.time + int(interval);
-
-	for (team_t team = TEAM_NONE; (team = G_IterateTeams(team)); ) {
-		if (!level.team[team].queuedBudget) {
-			nextBuildPoint[team] = -1;
-			continue;
-		}
-
-		if (nextBuildPoint[team] == -1) {
-			nextBuildPoint[team] = nextBuildPointTime;
-			continue;
-		}
-
-		if (nextBuildPoint[team] <= level.time) {
-			nextBuildPoint[team] = nextBuildPointTime;
-			level.team[team].queuedBudget--;
-		}
-	}
 }
 
 /**
@@ -149,7 +34,7 @@ void G_RecoverBuildPoints() {
  */
 int G_GetFreeBudget(team_t team)
 {
-	return (int)level.team[team].totalBudget - (level.team[team].spentBudget + level.team[team].queuedBudget);
+	return level.team[ team ].totalBudget;
 }
 
 /**
@@ -162,12 +47,7 @@ int G_GetMarkedBudget(team_t team)
 	ForEntities<BuildableComponent>(
 	[&](Entity& entity, BuildableComponent& buildableComponent) {
 		if (G_Team(entity.oldEnt) == team && buildableComponent.MarkedForDeconstruction()) {
-			int val = G_BuildableDeconValue(entity.oldEnt);
-			if ( g_BPVampire.Get() && level.time - entity.oldEnt->lastDamageTime < VAMPIRE_DAMAGE_TIME )
-			{
-				val *= g_BPVampireFactor.Get();
-			}
-			sum += val;
+			sum += G_BuildableDeconValue(entity.oldEnt);
 		}
 	});
 
@@ -183,18 +63,31 @@ int G_GetSpendableBudget(team_t team)
 	return G_GetFreeBudget(team) + G_GetMarkedBudget(team);
 }
 
+int G_GetEffectiveBudget( team_t team, int replacementCount, gentity_t *const *replacementList )
+{
+	int budget = G_GetFreeBudget( team );
+
+	for ( int i = 0; i < replacementCount; i++ )
+	{
+		if ( replacementList[ i ] )
+		{
+			budget += G_BuildableDeconValue( replacementList[ i ] );
+		}
+	}
+
+	return budget;
+}
+
 void G_FreeBudget( team_t team, int immediateAmount, int queuedAmount )
 {
 	if ( G_IsPlayableTeam( team ) )
 	{
-		level.team[ team ].spentBudget  -= (immediateAmount + queuedAmount);
-		level.team[ team ].queuedBudget += queuedAmount;
-
-		// Note that there can be more build points in queue than total - spent.
+		level.team[ team ].spentBudget -= ( immediateAmount + queuedAmount );
+		level.team[ team ].totalBudget += ( immediateAmount + queuedAmount );
+		level.team[ team ].queuedBudget = 0;
 
 		if ( level.team[ team ].spentBudget < 0 ) {
 			level.team[ team ].spentBudget = 0;
-			Log::Warn("A team spent a negative buildable budget total.");
 		}
 	}
 }
@@ -203,24 +96,35 @@ void G_SpendBudget( team_t team, int amount )
 {
 	if ( G_IsPlayableTeam( team ) )
 	{
+		level.team[ team ].totalBudget -= amount;
 		level.team[ team ].spentBudget += amount;
+	}
+}
+
+void G_RemoveBudget( team_t team, int amount )
+{
+	if ( !G_IsPlayableTeam( team ) )
+	{
+		return;
+	}
+
+	level.team[ team ].spentBudget -= amount;
+	if ( level.team[ team ].spentBudget < 0 )
+	{
+		level.team[ team ].spentBudget = 0;
 	}
 }
 
 int G_BuildableDeconValue(gentity_t *ent)
 {
-	if ( g_BPVampire.Get() ) {
-		return BG_Buildable( ent->s.modelindex )->buildPoints;
-	}
-
 	HealthComponent* healthComponent = ent->entity->Get<HealthComponent>();
 
 	if (!healthComponent->Alive()) {
 		return 0;
 	}
 
-	return (int)roundf((float)BG_Buildable(ent->s.modelindex)->buildPoints
-	                   * healthComponent->HealthFraction());
+	return (int)ceilf((float)BG_Buildable(ent->s.modelindex)->buildPoints
+	                  * healthComponent->HealthFraction());
 }
 
 /**

@@ -885,7 +885,6 @@ static void ClientTimerActions( gentity_t *ent, int msec )
 
 	gclient_t *client = ent->client;
 	playerState_t *ps = &client->ps;
-	team_t team       = (team_t)ps->persistant[PERS_TEAM];
 
 	client->time100   += msec;
 	client->time1000  += msec;
@@ -943,27 +942,7 @@ static void ClientTimerActions( gentity_t *ent, int msec )
 					client->ps.stats[ STAT_BUILDABLE ] &= ~SB_BUILDABLE_STATE_MASK;
 					client->ps.stats[ STAT_BUILDABLE ] |= SB_BUILDABLE_FROM_IBE( G_CanBuild( ent, buildable, dist, dummy, dummy2, &dummy3 ) );
 
-					if ( buildable == BA_H_DRILL || buildable == BA_A_LEECH )
-					{
-						float halfLife = std::pow(2.0f, static_cast<float>(level.matchTime) /
-	                            (60000.0f * g_buildPointRecoveryRateHalfLife.Get()));
-						float deltaEff = G_RGSPredictEfficiencyDelta(dummy, team);
-						int   deltaBP  = (int)(level.team[team].totalBudget + deltaEff *
-						                       g_buildPointBudgetPerMiner.Get() / halfLife) -
-						                 (int)(level.team[team].totalBudget);
-
-						signed char deltaEffNetwork = (signed char)((float)0x7f * deltaEff);
-						signed char deltaBPNetwork  = (signed char)deltaBP;
-
-						unsigned int deltasNetwork = (unsigned char)deltaEffNetwork |
-						                             (unsigned char)deltaBPNetwork << 8;
-
-						// The efficiency and budget deltas are signed values that are encode as the
-						// least and most significant byte of the de-facto short
-						// ps->stats[STAT_PREDICTION], respectively. The efficiency delta is a value
-						// between -1 and 1, the budget delta is an integer between -128 and 127.
-						client->ps.stats[STAT_PREDICTION] = (int)deltasNetwork;
-					}
+					client->ps.stats[ STAT_PREDICTION ] = 0;
 
 					// Let the client know which buildables will be removed by building
 					for ( i = 0; i < MAX_MISC; i++ )
@@ -1068,15 +1047,6 @@ static void ClientTimerActions( gentity_t *ent, int msec )
 		}
 
 		client->pers.aliveSeconds++;
-
-		if ( g_freeFundPeriod.Get() > 0 &&
-		     client->pers.aliveSeconds % g_freeFundPeriod.Get() == 0 )
-		{
-			// Give clients some credit periodically
-			float momentumExtra = level.team[ team ].momentum / MOMENTUM_MAX;
-			momentumExtra *= g_freeFundMax.Get();
-			G_AddCreditToClient( client, PLAYER_BASE_VALUE + static_cast<int>( momentumExtra ), true );
-		}
 
 		int devolveReturnedCredits = std::min(
 			static_cast<int>(g_devolveReturnRate.Get() * CREDITS_PER_EVO), client->pers.devolveReturningCredits );

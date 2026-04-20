@@ -1257,11 +1257,6 @@ const char *ClientBotConnect( int clientNum, bool firstTime )
 		return userInfoError;
 	}
 
-<<<<<<< HEAD
-=======
-	ent->r.svFlags |= SVF_BOT;
-
->>>>>>> 5a5218075 (color: Add back DECOLOR to the games.log ClientConnect)
 	G_LogPrintf( "ClientConnect: %i [%s] (%s) \"%s^*\" \"%c%s%c^*\" [BOT]",
 	             clientNum, client->pers.ip.str[0] ? client->pers.ip.str : "127.0.0.1", client->pers.guid,
 	             client->pers.netname,
@@ -1371,8 +1366,6 @@ void ClientBegin( int clientNum )
 
 	// count current clients and rank for scoreboard
 	CalculateRanks();
-
-	G_UpdateBPVampire( client->num() );
 
 	// display the help menu, if connecting the first time
 	if ( !client->sess.seenWelcome  )

@@ -198,175 +198,6 @@ static const gentity_t *G_FindKillAssist( const gentity_t *self, const gentity_t
 	return assistant;
 }
 
-Cvar::Cvar<bool> g_BPVampire("g_BPVampire", "BP transfer", Cvar::NONE, true);
-static Cvar::Cvar<bool> g_BPVampireNotifyTeam("g_BPVampireNotifyTeam", "BP transfer team notifications", Cvar::NONE, true);
-Cvar::Cvar<float> g_BPVampireFactor("g_BPVampireFactor", "BP transfer factor", Cvar::NONE, 0.5f);
-
-static int bpStolenAtThisFrame[ NUM_TEAMS ];
-static int buildablesDestroyedAtThisFrame[ BA_NUM_BUILDABLES ];
-
-static std::vector<buildable_t> alienBuildables = { BA_A_SPAWN, BA_A_BOOSTER, BA_A_BARRICADE, BA_A_ACIDTUBE, BA_A_TRAPPER, BA_A_SPIKER, BA_A_HIVE, BA_A_OVERMIND };
-static std::vector<buildable_t> humanBuildables = { BA_H_SPAWN, BA_H_MGTURRET, BA_H_ROCKETPOD, BA_H_ARMOURY, BA_H_MEDISTAT, BA_H_REACTOR };
-
-static void ResetDestroyedBuildables( team_t team )
-{
-	bpStolenAtThisFrame[ team ] = 0;
-	std::vector<buildable_t> &enemyBuildables = team == TEAM_HUMANS ? alienBuildables : humanBuildables;
-	for ( buildable_t buildable : enemyBuildables )
-	{
-		buildablesDestroyedAtThisFrame[ buildable ] = 0;
-	}
-}
-
-
-static std::string DestroyedMessage( team_t team, std::vector<buildable_t> &array )
-{
-	std::string result = "We destroyed";
-	bool needComma = false;
-	auto sep = [&] ()
-	{
-		result += ( needComma ? ", " : " " );
-		needComma = true;
-	};
-	for ( auto buildable : array )
-	{
-		int num = buildablesDestroyedAtThisFrame[ buildable ];
-		if ( num > 0 )
-		{
-			sep();
-			std::string humanName = BG_Buildable( buildable )->humanName;
-			if ( num > 1 )
-			{
-				if ( buildable == BA_H_ARMOURY )
-				{
-					humanName = "Armouries";
-				}
-				else
-				{
-					humanName += "s";
-				}
-			}
-			result += "^3" + std::to_string( num ) + "^* ";
-			if ( buildable == BA_H_REACTOR || buildable == BA_A_OVERMIND )
-			{
-				std::transform( humanName.begin(), humanName.end(), humanName.begin(), [] (unsigned char c) { return std::toupper(c); } );
-			}
-			result += humanName;
-		}
-	}
-	result += "!";
-	if ( bpStolenAtThisFrame[ team ] > 0 )
-	{
-		result += " ^3+" + std::to_string( bpStolenAtThisFrame[ team ] ) + " ^7Build Points";
-	}
-	return Quote( result );
-}
-
-static void AnnounceDestructions( team_t team )
-{
-	if ( !g_BPVampireNotifyTeam.Get() )
-	{
-		return;
-	}
-	std::string msg = DestroyedMessage( team, team == TEAM_HUMANS ? alienBuildables : humanBuildables );
-	for ( int i = 0; i < level.maxclients; i++ )
-	{
-		if ( G_Team( &g_entities[ i ] ) == team )
-		{
-			trap_SendServerCommand( i, va( "print_bp_message %s ", msg.c_str() ) );
-		}
-	}
-}
-
-void G_AnnounceStolenBP()
-{
-	if ( !g_BPVampire.Get() )
-	{
-		return;
-	}
-	if ( bpStolenAtThisFrame[ TEAM_HUMANS ] > 0 && bpStolenAtThisFrame[ TEAM_ALIENS ] > 0 )
-	{
-		if ( bpStolenAtThisFrame[ TEAM_HUMANS ] > bpStolenAtThisFrame[ TEAM_ALIENS ] )
-		{
-			bpStolenAtThisFrame[ TEAM_HUMANS ] -= bpStolenAtThisFrame[ TEAM_ALIENS ];
-			bpStolenAtThisFrame[ TEAM_ALIENS ] = 0;
-		}
-		else
-		{
-			// notice that this sets both to zero if they are equal
-			bpStolenAtThisFrame[ TEAM_ALIENS ] -= bpStolenAtThisFrame[ TEAM_HUMANS ];
-			bpStolenAtThisFrame[ TEAM_HUMANS ] = 0;
-		}
-	}
-	for ( auto tup : { std::tuple< team_t, buildable_t >( TEAM_HUMANS, BA_A_OVERMIND ),
-	                   std::tuple< team_t, buildable_t >( TEAM_ALIENS, BA_H_REACTOR ) } )
-	{
-		team_t team;
-		buildable_t mainBuildable;
-		std::tie( team, mainBuildable ) = tup;
-		int bpToTransfer = bpStolenAtThisFrame[ team ];
-		if ( bpToTransfer <= 0 && buildablesDestroyedAtThisFrame[ mainBuildable ] == 0 )
-		{
-			continue;
-		}
-		
-		G_UpdateBPVampire( -1 ); // update the BP bars for everyone
-
-		AnnounceDestructions( team );
-
-		bpStolenAtThisFrame[ team ] = 0;
-		ResetDestroyedBuildables( team );
-	}
-}
-
-static void TransferBPToEnemyTeam( gentity_t *self )
-{
-	if ( !g_BPVampire.Get() )
-	{
-		return;
-	}
-	if ( level.time - self->lastDamageTime > VAMPIRE_DAMAGE_TIME )
-	{
-		return;
-	}
-	buildablesDestroyedAtThisFrame[ self->s.modelindex ]++;
-	int bpToTransfer = BG_Buildable(self->s.modelindex)->buildPoints * g_BPVampireFactor.Get();
-	if ( bpToTransfer == 0 )
-	{
-		return;
-	}
-	team_t otherTeam = self->buildableTeam == TEAM_HUMANS ? TEAM_ALIENS : TEAM_HUMANS;
-	switch ( otherTeam )
-	{
-	case TEAM_ALIENS:
-		level.team[ TEAM_HUMANS ].totalBudget -= bpToTransfer;
-		level.team[ TEAM_ALIENS ].totalBudget += bpToTransfer;
-		bpStolenAtThisFrame[ TEAM_ALIENS ] += bpToTransfer;
-		break;
-	case TEAM_HUMANS:
-		level.team[ TEAM_HUMANS ].totalBudget += bpToTransfer;
-		level.team[ TEAM_ALIENS ].totalBudget -= bpToTransfer;
-		bpStolenAtThisFrame[ TEAM_HUMANS ] += bpToTransfer;
-		break;
-	default:
-		break;
-	}
-	// keep track of the budget surplus
-	// this is only required when the initial BP settings change during a game
-	for ( auto tup : { std::tuple< team_t, int >( TEAM_HUMANS, g_BPInitialBudgetHumans.Get() ),
-	                   std::tuple< team_t, int >( TEAM_ALIENS, g_BPInitialBudgetAliens.Get() ) } )
-	{
-		team_t team;
-		int initialBP;
-		std::tie( team, initialBP ) = tup;
-		if ( initialBP < 0 )
-		{
-			initialBP = g_buildPointInitialBudget.Get();
-		}
-		level.team[ team ].vampireBudgetSurplus = level.team[ team ].totalBudget - initialBP;
-	}
-}
-
 /**
  * @brief Function to distribute rewards to entities that killed this one.
  * @param self
@@ -393,10 +224,6 @@ void G_RewardAttackers( gentity_t *self )
 		if ( self->entity->Get<MainBuildableComponent>() )
 		{
 			value = MAIN_STRUCTURE_MOMENTUM_VALUE;
-		}
-		else if ( self->entity->Get<MiningComponent>() )
-		{
-			value = MINER_MOMENTUM_VALUE;
 		}
 		else
 		{
@@ -437,7 +264,6 @@ void G_RewardAttackers( gentity_t *self )
 		return;
 	}
 
-	bool enemyDamagedBuildable = false;
 	// Give individual rewards
 	for ( playerNum = 0; playerNum < level.maxclients; playerNum++ )
 	{
@@ -469,12 +295,12 @@ void G_RewardAttackers( gentity_t *self )
 			G_AddMomentumToScore( player, reward );
 
 			// Add credits
-			G_AddCreditToClient( player->client, static_cast<short>( reward * g_rewardDestruction.Get() ), true );
+			float scaledReward = reward * g_rewardDestruction.Get() * G_OverloadRewardMultiplier( playerTeam );
+			G_AddCreditToClient( player->client, static_cast<short>( scaledReward ), true );
 
 			// Add momentum
 			G_AddMomentumForDestroyingStep( self, player, reward );
 
-			enemyDamagedBuildable = true;
 		}
 		else
 		{
@@ -482,7 +308,7 @@ void G_RewardAttackers( gentity_t *self )
 			G_AddCreditsToScore( player, ( int )reward );
 
 			// Add credits
-			G_AddCreditToClient( player->client, ( short )reward, true );
+			G_AddCreditToClient( player->client, ( short )( reward * G_OverloadRewardMultiplier( playerTeam ) ), true );
 
 			// Add momentum
 			G_AddMomentumForKillingStep( self, player, share );
@@ -492,10 +318,6 @@ void G_RewardAttackers( gentity_t *self )
 	// Complete momentum modification
 	G_AddMomentumEnd();
 
-	if ( enemyDamagedBuildable )
-	{
-		TransferBPToEnemyTeam( self );
-	}
 }
 
 void G_PlayerDie( gentity_t *self, gentity_t *inflictor, gentity_t *attacker, int meansOfDeath )
