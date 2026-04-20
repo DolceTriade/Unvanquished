@@ -64,6 +64,16 @@ static const char *MomentumTypeToReason( momentum_t type )
 	}
 }
 
+static void NotifyLegacyStageSensors( team_t team, float amount );
+
+static void OverloadProgressChanged( team_t team, int oldProgress, int newProgress )
+{
+	level.team[ team ].economy.progress = newProgress - level.team[ team ].economy.tier * MOMENTUM_PER_LEGACY_STAGE;
+	level.team[ team ].economy.milestone = newProgress / MOMENTUM_PER_LEGACY_STAGE;
+	level.team[ team ].momentum = newProgress;
+	NotifyLegacyStageSensors( team, newProgress - oldProgress );
+}
+
 /**
  * Has to be called whenever the momentum of a team has been modified.
  */
@@ -90,7 +100,7 @@ static void MomentumChanged()
 		if ( team > TEAM_NONE && team < NUM_TEAMS )
 		{
 			client->ps.persistant[ PERS_MOMENTUM ] = ( short )
-				( level.team[ team ].momentum * 10.0f + 0.5f );
+				( G_OverloadProgressValue( team ) * 10.0f + 0.5f );
 		}
 	}
 
@@ -231,19 +241,13 @@ static float AddMomentum( momentum_t type, team_t team, float amount,
 	// apply modifier
 	amount *= MomentumMod( type );
 
-	// limit a team's total
-	amount = Math::Clamp( amount, 0.f - level.team[ team ].momentum, MOMENTUM_MAX - level.team[ team ].momentum );
-
 	if ( amount != 0.0f )
 	{
-		// add momentum to team
-		level.team[ team ].momentum += amount;
+		int oldProgress = G_OverloadProgressValue( team );
+		int newProgress = std::max( 0, oldProgress + (int)roundf( amount ) );
+		amount = newProgress - oldProgress;
 
-		// run change hook if requested
-		if ( !skipChangeHook )
-		{
-			MomentumChanged();
-		}
+		OverloadProgressChanged( team, oldProgress, newProgress );
 
 		// notify source
 		if ( source )
@@ -272,8 +276,11 @@ static float AddMomentum( momentum_t type, team_t team, float amount,
 			event->s.groundEntityNum = amount < 0.0f;
 		}
 
-		// notify legacy stage sensors
-		NotifyLegacyStageSensors( team, amount );
+		// run change hook if requested
+		if ( !skipChangeHook )
+		{
+			MomentumChanged();
+		}
 	}
 
 	if ( g_debugMomentum.Get() > 0 )
@@ -304,46 +311,6 @@ static float AddMomentum( momentum_t type, team_t team, float amount,
  */
 void G_DecreaseMomentum()
 {
-	int          team;
-	float        amount;
-
-	static float decreaseFactor = 1.0f, lastMomentumHalfLife = 0.0f;
-	static int   nextCalculation = 0;
-
-	if ( level.time < nextCalculation )
-	{
-		return;
-	}
-
-	if ( g_momentumHalfLife.Get() <= 0.0f )
-	{
-		return;
-	}
-
-	// only calculate decreaseFactor if the server configuration changed
-	if ( lastMomentumHalfLife != g_momentumHalfLife.Get() )
-	{
-		// ln(2) ~= 0.6931472
-		decreaseFactor = exp( ( -0.6931472f / ( ( 60000.0f / DECREASE_MOMENTUM_PERIOD ) *
-		                                        g_momentumHalfLife.Get() ) ) );
-
-		lastMomentumHalfLife = g_momentumHalfLife.Get();
-	}
-
-	// decrease momentum
-	for ( team = TEAM_NONE + 1; team < NUM_TEAMS; team++ )
-	{
-		amount = level.team[ team ].momentum * ( decreaseFactor - 1.0f );
-
-		level.team[ team ].momentum += amount;
-
-		// notify legacy stage sensors
-		NotifyLegacyStageSensors( (team_t) team, amount );
-	}
-
-	MomentumChanged();
-
-	nextCalculation = level.time + DECREASE_MOMENTUM_PERIOD;
 }
 
 /**
@@ -381,7 +348,7 @@ float G_PredictMomentumForBuilding( gentity_t *buildable )
 		return 0.0f;
 	}
 
-	return BG_Buildable( buildable->s.modelindex )->buildPoints * MomentumMod( CONF_BUILDING );
+	return 0.0f;
 }
 
 /**
@@ -391,33 +358,13 @@ float G_PredictMomentumForBuilding( gentity_t *buildable )
  */
 float G_AddMomentumForBuilding( gentity_t *buildable )
 {
-	float     value, reward;
-	team_t    team;
-	gentity_t *builder;
-
 	if ( !buildable || buildable->s.eType != entityType_t::ET_BUILDABLE )
 	{
 		return 0.0f;
 	}
 
-	value   = BG_Buildable( buildable->s.modelindex )->buildPoints;
-	team    = BG_Buildable( buildable->s.modelindex )->team;
-
-	if ( buildable->builtBy->slot != -1 )
-	{
-		builder = &g_entities[ buildable->builtBy->slot ];
-	}
-	else
-	{
-		builder = nullptr;
-	}
-
-	reward = AddMomentum( CONF_BUILDING, team, value, builder, false );
-
-	// Save reward with buildable so it can be reverted
-	buildable->momentumEarned = reward;
-
-	return reward;
+	buildable->momentumEarned = 0.0f;
+	return 0.0f;
 }
 
 /**
@@ -425,30 +372,9 @@ float G_AddMomentumForBuilding( gentity_t *buildable )
  */
 float G_RemoveMomentumForDecon( gentity_t *buildable, gentity_t *deconner )
 {
-	float     value;
-	team_t    team;
-
-	// sanity check buildable
-	if ( !buildable || buildable->s.eType != entityType_t::ET_BUILDABLE )
-	{
-		return 0.0f;
-	}
-	team = BG_Buildable( buildable->s.modelindex )->team;
-
-	if ( buildable->momentumEarned )
-	{
-		value = buildable->momentumEarned;
-	}
-	else
-	{
-		// assume the buildable has just been placed
-		value = G_PredictMomentumForBuilding( buildable );
-	}
-
-	// Remove only partial momentum as the lost health fraction awards momentum to the enemy.
-	value *= Entities::HealthFraction(buildable);
-
-	return AddMomentum( CONF_DECONSTRUCTING, team, -value, deconner, false );
+	(void) buildable;
+	(void) deconner;
+	return 0.0f;
 }
 
 /**

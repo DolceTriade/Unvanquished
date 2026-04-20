@@ -279,7 +279,8 @@ static int ImpactSlowblob( gentity_t *ent, const trace2_t *trace, gentity_t *hit
 	if ( reward )
 	{
 		// we extinguished some fire
-		float credits = g_firefightReward.Get() * CREDITS_PER_EVO * reward;
+		float credits = g_firefightReward.Get() * CREDITS_PER_EVO * reward *
+		                G_OverloadRewardMultiplier( (team_t) attacker->client->pers.team );
 		G_AddCreditToClient( attacker->client, credits, true );
 		CombatFeedback::HitNotify( attacker, &g_entities[ENTITYNUM_NONE], {}, 0, MOD_SLOWBLOB, true );
 	}

@@ -256,7 +256,6 @@ enum
   CS_WINNER, // string indicating round winner
   CS_SHADERSTATE,
   CS_PMOVE_PARAMS,
-  CS_BP_VAMPIRE,
   CS_GAMEPLAY_CVARS,
   CS_CLIENTS_READY,
   CS_GAMEPLAY,
