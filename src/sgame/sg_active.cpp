@@ -787,7 +787,7 @@ static void G_ReplenishHumanHealth( gentity_t *self )
 		}
 	}
 
-	if ( BG_InventoryContainsUpgrade( UP_BIOKIT, client->ps.stats ) 
+	if ( BG_InventoryContainsUpgrade( UP_BIOKIT, client->ps.stats )
 	     && self->nextRegenTime < level.time )
 	{
 		interval = ( int )( BIOKIT_INTERVAL );
@@ -849,6 +849,21 @@ static void BeaconAutoTag( gentity_t *self, int timePassed )
 			}
 		}
 	}
+}
+
+static bool G_PlayerCanActivateEntity( const gentity_t *ent, team_t team )
+{
+	if ( !ent || !ent->use || !BG_EntityIsUsable( ent->s, team ) )
+	{
+		return false;
+	}
+
+	if ( ent->s.eType != entityType_t::ET_BUILDABLE && !ent->mapEntity.triggerTeam( team ) )
+	{
+		return false;
+	}
+
+	return true;
 }
 
 /*
@@ -1024,7 +1039,7 @@ static void ClientTimerActions( gentity_t *ent, int msec )
 			{
 				dmg = dmg * BIOKIT_MODIFIER;
 			}
-			
+
 			ent->Damage(dmg, client->lastPoisonClient, Util::nullopt,
 			                    Util::nullopt, flags, MOD_POISON);
 		}
@@ -2190,13 +2205,11 @@ static void ClientThink_real( gentity_t *self )
 		trap_Trace( &trace, viewpoint, {}, {}, point, self->s.number, MASK_SHOT, 0 );
 
 		ent = &g_entities[ trace.entityNum ];
-		bool activableTarget = ent->s.eType == entityType_t::ET_BUILDABLE || ent->s.eType == entityType_t::ET_MOVER;
+		bool activableTarget = G_PlayerCanActivateEntity( ent, static_cast<team_t>( client->pers.team ) );
 
-		if ( ent && ent->use &&
-		     ( !ent->buildableTeam   || ent->buildableTeam   == client->pers.team ) &&
-		     ( ent->mapEntity.triggerTeam( static_cast<team_t>( client->pers.team ) ) ) &&
-		     trace.fraction < 1.0f &&
-				 !( activableTarget && Distance( self->s.origin, ent->s.origin ) < range1 ) )
+		if ( trace.fraction < 1.0f &&
+		     activableTarget &&
+		     Distance( self->s.origin, ent->s.origin ) < range1 )
 		{
 			if ( g_debugEntities.Get() > 1 )
 			{
@@ -2210,7 +2223,7 @@ static void ClientThink_real( gentity_t *self )
 			// no entity in front of player - do a small area search
 			for ( ent = nullptr; ( ent = G_IterateEntitiesWithinRadius( ent, VEC2GLM( client->ps.origin ), ENTITY_USE_RANGE ) ); )
 			{
-				if ( ent && ent->use && ent->buildableTeam == client->pers.team)
+				if ( G_PlayerCanActivateEntity( ent, static_cast<team_t>( client->pers.team ) ) )
 				{
 					if ( g_debugEntities.Get() > 1 )
 					{

@@ -555,6 +555,8 @@ enum persEnum_t
 #define EF_LCANNON_CHARGING BIT(20) // Lucifer Cannon primary is charging
 // overlaps with EF_BC_DYING!
 #define EF_TYPING           BIT(21) // player is writing a message
+// overlaps with EF_BC_ENEMY and EF_BC_TAG_PLAYER
+#define EF_USABLE           BIT(23) // usable by any player.
 
 // for beacons:
 #define EF_BC_BASE_OUTPOST  BIT(20) // base is an outpost
@@ -1575,6 +1577,7 @@ bool BG_GetTrajectoryPitch( vec3_t origin, vec3_t target, float v0, float g,
 void     BG_BuildEntityDescription( char *str, size_t size, entityState_t *es );
 bool     BG_IsMainStructure( buildable_t buildable );
 bool     BG_IsMainStructure( entityState_t *es );
+bool     BG_EntityIsUsable( const entityState_t& es, team_t team );
 void     BG_MoveOriginToBBOXCenter( vec3_t point, const vec3_t mins, const vec3_t maxs );
 void     BG_MoveOriginToBBOXCenter( glm::vec3& point, glm::vec3 const& mins, glm::vec3 const& maxs );
 void     ModifyFlag(int &flags, int flag, bool value);
@@ -1914,7 +1917,7 @@ glm::vec3 BG_GetClientNormal( const playerState_t *ps );
 glm::vec3 BG_GetClientViewOrigin( const playerState_t *ps );
 
 void BG_BoundingBox( class_t cl, glm::vec3* mins, glm::vec3* maxs, glm::vec3* cmaxs, glm::vec3* dmins, glm::vec3* dmaxs );
-void BG_BoundingBox( buildable_t buildablel, glm::vec3* mins, glm::vec3* maxs );
+void BG_BoundingBox( buildable_t buildable, glm::vec3* mins, glm::vec3* maxs );
 
 int BG_FOpenGameOrPakPath( Str::StringRef filename, fileHandle_t &handle );
 

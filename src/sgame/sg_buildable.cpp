@@ -1624,6 +1624,7 @@ static gentity_t *SpawnBuildable( gentity_t *builder, buildable_t buildable, con
 
 		case BA_H_ARMOURY:
 			built->use = HArmoury_Use;
+			built->s.eFlags |= EF_USABLE;
 			break;
 
 		case BA_H_MEDISTAT:

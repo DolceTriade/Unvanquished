@@ -133,6 +133,16 @@ bool BG_IsMainStructure( entityState_t *es )
 	return BG_IsMainStructure( (buildable_t)es->modelindex );
 }
 
+bool BG_EntityIsUsable( const entityState_t& es, team_t team )
+{
+	if ( es.eType == entityType_t::ET_BUILDABLE && es.modelindex == BA_H_ARMOURY )
+	{
+		return team == TEAM_HUMANS;
+	}
+
+	return ( es.eFlags & EF_USABLE ) != 0;
+}
+
 /**
  * @brief Moves a point from the origin of a bounding box to its center.
  * @param point The origin, will be modified.

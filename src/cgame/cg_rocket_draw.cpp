@@ -1248,38 +1248,85 @@ class UsableBuildableElement : public HudElement
 {
 public:
 	UsableBuildableElement( const Rml::String& tag ) :
-			HudElement( tag, ELEMENT_HUMANS ) {}
+			HudElement( tag, ELEMENT_BOTH ) {}
 
 	void DoOnUpdate() override
 	{
-		vec3_t        view, point;
+		vec3_t        view, point, viewpoint;
 		trace_t       trace;
+		int usableBuildable = BA_NONE;
+		bool show = false;
+
+		VectorCopy( cg.predictedPlayerState.origin, viewpoint );
+		viewpoint[ 2 ] += cg.predictedPlayerState.viewheight;
+		vec3_t mins, maxs;
+		BG_ClassBoundingBox( cg.predictedPlayerState.stats[ STAT_CLASS ],
+		                     mins, maxs, nullptr, nullptr, nullptr );
+		float range = ENTITY_USE_RANGE + RadiusFromBounds( mins, maxs );
 
 		AngleVectors( cg.refdefViewAngles, view, nullptr, nullptr );
-		VectorMA( cg.refdef.vieworg, ENTITY_USE_RANGE, view, point );
-		CG_Trace( &trace, cg.refdef.vieworg, nullptr, nullptr,
+		VectorMA( viewpoint, range, view, point );
+		CG_Trace( &trace, viewpoint, nullptr, nullptr,
 				  point, cg.predictedPlayerState.clientNum, MASK_SHOT, 0 );
 
-		const entityState_t &es = cg_entities[ trace.entityNum ].currentState;
-
-		if ( es.eType == entityType_t::ET_BUILDABLE
-				&& es.modelindex == BA_H_ARMOURY
-				&& Distance(cg.predictedPlayerState.origin, es.origin) < ENTITY_USE_RANGE - 0.2f // use an epsilon to account for rounding errors
-				&& CG_IsOnMyTeam(es) )
+		if ( trace.fraction < 1.0f )
 		{
+			const entityState_t &es = cg_entities[ trace.entityNum ].currentState;
+			show = BG_EntityIsUsable( es, CG_MyTeam() ) &&
+			       Distance( cg.predictedPlayerState.origin, es.origin ) < range;
+
+			if ( show )
+			{
+				usableBuildable = NON_BUILDABLE_USABLE_ENTITY;
+
+				if ( es.eType == entityType_t::ET_BUILDABLE
+						&& es.modelindex == BA_H_ARMOURY
+						&& Distance( cg.predictedPlayerState.origin, es.origin ) < ENTITY_USE_RANGE - 0.2f ) // use an epsilon to account for rounding errors
+				{
+					usableBuildable = es.modelindex;
+				}
+			}
+		}
+
+		if ( !show && cg.snap )
+		{
+			for ( const entityState_t &es : cg.snap->entities )
+			{
+				if ( !BG_EntityIsUsable( es, CG_MyTeam() ) )
+				{
+					continue;
+				}
+
+				if ( Distance( cg.predictedPlayerState.origin, es.origin ) >= ENTITY_USE_RANGE )
+				{
+					continue;
+				}
+
+				show = true;
+				usableBuildable = es.eType == entityType_t::ET_BUILDABLE && es.modelindex == BA_H_ARMOURY
+					? es.modelindex
+					: NON_BUILDABLE_USABLE_ENTITY;
+				break;
+			}
+		}
+
+		if ( show )
+		{
+			cg.nearUsableBuildable = usableBuildable;
+
 			if ( !IsVisible() )
 			{
 				SetProperty( Rml::PropertyId::Display, Rml::Property( Rml::Style::Display::Block ) );
-				cg.nearUsableBuildable = es.modelindex;
 			}
 		}
 		else
 		{
+			cg.nearUsableBuildable = BA_NONE;
+
 			if ( IsVisible() )
 			{
 				// Clear the old image if there was one.
 				SetProperty( Rml::PropertyId::Display, Rml::Property( Rml::Style::Display::None ) );
-				cg.nearUsableBuildable = BA_NONE;
 			}
 		}
 	}
