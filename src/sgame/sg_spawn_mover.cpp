@@ -1749,6 +1749,7 @@ void SP_func_door( gentity_t *self )
 	if ( self->mapEntity.spawnflags & ACTIVATE )
 	{
 		self->use = func_door_use;
+		self->s.eFlags |= EF_USABLE;
 		self->touch = nullptr;
 		self->think = nullptr;
 	}

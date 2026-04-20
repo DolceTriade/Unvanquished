@@ -191,6 +191,32 @@
 				momentum-border-width: 0;
 			}
 
+			div#items {
+				position: absolute;
+				width: 40%;
+				height: 10%;
+				bottom: 9%;
+				margin-left: auto;
+				margin-right: auto;
+			}
+
+			usable_buildable {
+				width: 3em;
+				position: absolute;
+				left: 0;
+				right: 0;
+				margin-left: auto;
+				margin-right: auto;
+				color: #ff6a6aff;
+			}
+
+			usable_buildable img {
+				display: inline;
+				width: 3em;
+				height: 3em;
+				image-color: #c61b27ee;
+			}
+
 			health,
 			health_cross {
 				z-index: 1;
@@ -202,6 +228,11 @@
 		<div id="momentum">
 			<unlocked_items/>
 			<momentum_bar/>
+		</div>
+		<div id="items">
+			<usable_buildable>
+				<img src="/ui/assets/neutral/use" />
+			</usable_buildable>
 		</div>
 		<div id="left">
 			<img class="bg sides" src="/ui/assets/alien/bg-l" />

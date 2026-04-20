@@ -140,8 +140,7 @@ static int Getteam( lua_State* L )
 				team = static_cast<team_t>( proxy->ent->client->pers.team );
 				break;
 			}
-			// Fall through otherwise.
-
+			// fallthrough
 		default:
 			team = proxy->ent->mapEntity.conditions.team;
 			break;
@@ -215,6 +214,8 @@ static int Setorigin( lua_State* L )
 		vec3_t origin;
 		Shared::Lua::CheckVec3( L, 2, origin );
 		VectorCopy( origin, proxy->ent->s.origin );
+		VectorCopy( origin, proxy->ent->r.currentOrigin );
+		trap_LinkEntity( proxy->ent );
 	}
 	return 0;
 }
@@ -239,6 +240,8 @@ static int Setangles( lua_State* L )
 		vec3_t angles;
 		Shared::Lua::CheckVec3( L, 2, angles );
 		VectorCopy( angles, proxy->ent->s.angles );
+		VectorCopy( angles, proxy->ent->r.currentAngles );
+		trap_LinkEntity( proxy->ent );
 	}
 	return 0;
 }
@@ -264,6 +267,7 @@ static int Setmins( lua_State* L )
 		vec3_t mins;
 		Shared::Lua::CheckVec3( L, 2, mins );
 		VectorCopy( mins, proxy->ent->r.mins );
+		trap_LinkEntity( proxy->ent );
 	}
 	return 0;
 }
@@ -277,6 +281,7 @@ static int Setmaxs( lua_State* L )
 		vec3_t maxs;
 		Shared::Lua::CheckVec3( L, 2, maxs );
 		VectorCopy( maxs, proxy->ent->r.maxs );
+		trap_LinkEntity( proxy->ent );
 	}
 	return 0;
 }
@@ -337,14 +342,20 @@ void PushArgs( lua_State* L, T arg, Args... args )
 			return;                                                                      \
 		}                                                                                \
 		auto it = proxy->funcs.find( EntityProxy::upper );                               \
-		if ( it->second.method ) it->second.method( __VA_ARGS__ );                       \
+		if ( it == proxy->funcs.end() )                                                  \
+		{                                                                                \
+			Log::Warn( "Error " #method "-ing: No Lua callback for entity num %d", entityNum ); \
+			return;                                                                      \
+		}                                                                                \
 		lua_rawgeti( proxy->L, LUA_REGISTRYINDEX, it->second.luaRef );                   \
 		PushArgs( proxy->L, __VA_ARGS__ );                                               \
-		if ( lua_pcall( proxy->L, numArgs, 0, 0 ) != 0 )                                 \
+		if ( lua_pcall( proxy->L, numArgs, 1, 0 ) != 0 )                                 \
 		{                                                                                \
 			Log::Warn( "Could not run lua " #method " callback: %s",                     \
-			           lua_tostring( proxy->L, -1 ) );                                   \
+				lua_tostring( proxy->L, -1 ) );                                   \
 		}                                                                                \
+		if ( lua_toboolean( proxy->L, -1 ) && it->second.method ) it->second.method( __VA_ARGS__ );                       \
+		lua_pop( proxy->L, 1 );                                                          \
 	}                                                                                    \
 	static int Set##method( lua_State* L )                                               \
 	{                                                                                    \
@@ -356,7 +367,7 @@ void PushArgs( lua_State* L, T arg, Args... args )
 		{                                                                                \
 			ref = -1;                                                                    \
 		}                                                                                \
-		if ( lua_isfunction( L, 2 ) )                                                    \
+		else if ( lua_isfunction( L, 2 ) )                                                    \
 		{                                                                                \
 			ref = luaL_ref( L, LUA_REGISTRYINDEX );                                      \
 		}                                                                                \
@@ -366,6 +377,7 @@ void PushArgs( lua_State* L, T arg, Args... args )
 			return 0;                                                                    \
 		}                                                                                \
 		auto it = proxy->funcs.find( EntityProxy::upper );                               \
+		bool hadExistingFunc = it != proxy->funcs.end();                                 \
 		if ( it == proxy->funcs.end() && ref != -1 )                                     \
 		{                                                                                \
 			EntityProxy::EntityFunction func = {};                                       \
@@ -375,28 +387,27 @@ void PushArgs( lua_State* L, T arg, Args... args )
 			it = proxy->funcs.insert( { EntityProxy::upper, std::move( func ) } ).first; \
 			proxy->ent->method = Exec##method;                                           \
 		}                                                                                \
-		else                                                                             \
-		{                                                                                \
-			/* Clean up old ref... */                                                    \
-			lua_rawgeti( L, LUA_REGISTRYINDEX, it->second.luaRef );                      \
-			luaL_unref( L, LUA_REGISTRYINDEX, it->second.luaRef );                       \
-			/* If set to nil, remove lua func all together */                            \
-			if ( ref == -1 )                                                             \
-			{                                                                            \
-				if ( !it->second.method ) return 0;                                      \
-				proxy->ent->method = it->second.method;                                  \
-				it->second.method = nullptr;                                             \
-			}                                                                            \
-			else                                                                         \
-			{                                                                            \
-				it->second.luaRef = ref;                                                 \
-				if ( proxy->ent->method != Exec##method )                                \
-				{                                                                        \
-					it->second.method = proxy->ent->method;                              \
-					proxy->ent->method = Exec##method;                                   \
-				}                                                                        \
-			}                                                                            \
-		}                                                                                \
+		if ( hadExistingFunc )                                                        \
+		{                                                                            \
+			luaL_unref( L, LUA_REGISTRYINDEX, it->second.luaRef );                   \
+		}                                                                            \
+		/* If set to nil, remove lua func all together */                            \
+		if ( ref == -1 )                                                             \
+		{                                                                            \
+			if ( it == proxy->funcs.end() ) return 0;                                \
+			proxy->ent->method = it->second.method;                                  \
+			proxy->funcs.erase( it );                                                \
+		}                                                                            \
+		else                                                                         \
+		{                                                                            \
+			it->second.luaRef = ref;                                                 \
+			if ( proxy->ent->method != Exec##method )                                \
+			{                                                                        \
+				it->second.method = proxy->ent->method;                              \
+				proxy->ent->method = Exec##method;                                   \
+			}                                                                        \
+			if ( EntityProxy::upper == EntityProxy::USE ) proxy->ent->s.eFlags |= EF_USABLE; \
+		}                                                                            \
 		return 0;                                                                        \
 	}                                                                                    \
 	static int Get##method( lua_State* L )                                               \
@@ -409,10 +420,11 @@ void PushArgs( lua_State* L, T arg, Args... args )
 
 /// The Lua think function. Will be called every time the entity thinks.
 // General notes about these Lua Entity functions:
-// Does not override the existing function. Runs in addition to it.
-// On read, returns true or nil if the think function is set.
+// On read, returns true or nil if the function is set.
 // On write, accepts a function.
 // Set to nil to clear the Lua function.
+// When the Lua callback runs, returning true will also run the original C++
+// function. Returning false or nil suppresses the original function.
 // @tfield function|bool think function(EntityProxy self)
 // @tparam EntityProxy self The current entity.
 // @within EntityProxy
