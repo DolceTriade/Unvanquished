@@ -280,7 +280,7 @@ static void CG_CompleteGive()
 	unsigned               i = 0;
 	static const char give[][ 12 ] =
 	{
-		"all", "health", "funds", "stamina", "poison", "fuel", "ammo", "momentum", "bp"
+		"all", "health", "funds", "stamina", "poison", "fuel", "ammo", "bp"
 	};
 
 	for( i = 0; i < ARRAY_LEN( give ); i++ )
@@ -519,7 +519,6 @@ static const struct cg_cmd_t
 	{ "notarget",         0,                       0                },
 	{ "prevframe",        CG_TestModelPrevFrame_f, 0                },
 	{ "prevskin",         CG_TestModelPrevSkin_f,  0                },
-	{ "print_momentum",   0,                       0                },
 	{ "reload",           0,                       0                },
 	{ "reloadHud",        CG_ReloadHud_f,          0                },
 	{ "rocket",           Rocket_Rocket_f,         0,               },

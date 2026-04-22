@@ -1285,10 +1285,6 @@ struct cg_t
 	cgBinaryShaderSetting_t binaryShaderSettings[ NUM_BINARY_SHADERS ];
 	sayType_t               sayType;
 
-	// momentum
-	float                   momentumGained;
-	int                     momentumGainedTime;
-
 	// beacons
 	cbeacon_t               *beacons[ MAX_CBEACONS ];
 	int                     beaconCount;
@@ -1452,6 +1448,18 @@ struct rocketDataSource_t
 	int armouryBuyListCount[2];
 };
 
+struct cgTeamEconomyState_t
+{
+	bool valid;
+	int completedPurchases;
+	int bpPurchased;
+	int totalBudget;
+	int spentBudget;
+	int investedCredits[ MAX_OVERLOAD_PURCHASES ];
+	int repeatCounts[ MAX_OVERLOAD_PURCHASES ];
+	bool ownedPurchases[ MAX_OVERLOAD_PURCHASES ];
+};
+
 struct rocketInfo_t
 {
 	int currentNetSrc;
@@ -1470,6 +1478,7 @@ struct rocketInfo_t
 	int cursorFreezeTime = -1; // mouse input is ignored and cursor is locked in place when cursorFreezeTime = realtime
 	int cursorFreezeX, cursorFreezeY;
 	rectDef_t cursor_pos;
+	cgTeamEconomyState_t teamEconomy[ NUM_TEAMS ];
 };
 
 extern rocketInfo_t rocketInfo;
@@ -1680,9 +1689,6 @@ struct cgs_t
 	char     mapname[ MAX_QPATH ];
 
 	float    devolveMaxBaseDistance; // used for evolve/devolve ui
-
-	float    momentumHalfLife; // used for momentum bar (un)lock markers
-	float    unlockableMinTime;  // used for momentum bar (un)lock markers
 
 	float    buildPointBudgetPerMiner;
 	float    buildPointRecoveryInitialRate;

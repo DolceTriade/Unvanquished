@@ -3400,35 +3400,35 @@ static void CG_Rocket_DrawChatType()
 	}
 }
 
-#define MOMENTUM_BAR_MARKWIDTH 0.5f
-#define MOMENTUM_BAR_GLOWTIME  2000
+#define OVERLOAD_BAR_MARKWIDTH 0.5f
+#define OVERLOAD_PROGRESS_MAX  6.0f
 
-static void CG_Rocket_DrawPlayerMomentumBar()
+static void CG_Rocket_DrawPlayerOverloadBar()
 {
 	// data
 	rectDef_t     rect;
 	Color::Color  foreColor, backColor, lockedColor, unlockedColor;
-	float         rawFraction, fraction, glowFraction, glowOffset, borderSize;
+	float         fraction, borderSize;
 	int           threshold;
 	bool      unlocked;
 
-	momentumThresholdIterator_t unlockableIter = { -1, 0 };
+	unlockThresholdIterator_t unlockableIter = { -1, 0 };
 
 	// display
 	Color::Color  color;
-	float         x, y, w, h, b, glowStrength;
+	float         x, y, w, h, b;
 	bool      vertical;
 
 	CG_GetRocketElementRect( &rect );
 	CG_GetRocketElementBGColor( backColor );
 	CG_GetRocketElementColor( foreColor );
-	Rocket_GetProperty( "momentum-border-width", &borderSize, sizeof( borderSize ), rocketVarType_t::ROCKET_FLOAT );
+	Rocket_GetProperty( "overload-border-width", &borderSize, sizeof( borderSize ), rocketVarType_t::ROCKET_FLOAT );
 	Rocket_GetProperty( "locked-marker-color", &lockedColor, sizeof(Color::Color), rocketVarType_t::ROCKET_COLOR );
 	Rocket_GetProperty( "unlocked-marker-color", &unlockedColor, sizeof(Color::Color), rocketVarType_t::ROCKET_COLOR );
 
 
 	team_t team = CG_MyTeam();
-	float momentum = cg.predictedPlayerState.persistant[ PERS_MOMENTUM ] / 10.0f;
+	float overloadProgress = cg.predictedPlayerState.persistant[ PERS_OVERLOAD ] / 10.0f;
 
 	x = rect.x;
 	y = rect.y;
@@ -3452,8 +3452,8 @@ static void CG_Rocket_DrawPlayerMomentumBar()
 	color.SetAlpha( color.Alpha() * 0.5f );
 	CG_FillRect( x, y, w, h, color );
 
-	// draw momentum bar
-	fraction = Math::Clamp( rawFraction = momentum / MOMENTUM_MAX, 0.0f, 1.0f );
+	// draw overload progress bar
+	fraction = Math::Clamp( overloadProgress / OVERLOAD_PROGRESS_MAX, 0.0f, 1.0f );
 
 	if ( vertical )
 	{
@@ -3465,45 +3465,11 @@ static void CG_Rocket_DrawPlayerMomentumBar()
 		CG_FillRect( x, y, w * fraction, h, foreColor );
 	}
 
-	// draw glow on momentum event
-	if ( cg.momentumGainedTime + MOMENTUM_BAR_GLOWTIME > cg.time )
-	{
-		glowFraction = fabs( cg.momentumGained / MOMENTUM_MAX );
-		glowStrength = ( MOMENTUM_BAR_GLOWTIME - ( cg.time - cg.momentumGainedTime ) ) /
-					   ( float )MOMENTUM_BAR_GLOWTIME;
-
-		if ( cg.momentumGained > 0.0f )
-		{
-			glowOffset = vertical ? 0 : glowFraction;
-		}
-
-		else
-		{
-			glowOffset = vertical ? glowFraction : 0;
-		}
-
-		CG_SetClipRegion( x, y, w, h );
-
-		color = Color::Color( 1.0f, 1.0f, 1.0f, 0.5f * glowStrength );
-
-		if ( vertical )
-		{
-			CG_FillRect( x, y + h * ( 1.0f - ( rawFraction + glowOffset ) ), w, h * glowFraction, color );
-		}
-
-		else
-		{
-			CG_FillRect( x + w * ( rawFraction - glowOffset ), y, w * glowFraction, h, color );
-		}
-
-		CG_ClearClipRegion();
-	}
-
 	// draw threshold markers
-	while ( ( unlockableIter = BG_IterateMomentumThresholds( unlockableIter, team, &threshold, &unlocked ) ),
+	while ( ( unlockableIter = BG_IterateUnlockThresholds( unlockableIter, team, &threshold, &unlocked ) ),
 			( unlockableIter.num >= 0 ) )
 	{
-		fraction = threshold / MOMENTUM_MAX;
+		fraction = threshold / OVERLOAD_PROGRESS_MAX;
 
 		if ( fraction > 1.0f )
 		{
@@ -3512,12 +3478,12 @@ static void CG_Rocket_DrawPlayerMomentumBar()
 
 		if ( vertical )
 		{
-			CG_FillRect( x, y + h * ( 1.0f - fraction ), w, MOMENTUM_BAR_MARKWIDTH, unlocked ? unlockedColor : lockedColor );
+			CG_FillRect( x, y + h * ( 1.0f - fraction ), w, OVERLOAD_BAR_MARKWIDTH, unlocked ? unlockedColor : lockedColor );
 		}
 
 		else
 		{
-			CG_FillRect( x + w * fraction, y, MOMENTUM_BAR_MARKWIDTH, h, unlocked ? unlockedColor : lockedColor );
+			CG_FillRect( x + w * fraction, y, OVERLOAD_BAR_MARKWIDTH, h, unlocked ? unlockedColor : lockedColor );
 		}
 	}
 
@@ -3576,14 +3542,14 @@ static void CG_Rocket_DrawPlayerUnlockedItems() {
 		bool unlocked;
 	} icon[NUM_UNLOCKABLES]; // more than enough(!)
 	team_t team = CG_MyTeam();
-	momentumThresholdIterator_t unlockableIter = { -1, 1 }, previousIter;
+	unlockThresholdIterator_t unlockableIter = { -1, 1 }, previousIter;
 	for ( ;; ) {
 		qhandle_t shader;
 		int threshold;
 		bool unlocked;
 
 		previousIter = unlockableIter;
-		unlockableIter = BG_IterateMomentumThresholds( unlockableIter, team, &threshold, &unlocked );
+		unlockableIter = BG_IterateUnlockThresholds( unlockableIter, team, &threshold, &unlocked );
 
 		if ( previousIter.threshold != unlockableIter.threshold && icons ) {
 			count[ counts++ ] = icons - prevIcons;
@@ -3616,7 +3582,7 @@ static void CG_Rocket_DrawPlayerUnlockedItems() {
 	CG_GetRocketElementRect( &rect );
 	Rocket_GetProperty( "cell-color", &backColour, sizeof( Color::Color ), rocketVarType_t::ROCKET_COLOR );
 	CG_GetRocketElementColor( foreColour );
-	Rocket_GetProperty( "momentum-border-width", &borderSize, sizeof( borderSize ), rocketVarType_t::ROCKET_FLOAT );
+	Rocket_GetProperty( "overload-border-width", &borderSize, sizeof( borderSize ), rocketVarType_t::ROCKET_FLOAT );
 
 	float w = rect.w - 2 * borderSize;
 	float h = rect.h - 2 * borderSize;
@@ -3635,10 +3601,10 @@ static void CG_Rocket_DrawPlayerUnlockedItems() {
 	for ( uint i = 0; i < counts; ++i )
 	{
 		if ( vertical ) {
-			barY += ( thresholds[i] / MOMENTUM_MAX ) * h;
-		} else {
-			barX += ( thresholds[i] / MOMENTUM_MAX ) * w;
-		}
+				barY += ( thresholds[i] / OVERLOAD_PROGRESS_MAX ) * h;
+			} else {
+				barX += ( thresholds[i] / OVERLOAD_PROGRESS_MAX ) * w;
+			}
 
 		float unlockableX = vertical ? barX : barX - count[i] * iw / 2;
 		float unlockableY = vertical ? barY - count[i] * ih / 2 : barY;
@@ -3915,7 +3881,7 @@ static const elementRenderCmd_t elementRenderCmdList[] =
 	{ "loadingText", &CG_Rocket_DrawLoadingText, nullptr, ELEMENT_ALL },
 	{ "mine_rate", &CG_Rocket_DrawMineRate, nullptr, ELEMENT_BOTH },
 	{ "minimap", nullptr, &CG_Rocket_DrawMinimap, ELEMENT_ALL },
-	{ "momentum_bar", nullptr, &CG_Rocket_DrawPlayerMomentumBar, ELEMENT_BOTH },
+	{ "overload_bar", nullptr, &CG_Rocket_DrawPlayerOverloadBar, ELEMENT_BOTH },
 	{ "motd", &CG_Rocket_DrawMOTD, nullptr, ELEMENT_ALL },
 	{ "progress_value", &CG_Rocket_DrawProgressValue, nullptr, ELEMENT_ALL },
 	{ "tutorial", &CG_Rocket_DrawTutorial, nullptr, ELEMENT_GAME },

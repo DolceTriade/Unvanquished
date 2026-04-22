@@ -89,66 +89,6 @@
 			</row>
 		</panel>
 
-		<!-- MOMENTUM CONFIG -->
-		<tab><translate>Momentum</translate></tab><panel>
-			<row>
-				<parent>
-					<h3><translate>Half life time</translate></h3>
-					<tooltip><translate>Time for momentum to decrease 50%. 0 disables this behavior.</translate></tooltip>
-				</parent>
-				<input type="range" min="0" max="60" step="1" cvar="g_momentumHalfLife"/>
-				<p><inlinecvar cvar="g_momentumHalfLife" type="number" format="%g"/>&nbsp;<translate>minutes</translate><ilink onclick='Cmd.exec("reset g_momentumHalfLife")'> (reset) </ilink></p>
-			</row>
-			<row>
-				<parent>
-					<h3><translate>Double reward delay</translate></h3>
-					<tooltip><translate>Time after which some momentum rewards double</translate></tooltip>
-				</parent>
-				<input type="range" min="0" max="240" step="5" cvar="g_momentumRewardDoubleTime"/>
-				<p><inlinecvar cvar="g_momentumRewardDoubleTime" type="number" format="%g"/>&nbsp;<translate>minutes</translate><ilink onclick='Cmd.exec("reset g_momentumRewardDoubleTime")'> (reset) </ilink></p>
-			</row>
-			<row>
-				<parent>
-					<h3><translate>Base Multiplier</translate></h3>
-					<tooltip><translate>Generic momentum reward multiplier</translate></tooltip>
-				</parent>
-				<input type="range" min="0" max="5" step="0.1" cvar="g_momentumBaseMod"/>
-				<p><inlinecvar cvar="g_momentumBaseMod" type="number" format="%g"/>&nbsp;<ilink onclick='Cmd.exec("reset g_momentumBaseMod")'> (reset) </ilink></p>
-			</row>
-			<row>
-				<parent>
-					<h3><translate>Kills reward multiplier</translate></h3>
-					<tooltip><translate>Momentum reward multiplier for kills</translate></tooltip>
-				</parent>
-				<input type="range" min="0" max="5" step="0.1" cvar="g_momentumKillMod"/>
-				<p><inlinecvar cvar="g_momentumKillMod" type="number" format="%g"/>&nbsp;<ilink onclick='Cmd.exec("reset g_momentumKillMod")'> (reset) </ilink></p>
-			</row>
-			<row>
-				<parent>
-					<h3><translate>Building reward multiplier</translate></h3>
-					<tooltip><translate>Momentum reward multiplier for construction</translate></tooltip>
-				</parent>
-				<input type="range" min="0" max="5" step="0.1" cvar="g_momentumBuildMod"/>
-				<p><inlinecvar cvar="g_momentumBuildMod" type="number" format="%g"/>&nbsp;<ilink onclick='Cmd.exec("reset g_momentumBuildMod")'> (reset) </ilink></p>
-			</row>
-			<row>
-				<parent>
-					<h3><translate>Deconstruction penalty multiplier</translate></h3>
-					<tooltip><translate>Momentum penalty multiplier for deconstruction</translate></tooltip>
-				</parent>
-				<input type="range" min="0" max="5" step="0.1" cvar="g_momentumDeconMod"/>
-				<p><inlinecvar cvar="g_momentumDeconMod" type="number" format="%g"/>&nbsp;<ilink onclick='Cmd.exec("reset g_momentumDeconMod")'> (reset) </ilink></p>
-			</row>
-			<row>
-				<parent>
-					<h3><translate>Building kill reward multiplier</translate></h3>
-					<tooltip><translate>Momentum reward multiplier for killing buildables</translate></tooltip>
-				</parent>
-				<input type="range" min="0" max="5" step="0.1" cvar="g_momentumDestroyMod"/>
-				<p><inlinecvar cvar="g_momentumDestroyMod" type="number" format="%g"/>&nbsp;<ilink onclick='Cmd.exec("reset g_momentumDestroyMod")'> (reset) </ilink></p>
-			</row>
-		</panel>
-
 		<!-- BUILDPOINTS CONFIG -->
 		<tab><translate>Build system</translate></tab><panel>
 			<row>
@@ -230,10 +170,6 @@
 			<row>
 				<input cvar="g_bot_infiniteFunds" type="checkbox" />
 				<h3><translate>Infinite funds</translate></h3>
-			</row>
-			<row>
-				<input cvar="g_bot_infiniteMomentum" type="checkbox" />
-				<h3><translate>Ignore momentum</translate></h3>
 			</row>
 			<h2><translate>Navmesh generation</translate></h2>
 			<row>
