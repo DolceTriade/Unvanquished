@@ -120,7 +120,7 @@
 		<script>
 			function WeaponClick(idx)
 				if idx > #weapons then return end
-				-- Query again in case credits/momentum changed
+				-- Query again in case credits or availability changed
 				CDataSource.Build("armouryBuyList", "weapons")
 				local data = CDataSource.Read("armouryBuyList", "weapons", "availability,cmdName")[idx]
 				if data[1] == "available" then
@@ -174,7 +174,7 @@
 			end
 			function UpgradeClick(idx)
 				if idx > #upgrades then return end
-				-- Query again in case credits/momentum changed
+				-- Query again in case credits or availability changed
 				CDataSource.Build("armouryBuyList", "upgrades")
 				local data = CDataSource.Read("armouryBuyList", "upgrades", "availability,cmdName")[idx]
 				if data[1] == "available" then

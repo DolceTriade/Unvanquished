@@ -123,6 +123,7 @@ constexpr float HUGE_DISTANCE = 1e15f;
 #define DEFAULT_GRAVITY    800
 
 #define VOTE_TIME          30000 // 30 seconds before vote times out
+#define MAX_OVERLOAD_PURCHASES 64
 
 #define DEAD_VIEWHEIGHT    4 // height from ground
 
@@ -260,7 +261,6 @@ enum
   CS_CLIENTS_READY,
   CS_GAMEPLAY,
   CS_ATTRIBUTES,
-
   // Everything before CS_PLAYERS gets a CG_ConfigStringModified(n) event generated in CG_Init
 
   CS_PLAYERS,
@@ -269,8 +269,8 @@ enum
 
   CS_MUSIC = CS_PLAYERS + MAX_CLIENTS,
   CS_MESSAGE, // from the map worldspawn's message field
-
-  CS_MODELS,
+  CS_OVERLOAD = CS_MESSAGE + 1, // NUM_TEAMS team economy payloads
+  CS_MODELS = CS_OVERLOAD + NUM_TEAMS,
   CS_SOUNDS = CS_MODELS + MAX_MODELS,
   CS_SHADERS = CS_SOUNDS + MAX_SOUNDS,
   CS_GRADING_TEXTURES = CS_SHADERS + MAX_GAME_SHADERS,
@@ -500,7 +500,7 @@ enum itemBuildError_t
 enum persEnum_t
 {
   PERS_SCORE,          // !!! MUST NOT CHANGE, SERVER AND GAME BOTH REFERENCE !!!
-  PERS_MOMENTUM,     // the total momentum of a team
+  PERS_OVERLOAD,     // the team's Overload progression value
   PERS_SPAWNQUEUE,     // number of spawns and position in spawn queue
   PERS_SPECSTATE,
   PERS_SPAWN_COUNT,    // incremented every respawn
@@ -844,7 +844,7 @@ enum entity_event_t
 
   EV_HIT, // notify client of a hit
 
-  EV_MOMENTUM // notify client of generated momentum
+  EV_UNUSED_1 // legacy unused event slot
 };
 
 enum dynMenu_t
@@ -1743,7 +1743,7 @@ enum unlockableType_t
 	UNLT_NUM_UNLOCKABLETYPES
 };
 
-struct momentumThresholdIterator_t {
+struct unlockThresholdIterator_t {
 	int num;
 	int threshold;
 };
@@ -1758,7 +1758,7 @@ bool BG_ClassUnlocked( int class_ );
 
 unlockableType_t              BG_UnlockableType( int num );
 int                           BG_UnlockableTypeIndex( int num );
-momentumThresholdIterator_t BG_IterateMomentumThresholds( momentumThresholdIterator_t unlockableIter, team_t team, int *threshold, bool *unlocked );
+unlockThresholdIterator_t BG_IterateUnlockThresholds( unlockThresholdIterator_t unlockableIter, team_t team, int *threshold, bool *unlocked );
 #ifdef BUILD_SGAME
 void     G_UpdateUnlockables();
 #endif

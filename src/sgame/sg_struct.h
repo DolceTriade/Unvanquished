@@ -32,8 +32,6 @@ struct botMemory_t;
 
 #define MAX_NAMELOG_NAMES 5
 #define MAX_NAMELOG_ADDRS 5
-#define MAX_OVERLOAD_PURCHASES 16
-
 using unnamed_t = signed int;
 struct namelog_t
 {
@@ -66,13 +64,9 @@ class Entity;
 
 struct TeamEconomyState
 {
-	int   bankBalance;
-	int   progress;
-	int   milestone;
-	int   tier;
+	int   completedPurchases;
 	int   bpPurchased;
-	int   multiplierLevel;
-	float rewardMultiplier;
+	int   investedCredits[ MAX_OVERLOAD_PURCHASES ];
 	int   repeatCounts[ MAX_OVERLOAD_PURCHASES ];
 	bool  ownedPurchases[ MAX_OVERLOAD_PURCHASES ];
 };
@@ -195,11 +189,6 @@ struct gentity_t
 	 * other entities might also consider the powergrid for behavior changes
 	 */
 	bool     powered;
-
-	/**
-	 * The amount of momentum this building generated on construction
-	 */
-	float        momentumEarned;
 
 	GentityRef   target; // target of hive, rocketpod, builder's +deconstruct
 
@@ -537,7 +526,6 @@ struct buildLog_t
 	buildable_t modelindex;
 	int humanBP;
 	int alienBP;
-	float       momentumEarned;
 	bool        markedForDeconstruction;
 	vec3_t      origin;
 	vec3_t      angles;
@@ -676,7 +664,7 @@ struct level_locals_t
 		int              queuedBudget;
 		spawnQueue_t     spawnQueue;
 		bool             locked;
-		float            momentum;
+			float            overloadProgress;
 		TeamEconomyState economy;
 		int              layoutBuildPoints;
 		int              botFillTeamSize;

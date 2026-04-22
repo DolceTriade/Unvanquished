@@ -101,9 +101,7 @@ void BuildableComponent::Think(int timeDelta) {
 					// Finish construction.
 					state = CONSTRUCTED;
 
-					// Award momentum.
-					G_AddMomentumForBuilding(entity.oldEnt);
-				} else {
+					} else {
 					// Gain health while constructing.
 					entity.Heal(GetHealthComponent().MaxHealth() * ((float)timeDelta / (float)constructionTime)
 					            * (1.0f - BUILDABLE_START_HEALTH_FRAC), nullptr);

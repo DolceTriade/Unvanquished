@@ -25,6 +25,8 @@ along with Unvanquished Source Code.  If not, see <http://www.gnu.org/licenses/>
 #ifndef SG_PUBLIC_H_
 #define SG_PUBLIC_H_
 
+#include "shared/bg_attributes.h"
+
 struct trace2_t;
 
 // sg_active.c
@@ -121,10 +123,10 @@ void              G_RemoveBudget(team_t team, int amount);
 int               G_BuildableDeconValue(gentity_t *ent);
 void              G_GetTotalBuildableValues(int *buildableValuesByTeam);
 void              G_InitOverloadEconomy();
-float             G_OverloadRewardMultiplier( team_t team );
 int               G_OverloadProgressValue( team_t team );
-bool              G_OverloadDonate( gentity_t *ent, int amount );
-bool              G_OverloadPurchase( gentity_t *ent, Str::StringRef purchaseName );
+bool              G_OverloadUnlockPurchased( team_t team, bgAttributeFamily_t family, int objectIndex );
+void              G_PublishOverloadState( team_t team );
+bool              G_OverloadPurchase( gentity_t *ent, const Cmd::Args& args, std::string* message = nullptr );
 
 // sg_client.c
 void              G_AddCreditToClient( gclient_t *client, short credit, bool cap );
@@ -192,21 +194,9 @@ bool          G_RadiusDamage( const vec3_t origin, gentity_t *attacker, float da
 bool          G_SelectiveRadiusDamage( const vec3_t origin, gentity_t *attacker, float damage, float radius, gentity_t *ignore, int mod, int ignoreTeam );
 void              G_RewardAttackers( gentity_t *self );
 void              G_AddCreditsToScore( gentity_t *self, int credits );
-void              G_AddMomentumToScore( gentity_t *self, float momentum );
 void              G_LogDestruction( gentity_t *self, gentity_t *actor, int mod );
 void              G_InitDamageLocations();
 void              G_PlayerDie( gentity_t *self, gentity_t *inflictor, gentity_t *attacker, int mod );
-
-// sg_momentum.c
-void              G_DecreaseMomentum();
-float             G_AddMomentumGeneric( team_t team, float amount );
-float             G_AddMomentumGenericStep( team_t team, float amount );
-float             G_PredictMomentumForBuilding( gentity_t *buildable );
-float             G_AddMomentumForBuilding( gentity_t *buildable );
-float             G_RemoveMomentumForDecon( gentity_t *buildable, gentity_t *deconner );
-float             G_AddMomentumForKillingStep( gentity_t *victim, gentity_t *attacker, float share );
-float             G_AddMomentumForDestroyingStep( gentity_t *buildable, gentity_t *attacker, float amount );
-void              G_AddMomentumEnd();
 
 // sg_main.c
 void              G_InitSpawnQueue( spawnQueue_t *sq );

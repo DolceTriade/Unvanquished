@@ -89,6 +89,8 @@ void G_FreeBudget( team_t team, int immediateAmount, int queuedAmount )
 		if ( level.team[ team ].spentBudget < 0 ) {
 			level.team[ team ].spentBudget = 0;
 		}
+
+		G_PublishOverloadState( team );
 	}
 }
 
@@ -98,6 +100,7 @@ void G_SpendBudget( team_t team, int amount )
 	{
 		level.team[ team ].totalBudget -= amount;
 		level.team[ team ].spentBudget += amount;
+		G_PublishOverloadState( team );
 	}
 }
 
@@ -113,6 +116,8 @@ void G_RemoveBudget( team_t team, int amount )
 	{
 		level.team[ team ].spentBudget = 0;
 	}
+
+	G_PublishOverloadState( team );
 }
 
 int G_BuildableDeconValue(gentity_t *ent)

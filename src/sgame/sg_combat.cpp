@@ -29,7 +29,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "Entities.h"
 #include "CBSE.h"
 
-Cvar::Cvar<float> g_rewardDestruction( "g_rewardDestruction", "Reward players when they destroy a building by momentum * g_rewardDestruction", Cvar::NONE, 10.f );
+Cvar::Cvar<float> g_rewardDestruction( "g_rewardDestruction", "Reward players when they destroy a building by base value * g_rewardDestruction", Cvar::NONE, 10.f );
 // damage region data
 damageRegion_t g_damageRegions[ PCL_NUM_CLASSES ][ MAX_DAMAGE_REGIONS ];
 int            g_numDamageRegions[ PCL_NUM_CLASSES ];
@@ -97,7 +97,7 @@ static const char *const modNames[] =
 };
 
 /**
- * @brief Helper function for G_AddCreditsToScore and G_AddMomentumToScore.
+ * @brief Helper function for score updates.
  * @param self
  * @param score
  */
@@ -121,16 +121,6 @@ static void AddScoreHelper( gentity_t *self, float score )
 void G_AddCreditsToScore( gentity_t *self, int credits )
 {
 	AddScoreHelper( self, credits * SCORE_PER_CREDIT );
-}
-
-/**
- * @brief Adds score to the client, input represents a momentum value.
- * @param self
- * @param momentum
- */
-void G_AddMomentumToScore( gentity_t *self, float momentum )
-{
-	AddScoreHelper( self, momentum * SCORE_PER_MOMENTUM );
 }
 
 static void LookAtKiller( gentity_t *self, gentity_t *inflictor, gentity_t *attacker )
@@ -223,7 +213,7 @@ void G_RewardAttackers( gentity_t *self )
 
 		if ( self->entity->Get<MainBuildableComponent>() )
 		{
-			value = MAIN_STRUCTURE_MOMENTUM_VALUE;
+			value = MAIN_STRUCTURE_VALUE;
 		}
 		else
 		{
@@ -292,14 +282,11 @@ void G_RewardAttackers( gentity_t *self )
 		if ( self->s.eType == entityType_t::ET_BUILDABLE )
 		{
 			// Add score
-			G_AddMomentumToScore( player, reward );
+			G_AddCreditsToScore( player, ( int )( reward * g_rewardDestruction.Get() ) );
 
 			// Add credits
-			float scaledReward = reward * g_rewardDestruction.Get() * G_OverloadRewardMultiplier( playerTeam );
+			float scaledReward = reward * g_rewardDestruction.Get();
 			G_AddCreditToClient( player->client, static_cast<short>( scaledReward ), true );
-
-			// Add momentum
-			G_AddMomentumForDestroyingStep( self, player, reward );
 
 		}
 		else
@@ -308,15 +295,10 @@ void G_RewardAttackers( gentity_t *self )
 			G_AddCreditsToScore( player, ( int )reward );
 
 			// Add credits
-			G_AddCreditToClient( player->client, ( short )( reward * G_OverloadRewardMultiplier( playerTeam ) ), true );
+			G_AddCreditToClient( player->client, ( short ) reward, true );
 
-			// Add momentum
-			G_AddMomentumForKillingStep( self, player, share );
 		}
 	}
-
-	// Complete momentum modification
-	G_AddMomentumEnd();
 
 }
 
