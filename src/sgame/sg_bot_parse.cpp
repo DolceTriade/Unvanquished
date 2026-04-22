@@ -320,16 +320,16 @@ static AIValue_t botCanEvolveTo( gentity_t *self, const AIValue_t *params )
 		G_AlienEvolve( self, c, false, /* dryRun = */ true ) );
 }
 
-// Returns a team's momentum for use in behavior trees.
-static AIValue_t momentum( gentity_t *, const AIValue_t *params )
+// Returns a team's Overload progress for use in behavior trees.
+static AIValue_t overload_progress( gentity_t *, const AIValue_t *params )
 {
 	int requestedTeam = AIUnBoxInt( params[ 0 ] ); //is really a team_t
 	if( !G_IsPlayableTeam( requestedTeam ) )
 	{
-		Log::Warn( "invalid argument %d to 'momentum' in behavior tree", requestedTeam );
+		Log::Warn( "invalid argument %d to 'overload_progress' in behavior tree", requestedTeam );
 		return AIBoxInt( 0 );
 	}
-	return AIBoxInt( level.team[ requestedTeam ].momentum );
+	return AIBoxInt( level.team[ requestedTeam ].overloadProgress );
 }
 
 // Number of alive (not necessarily active) friendly buildables of a given type
@@ -523,10 +523,10 @@ static const struct AIConditionMap_s
 	{ "isVisible",         isVisible,         1 },
 	{ "levelTime",         levelTime,         0 },
 	{ "matchTime",         matchTime,         0 },
-	{ "momentum",          momentum,          1 },
 	{ "myTimer",           myTimer,           0 },
 	{ "numOurBuildings",   numOurBuildings,   1 },
 	{ "numUsersInTeam",    numUsersInTeam,    0 },
+	{ "overload_progress", overload_progress, 1 },
 	{ "percentAmmoClip",   percentAmmoClip,   0 },
 	{ "percentClips",      percentClips,      0 },
 	{ "percentHealth",     percentHealth,     1 },

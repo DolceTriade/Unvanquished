@@ -690,25 +690,6 @@ void CG_OnMapRestart()
 
 /*
 ==============
-CG_Momentum
-
-Notify player of generated momentum
-==============
-*/
-static void CG_Momentum( entityState_t *es )
-{
-	float                  momentum;
-	bool               negative;
-
-	negative   = es->groundEntityNum;
-	momentum = ( negative ? -es->otherEntityNum2 : es->otherEntityNum2 ) / 10.0f;
-
-	cg.momentumGained     = momentum;
-	cg.momentumGainedTime = cg.time;
-}
-
-/*
-==============
 CG_EntityEvent
 
 An entity has an event value
@@ -1378,10 +1359,6 @@ void CG_EntityEvent( centity_t *cent, vec3_t position )
 				cg.spawnTime = cg.time;
 			}
 
-			break;
-
-		case EV_MOMENTUM:
-			CG_Momentum( es );
 			break;
 
 		case EV_HIT:

@@ -79,20 +79,20 @@
 				<translate>Don't build mining structures too close together or they will compete with each other and ultimately cost build resources!</translate>
 				<br />
 				<br />
-				<translate>Builders will see another bar above the health bar of a resource generator which represents its efficiency. A prediction will be shown when you position the buildable. The build points are available instantly when the mining structure finishes building, and will be subtracted back if the building is destroyed. Don't build unprotected drills!</translate>
+				<translate>Builders spend build points directly when they place structures. Deconstructing or replacing damaged structures refunds only their remaining value, so reorganizing a healthy base is cheap but losing structures to the enemy burns BP.</translate>
 				<br />
 				<br />
-				<translate>When a building is destroyed, the miners will recover its build points slowly. The mine recovery rate decreases over time, so that it gets increasingly harder to rebuild destroyed buildings in a long lasting match. This replaces sudden death.</translate>
+				<translate>Teams start with an initial BP stock and can only gain more through Overload purchases at the reactor or overmind. There is no passive BP recovery and no mining system.</translate>
 			</panel>
 			<tab>
 				<img class="emoticon" style="margin-right:0.2em;" src="/emoticons/bsuit" />
-				<translate>Stages &amp; Momentum</translate>
+				<translate>Overload</translate>
 			</tab>
 			<panel>
-				<translate>Building and destroying structures as well as killing enemies earns your team a new resource called momentum. If you gain enough momentum new weapons, structures or classes will be unlocked.</translate>
+				<translate>Overload progression is driven by team purchases at the reactor or overmind. Players spend their own credits on BP bundles, unlocks, and upgrades for the whole team.</translate>
 				<br />
 				<br />
-				<translate>Momentum decreases exponentially over time so if you idle your team will lose access to new items. Existing upgrades will remain functional.</translate>
+				<translate>Each unlock or upgrade tracks its own spend threshold. There is no single shared progress bar to fill and no passive decay over time.</translate>
 			</panel>
 			<tab>
 				<img class="emoticon" style="margin-right:0.2em;" src="/emoticons/flamer" />
@@ -156,7 +156,7 @@
 				<translate>Alien defensive structures like trapper and spiker work better on walls, building them on ceiling will protect them from grenades.</translate>
 				<br />
 				<br />
-				<translate>The advanced granger can be unlocked with momentum.</translate>
+				<translate>The advanced granger can be unlocked through Overload purchases when your team reaches the required progression.</translate>
 			</panel>
 			<tab>
 				<img class="emoticon" style="margin-right:0.2em;" src="/emoticons/dev" />
@@ -169,7 +169,7 @@
 				<translate>All alien evolution costs and gains have been doubled. The new maximum of evos an alien can store is 20 (formerly 9).</translate>
 				<br />
 				<br />
-				<translate>Stages were replace with momentum, and build points depend directly on the number of drills.</translate>
+				<translate>Stage compatibility now comes from completed Overload progression purchases, and build points are a consumable team resource rather than a miner-backed income stream.</translate>
 				<br />
 				<br />
 				<translate>Humans no longer have the Tesla defense tower nor the defense computer but they can build rocket pods.</translate>

@@ -175,6 +175,16 @@ static float UnlockToLockThreshold( float unlockThreshold )
 	return unlockThreshold;
 }
 
+static int NormalizeUnlockThreshold( int unlockThreshold )
+{
+	if ( unlockThreshold <= 0 )
+	{
+		return 0;
+	}
+
+	return unlockThreshold >= 200 ? 6 : 3;
+}
+
 // ----------
 // BG methods
 // ----------
@@ -263,7 +273,7 @@ void BG_ImportUnlockablesFromMask( int team, int mask )
 				Sys::Error( "BG_ImportUnlockablesFromMask: Unknown unlockable type" );
 		}
 
-		unlockThreshold = std::max( unlockThreshold, 0 );
+		unlockThreshold = NormalizeUnlockThreshold( std::max( unlockThreshold, 0 ) );
 
 		unlockable->type            = unlockableType;
 		unlockable->num             = itemNum;
@@ -369,7 +379,7 @@ bool BG_ClassUnlocked( int class_ )
 	return Unlocked( UNLT_CLASS, class_);
 }
 
-static int MomentumNextThreshold( int threshold )
+static int NextUnlockThreshold( int threshold )
 {
 	int next = 1 << 30;
 	int i;
@@ -387,9 +397,9 @@ static int MomentumNextThreshold( int threshold )
 	return next < ( 1 << 30 ) ? next : 0;
 }
 
-momentumThresholdIterator_t BG_IterateMomentumThresholds( momentumThresholdIterator_t unlockableIter, team_t team, int *threshold, bool *unlocked )
+unlockThresholdIterator_t BG_IterateUnlockThresholds( unlockThresholdIterator_t unlockableIter, team_t team, int *threshold, bool *unlocked )
 {
-	static const momentumThresholdIterator_t finished = { -1, 0 };
+	static const unlockThresholdIterator_t finished = { -1, 0 };
 
 	if ( unlockableIter.num < 0 )
 	{
@@ -412,12 +422,12 @@ momentumThresholdIterator_t BG_IterateMomentumThresholds( momentumThresholdItera
 
 	if ( unlockableIter.threshold )
 	{
-		unlockableIter.threshold = MomentumNextThreshold( unlockableIter.threshold );
+			unlockableIter.threshold = NextUnlockThreshold( unlockableIter.threshold );
 
 		if ( unlockableIter.threshold )
 		{
 			unlockableIter.num = -1;
-			return BG_IterateMomentumThresholds( unlockableIter, team, threshold, unlocked );
+				return BG_IterateUnlockThresholds( unlockableIter, team, threshold, unlocked );
 		}
 	}
 
@@ -429,6 +439,18 @@ momentumThresholdIterator_t BG_IterateMomentumThresholds( momentumThresholdItera
 // ------------
 
 #ifdef BUILD_SGAME
+static bgAttributeFamily_t UnlockableFamily( int unlockableType )
+{
+	switch ( unlockableType )
+	{
+		case UNLT_WEAPON: return BG_ATTR_WEAPON;
+		case UNLT_UPGRADE: return BG_ATTR_UPGRADE;
+		case UNLT_BUILDABLE: return BG_ATTR_BUILDABLE;
+		case UNLT_CLASS: return BG_ATTR_CLASS;
+		default: Sys::Error( "UnlockableFamily: Unknown unlockable type" );
+	}
+}
+
 static void UpdateUnlockablesMask()
 {
 	int    unlockable, unlockableNum[ NUM_TEAMS ];
@@ -471,7 +493,6 @@ static void UpdateUnlockablesMask()
 void G_UpdateUnlockables()
 {
 	int              itemNum = 0, unlockableNum, unlockThreshold;
-	int              progress;
 	unlockable_t     *unlockable;
 	int              unlockableType = 0;
 	team_t           team;
@@ -514,8 +535,8 @@ void G_UpdateUnlockables()
 				Sys::Error( "G_UpdateUnlockables: Unknown unlockable type" );
 		}
 
-		unlockThreshold = std::max( unlockThreshold, 0 );
-		progress = G_OverloadProgressValue( team );
+		int rawThreshold = std::max( unlockThreshold, 0 );
+		unlockThreshold = NormalizeUnlockThreshold( rawThreshold );
 
 		unlockable->type            = unlockableType;
 		unlockable->num             = itemNum;
@@ -524,18 +545,22 @@ void G_UpdateUnlockables()
 		unlockable->unlockThreshold = unlockThreshold;
 		unlockable->lockThreshold   = UnlockToLockThreshold( unlockThreshold );
 
-		// calculate the item's locking state
-		unlockable->unlocked = (
-		    !unlockThreshold || progress >= unlockThreshold ||
-		    ( unlockable->unlocked && progress >= unlockable->lockThreshold )
-		);
+		// Overload unlocks gated content only by explicit team purchases.
+		if ( rawThreshold == 0 )
+		{
+			unlockable->unlocked = true;
+		}
+		else
+		{
+			unlockable->unlocked = G_OverloadUnlockPurchased( team, UnlockableFamily( unlockableType ), itemNum - 1 );
+		}
 
 		itemNum++;
 
 		/*Log::Notice( "G_UpdateUnlockables: Team %s, Type %s, Item %s, Momentum %d, Threshold %d, "
 		            "Unlocked %d, Synchronize %d\n",
 		            BG_TeamName( team ), UnlockableTypeName( unlockable ), UnlockableName( unlockable ),
-		            momentum, unlockThreshold, unlockable->unlocked, unlockable->synchronize );*/
+		            overloadProgress, unlockThreshold, unlockable->unlocked, unlockable->synchronize );*/
 	}
 
 	// GAME knows about all teams

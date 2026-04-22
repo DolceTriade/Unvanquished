@@ -234,7 +234,6 @@ set(SGAMELIST
     ${GAMELOGIC_DIR}/sgame/sg_map_entity.h
     ${GAMELOGIC_DIR}/sgame/sg_maprotation.cpp
     ${GAMELOGIC_DIR}/sgame/sg_missile.cpp
-    ${GAMELOGIC_DIR}/sgame/sg_momentum.cpp
     ${GAMELOGIC_DIR}/sgame/sg_namelog.cpp
     ${GAMELOGIC_DIR}/sgame/sg_physics.cpp
     ${GAMELOGIC_DIR}/sgame/sg_public.h
