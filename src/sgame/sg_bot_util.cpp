@@ -79,10 +79,10 @@ struct equipment_t
 	int price( void ) const;
 	bool unlocked( void ) const;
 	bool allowed( void ) const;
-	bool canBuyNow( void ) const
-	{
-		return allowed() && ( g_bot_infiniteMomentum.Get() || unlocked() );
-	}
+		bool canBuyNow( void ) const
+		{
+			return allowed() && unlocked();
+		}
 	int slots( void ) const;
 	bool operator==( T other ) const
 	{

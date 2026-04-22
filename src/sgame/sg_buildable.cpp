@@ -678,9 +678,6 @@ void G_Deconstruct( gentity_t *self, gentity_t *deconner, meansOfDeath_t deconTy
 	G_RemoveBudget( self->buildableTeam, attr->buildPoints );
 	G_FreeBudget( self->buildableTeam, immediateRefund, 0 );
 
-	// remove momentum
-	G_RemoveMomentumForDecon( self, deconner );
-
 	// reward attackers if the structure was hurt before deconstruction
 	float healthFraction = self->entity->Get<HealthComponent>()->HealthFraction();
 	if ( healthFraction < 1.0f ) G_RewardAttackers( self );
@@ -1595,8 +1592,6 @@ static gentity_t *SpawnBuildable( gentity_t *builder, buildable_t buildable, con
 
 	if ( log )
 	{
-		// HACK: Assume the buildable got build in full
-		built->momentumEarned = G_PredictMomentumForBuilding( built );
 		G_BuildLogSet( log, built );
 	}
 
@@ -2107,7 +2102,6 @@ void G_BuildLogSet( buildLog_t *log, gentity_t *ent )
 	log->modelindex = (buildable_t) ent->s.modelindex;
 	log->markedForDeconstruction = ent->entity->Get<BuildableComponent>()->MarkedForDeconstruction();
 	log->builtBy = ent->builtBy;
-	log->momentumEarned = ent->momentumEarned;
 	VectorCopy( ent->s.pos.trBase, log->origin );
 	VectorCopy( ent->s.angles, log->angles );
 	VectorCopy( ent->s.origin2, log->origin2 );
@@ -2172,7 +2166,6 @@ static void G_BuildLogRevertThink( gentity_t *ent )
 	}
 
 	built->creationTime = built->s.time = 0;
-	built->momentumEarned = ent->momentumEarned;
 	G_KillBox( built );
 
 	G_LogPrintf( "revert: restore %d %s",
@@ -2187,8 +2180,6 @@ void G_BuildLogRevert( int id )
 	gentity_t  *ent;
 	vec3_t     dist;
 	gentity_t  *buildable;
-	float      momentumChange[ NUM_TEAMS ] = { 0 };
-
 	level.numBuildablesForRemoval = 0;
 
 	level.numBuildLogs -= level.buildId - id;
@@ -2226,9 +2217,8 @@ void G_BuildLogRevert( int id )
 						else
 						{
 							// Free a pseudo-entity (see the destruction case below)
-							G_FreeBudget( log->buildableTeam, BG_Buildable( ent->s.modelindex )->buildPoints, 0 );
-							momentumChange[ log->buildableTeam ] -= log->momentumEarned;
-							G_FreeEntity( ent );
+								G_FreeBudget( log->buildableTeam, BG_Buildable( ent->s.modelindex )->buildPoints, 0 );
+								G_FreeEntity( ent );
 						}
 
 						break;
@@ -2237,10 +2227,9 @@ void G_BuildLogRevert( int id )
 			}
 			break;
 
-		case BF_DECONSTRUCT:
-		case BF_REPLACE:
-				momentumChange[ log->buildableTeam ] += log->momentumEarned;
-				DAEMON_FALLTHROUGH;
+			case BF_DECONSTRUCT:
+			case BF_REPLACE:
+					DAEMON_FALLTHROUGH;
 
 		// Destruction. TODO: try to unqueue BP if applicable
 		case BF_DESTROY:
@@ -2256,10 +2245,9 @@ void G_BuildLogRevert( int id )
 			VectorCopy( log->origin2, buildable->s.origin2 );
 			VectorCopy( log->angles2, buildable->s.angles2 );
 			buildable->s.modelindex = log->modelindex;
-			buildable->deconMarkHack = log->markedForDeconstruction;
-			buildable->builtBy = log->builtBy;
-			buildable->momentumEarned = log->momentumEarned;
-			buildable->think = G_BuildLogRevertThink;
+				buildable->deconMarkHack = log->markedForDeconstruction;
+				buildable->builtBy = log->builtBy;
+				buildable->think = G_BuildLogRevertThink;
 			buildable->nextthink = level.time + FRAMETIME;
 			buildable->suicideTime = 30; // number of thinks before killing players in the way
 		}
@@ -2270,10 +2258,4 @@ void G_BuildLogRevert( int id )
 		level.team[ TEAM_ALIENS ].totalBudget = log->alienBP;
 	}
 
-	for ( int team = TEAM_NONE + 1; team < NUM_TEAMS; ++team )
-	{
-		G_AddMomentumGenericStep( (team_t) team, momentumChange[ team ] );
-	}
-
-	G_AddMomentumEnd();
 }

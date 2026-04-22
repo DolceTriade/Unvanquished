@@ -130,17 +130,6 @@ Cvar::Callback<Cvar::Cvar<int>> g_BPInitialBudgetAliens(
 		[](int) {
 			G_UpdateBuildPointBudgets();
 		});
-Cvar::Range<Cvar::Cvar<int>> g_debugMomentum("g_debugMomentum", "momentum debug level", Cvar::NONE, 0, 0, 2);
-Cvar::Cvar<float> g_momentumHalfLife("g_momentumHalfLife", "minutes for momentum to decrease 50%", Cvar::NONE, DEFAULT_MOMENTUM_HALF_LIFE);
-Cvar::Cvar<float> g_momentumRewardDoubleTime("g_momentumRewardDoubleTime", "some momentum rewards double after x minutes", Cvar::NONE, DEFAULT_CONF_REWARD_DOUBLE_TIME);
-Cvar::Cvar<float> g_unlockableMinTime("g_unlockableMinTime", "an unlock is lost after x seconds without further momentum rewards", Cvar::NONE, DEFAULT_UNLOCKABLE_MIN_TIME);
-Cvar::Cvar<float> g_momentumBaseMod("g_momentumBaseMod", "generic momentum reward multiplier", Cvar::NONE, DEFAULT_MOMENTUM_BASE_MOD);
-Cvar::Cvar<float> g_momentumKillMod("g_momentumKillMod", "momentum reward multiplier for kills", Cvar::NONE, DEFAULT_MOMENTUM_KILL_MOD);
-Cvar::Cvar<float> g_momentumBuildMod("g_momentumBuildMod", "momentum reward multiplier for construction", Cvar::NONE, DEFAULT_MOMENTUM_BUILD_MOD);
-Cvar::Cvar<float> g_momentumDeconMod("g_momentumDeconMod", "momentum penalty multiplier for deconstruction", Cvar::NONE, DEFAULT_MOMENTUM_DECON_MOD);
-Cvar::Cvar<float> g_momentumDestroyMod("g_momentumDestroyMod", "momentum reward multiplier for killing buildables", Cvar::NONE, DEFAULT_MOMENTUM_DESTROY_MOD);
-
-
 Cvar::Cvar<bool> g_humanAllowBuilding(
 		"g_humanAllowBuilding",
 		"can human build",
@@ -302,7 +291,6 @@ Cvar::Cvar<float> g_bot_fov("g_bot_fov", "bots' \"field of view\"", Cvar::NONE, 
 Cvar::Cvar<int> g_bot_chasetime("g_bot_chasetime", "bots stop chasing after x ms out of sight", Cvar::NONE, 2000);
 Cvar::Cvar<int> g_bot_reactiontime("g_bot_reactiontime", "bots' reaction time to enemies (milliseconds)", Cvar::NONE, 500);
 Cvar::Cvar<bool> g_bot_infiniteFunds("g_bot_infiniteFunds", "give bots unlimited funds", Cvar::NONE, false);
-Cvar::Cvar<bool> g_bot_infiniteMomentum("g_bot_infiniteMomentum", "allow bots to ignore momentum, but not other restrictions", Cvar::NONE, false);
 Cvar::Cvar<int> g_bot_aliensenseRange("g_bot_aliensenseRange", "custom aliensense range for bots", Cvar::NONE, ALIENSENSE_RANGE);
 Cvar::Cvar<std::string> g_bot_defaultBehavior("g_bot_defaultBehavior", "name of the default .bt file", Cvar::NONE, BOT_DEFAULT_BEHAVIOR);
 
@@ -1691,18 +1679,18 @@ static void G_LogGameplayStats( int state )
 			             "# Time:    %02i:%02i:%02i\n"
 			             "# Format:  %i\n"
 			             "#\n"
-			             "# g_momentumHalfLife:        %4g\n"
+			             "# overloadInitialProgress:   %4i\n"
 			             "# g_initialBuildPoints:      %4i\n"
 			             "#\n"
 			             "#  1  2  3    4    5    6    7    8    9   10   11   12   13   14   15   16\n"
-			             "#  T #A #H AMom HMom ---- ATBP HTBP AUBP HUBP ABRV HBRV ACre HCre AVal HVal\n"
+			             "#  T #A #H AOvr HOvr ---- ATBP HTBP AUBP HUBP ABRV HBRV ACre HCre AVal HVal\n"
 			             "# -------------------------------------------------------------------------\n",
 			             Q3_VERSION,
 			             mapname,
 			             t.tm_year + 1900, t.tm_mon + 1, t.tm_mday,
 			             t.tm_hour, t.tm_min, t.tm_sec,
 			             LOG_GAMEPLAY_STATS_VERSION,
-			             g_momentumHalfLife.Get(),
+			             0,
 			             g_buildPointInitialBudget.Get() );
 
 			break;
@@ -1713,7 +1701,7 @@ static void G_LogGameplayStats( int state )
 			int    XXX;
 			int    team;
 			int    num[ NUM_TEAMS ];
-			int    Mom[ NUM_TEAMS ];
+				int    Ovr[ NUM_TEAMS ];
 			int    TBP[ NUM_TEAMS ];
 			int    UBP[ NUM_TEAMS ];
 			int    BRV[ NUM_TEAMS ];
@@ -1731,7 +1719,7 @@ static void G_LogGameplayStats( int state )
 			for( team = TEAM_NONE + 1; team < NUM_TEAMS; team++ )
 			{
 				num[ team ] = level.team[ team ].numClients;
-				Mom[ team ] = ( int )level.team[ team ].momentum;
+					Ovr[ team ] = ( int )level.team[ team ].overloadProgress;
 				TBP[ team ] = ( int )level.team[ team ].totalBudget;
 				UBP[ team ] = ( int )G_GetFreeBudget( ( team_t )team );
 			}
@@ -1741,7 +1729,7 @@ static void G_LogGameplayStats( int state )
 
 			Com_sprintf( logline, sizeof( logline ),
 			             "%4i %2i %2i %4i %4i %4i %4i %4i %4i %4i %4i %4i %4i %4i %4i %4i\n",
-			             time, num[ TEAM_ALIENS ], num[ TEAM_HUMANS ], Mom[ TEAM_ALIENS ], Mom[ TEAM_HUMANS ],
+				             time, num[ TEAM_ALIENS ], num[ TEAM_HUMANS ], Ovr[ TEAM_ALIENS ], Ovr[ TEAM_HUMANS ],
 			             XXX, TBP[ TEAM_ALIENS ], TBP[ TEAM_HUMANS ], UBP[ TEAM_ALIENS ], UBP[ TEAM_HUMANS ],
 			             BRV[ TEAM_ALIENS ], BRV[ TEAM_HUMANS ], Cre[ TEAM_ALIENS ], Cre[ TEAM_HUMANS ],
 			             Val[ TEAM_ALIENS ], Val[ TEAM_HUMANS ] );
@@ -2210,8 +2198,6 @@ static void G_TransmitGameplayCvars()
 	};
 
 	AddCvar( g_devolveMaxBaseDistance );
-	AddCvar( g_momentumHalfLife );
-	AddCvar( g_unlockableMinTime );
 
 	Info_SetValueForKey( info, "g_disabledEquipment", Cvar::GetValue( "g_disabledEquipment" ).c_str(), true );
 	Info_SetValueForKey( info, "g_disabledClasses", Cvar::GetValue( "g_disabledClasses" ).c_str(), true );
@@ -2427,7 +2413,6 @@ void G_RunFrame( int levelTime )
 	// Power down buildables if there is a budget deficit.
 	G_UpdateBuildablePowerStates();
 
-	G_DecreaseMomentum();
 	G_CalculateAvgPlayers();
 	G_SpawnClients( TEAM_ALIENS );
 	G_SpawnClients( TEAM_HUMANS );

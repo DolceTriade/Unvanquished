@@ -98,23 +98,16 @@ GET_TEAM_FUNC( queued_budget, lua_pushinteger( L, team.queuedBudget ) )
 // @tfield boolean locked Read/Write.
 // @within TeamProxy
 GET_TEAM_FUNC( locked, lua_pushboolean( L, team.locked ) )
-/// Total team momentum.
-// @tfield integer momentum Read/Write.
+/// Total team Overload progression.
+// @tfield integer overload_progress Read only.
 // @within TeamProxy
-GET_TEAM_FUNC( momentum, lua_pushnumber( L, team.momentum ) )
+GET_TEAM_FUNC( overload_progress, lua_pushnumber( L, team.overloadProgress ) )
 
 static int SetTeamlocked( lua_State* L )
 {
 	TeamProxy* t = LuaLib<TeamProxy>::check( L, 1 );
 	auto& team = level.team[ t->team ];
 	team.locked = lua_toboolean( L, 2 );
-	return 0;
-}
-
-static int SetTeammomentum( lua_State* L )
-{
-	TeamProxy* t = LuaLib<TeamProxy>::check( L, 1 );
-	G_AddMomentumGeneric( t->team, luaL_checknumber( L, 2 ) );
 	return 0;
 }
 
@@ -144,7 +137,7 @@ luaL_Reg TeamProxyGetters[] = {
 	TEAM_GETTER( spent_budget ),
 	TEAM_GETTER( queued_budget ),
 	TEAM_GETTER( locked ),
-	TEAM_GETTER( momentum ),
+	TEAM_GETTER( overload_progress ),
 
 	{ nullptr, nullptr },
 };
@@ -155,7 +148,6 @@ luaL_Reg TeamProxyGetters[] = {
 	}
 luaL_Reg TeamProxySetters[] = {
 	TEAM_SETTER( locked ),
-	TEAM_SETTER( momentum ),
 	TEAM_SETTER( total_budget ),
 
 	{ nullptr, nullptr },

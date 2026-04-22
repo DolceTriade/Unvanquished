@@ -602,7 +602,7 @@ static void Cmd_Give_printUsage( gentity_t *ent )
 {
 	ADMP( QQ( N_( "usage: give [what]" ) ) );
 	ADMP( QQ( N_( "usage: valid choices are: all, health [amount], funds [amount], "
-	              "bp [amount], momentum [amount] [team], stamina, poison, fuel, ammo" ) ) );
+	              "bp [amount], stamina, poison, fuel, ammo" ) ) );
 }
 static void Cmd_Give_f( gentity_t *ent )
 {
@@ -642,36 +642,6 @@ static void Cmd_Give_f( gentity_t *ent )
 		{
 			valid = true;
 			G_AddCreditToClient( ent->client, ( short ) amount, true );
-		}
-	}
-
-	// give momentum
-	if ( Q_strnicmp( name, "momentum", strlen("momentum") ) == 0 )
-	{
-		char* end = nullptr;
-		if ( trap_Argc() < 3 )
-		{
-			amount = 300.0f;
-		}
-		else
-		{
-			amount = strtof( name + strlen( "momentum" ), &end );
-		}
-
-		if ( trap_Argc() >= 4 && *end != '\0' )
-		{
-			++end;
-			team = BG_PlayableTeamFromString( end );
-			if ( team == TEAM_NONE )
-			{
-				team = G_Team( ent );
-			}
-		}
-
-		if ( team != TEAM_NONE && fabsf(amount) >= 0.1f )
-		{
-			valid = true;
-			G_AddMomentumGeneric( team, amount );
 		}
 	}
 
@@ -821,13 +791,6 @@ static void Cmd_Notarget_f( gentity_t *ent )
 	}
 
 	trap_SendServerCommand( ent->num(), va( "print_tr %s", msg ) );
-}
-
-static void Cmd_PrintMomentum_f( gentity_t * )
-{
-	Log::Notice( "Alien momentum: %.2f, Human momentum: %.2f"
-			, level.team[ TEAM_ALIENS ].momentum
-			, level.team[ TEAM_HUMANS ].momentum );
 }
 
 /*
@@ -2038,8 +2001,7 @@ bool G_AlienEvolve( gentity_t *ent, class_t newClass, bool report, bool dryRun )
 	}
 
 	evolveInfo_t evolveInfo = BG_ClassEvolveInfoFromTo( currentClass, newClass );
-	// allow bots to bypass the unlock restriction
-	bool unlocked = BG_ClassUnlocked( newClass ) || (ent->client->pers.isBot && g_bot_infiniteMomentum.Get());
+		bool unlocked = BG_ClassUnlocked( newClass );
 	if ( BG_ClassDisabled( newClass ) || !unlocked || ent->client->pers.credit < evolveInfo.evolveCost )
 	{
 		if ( report )
@@ -2255,54 +2217,9 @@ static bool G_NearOverloadTerminal( gentity_t *ent )
 	       G_Distance( ent, mainBuildable ) <= ENTITY_USE_RANGE;
 }
 
-static void Cmd_Donate_f( gentity_t *ent )
-{
-	char arg[ MAX_TOKEN_CHARS ];
-	int amount;
-
-	if ( !G_NearOverloadTerminal( ent ) )
-	{
-		trap_SendServerCommand( ent->num(),
-		                        va( "print_tr %s",
-		                            QQ( N_("You must be near your team's main structure to donate.") ) ) );
-		return;
-	}
-
-	if ( trap_Argc() < 2 )
-	{
-		trap_SendServerCommand( ent->num(),
-		                        va( "print_tr %s",
-		                            QQ( N_("usage: /donate <amount|all>") ) ) );
-		return;
-	}
-
-	trap_Argv( 1, arg, sizeof( arg ) );
-	if ( !Q_stricmp( arg, "all" ) )
-	{
-		amount = ent->client->pers.credit;
-	}
-	else
-	{
-		amount = atoi( arg );
-	}
-
-	if ( !G_OverloadDonate( ent, amount ) )
-	{
-		trap_SendServerCommand( ent->num(),
-		                        va( "print_tr %s",
-		                            QQ( N_("Donation failed.") ) ) );
-		return;
-	}
-
-	trap_SendServerCommand( ent->num(),
-	                        va( "print_tr %s %d",
-	                            QQ( N_("Donated $1$ credits to the team bank.") ),
-	                            amount ) );
-}
-
 static void Cmd_TeamBuy_f( gentity_t *ent )
 {
-	char arg[ MAX_TOKEN_CHARS ];
+	std::string message;
 
 	if ( !G_NearOverloadTerminal( ent ) )
 	{
@@ -2312,28 +2229,27 @@ static void Cmd_TeamBuy_f( gentity_t *ent )
 		return;
 	}
 
-	if ( trap_Argc() < 2 )
+	if ( trap_Argc() < 3 )
 	{
 		trap_SendServerCommand( ent->num(),
 		                        va( "print_tr %s",
-		                            QQ( N_("usage: /teambuy <bp_25|multiplier|tier_1>") ) ) );
+		                            QQ( N_("usage: /teambuy bp_25 <spend> | /teambuy unlock <thing> <spend> | /teambuy upgrade <thing> <stat> <spend>") ) ) );
 		return;
 	}
 
-	trap_Argv( 1, arg, sizeof( arg ) );
-	if ( !G_OverloadPurchase( ent, arg ) )
+	if ( !G_OverloadPurchase( ent, trap_Args(), &message ) )
 	{
 		trap_SendServerCommand( ent->num(),
 		                        va( "print_tr %s %s",
 		                            QQ( N_("Team purchase failed: $1$") ),
-		                            Quote( arg ) ) );
+		                            Quote( message.c_str() ) ) );
 		return;
 	}
 
 	trap_SendServerCommand( ent->num(),
 	                        va( "print_tr %s %s",
 	                            QQ( N_("Team purchase completed: $1$") ),
-	                            Quote( arg ) ) );
+	                            Quote( message.c_str() ) ) );
 }
 
 static void Cmd_Deconstruct_f( gentity_t *ent )
@@ -4377,7 +4293,6 @@ static const commands_t cmds[] =
 	{ "damage",          CMD_CHEAT | CMD_ALIVE,               Cmd_Damage_f           },
 	{ "deconstruct",     CMD_TEAM | CMD_ALIVE,                Cmd_Deconstruct_f      },
 	{ "devteam",         CMD_CHEAT,                           Cmd_Devteam_f          },
-	{ "donate",          CMD_TEAM | CMD_ALIVE,                Cmd_Donate_f           },
 	{ "follow",          CMD_SPEC,                            Cmd_Follow_f           },
 	{ "follownext",      CMD_SPEC,                            Cmd_FollowCycle_f      },
 	{ "followprev",      CMD_SPEC,                            Cmd_FollowCycle_f      },
@@ -4398,7 +4313,6 @@ static const commands_t cmds[] =
 	{ "mt",              CMD_MESSAGE | CMD_INTERMISSION,      Cmd_PrivateMessage_f   },
 	{ "noclip",          CMD_CHEAT_TEAM,                      Cmd_Noclip_f           },
 	{ "notarget",        CMD_CHEAT | CMD_TEAM | CMD_ALIVE,    Cmd_Notarget_f         },
-	{ "print_momentum",  CMD_CHEAT,                           Cmd_PrintMomentum_f    },
 	{ "pubkey_identify", CMD_INTERMISSION,                    Cmd_Pubkey_Identify_f  },
 	{ "r",               CMD_MESSAGE | CMD_INTERMISSION,      Cmd_ReplyPrivateMessage_f   },
 	{ "reload",          CMD_HUMAN | CMD_ALIVE,               Cmd_Reload_f           },

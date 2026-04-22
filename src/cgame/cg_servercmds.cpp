@@ -27,11 +27,13 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 // cg_servercmds.c -- reliably sequenced text commands sent by the server
 // these are processed at snapshot transition time, so there will definitely
 // be a valid snapshot this frame
+#include <sstream>
 
 #include "common/Common.h"
 #include "cg_local.h"
 #include "shared/bg_attributes.h"
 #include "shared/CommonProxies.h"
+
 
 static void ParsePmoveParams() {
 	Cmd::Args args(CG_ConfigString( CS_PMOVE_PARAMS ));
@@ -95,6 +97,97 @@ static void CG_PrintBPMessage_f()
 {
 	// cg.bpMessage = TranslateText_Internal( false, 1 ); // Fuck do you mean it's not found?
 	cg.bpMessage = CG_Argv( 1 );
+}
+
+static void CG_ParseTeamEconomyConfig( team_t team, const char* config )
+{
+	if ( team != TEAM_ALIENS && team != TEAM_HUMANS )
+	{
+		return;
+	}
+
+	cgTeamEconomyState_t& state = rocketInfo.teamEconomy[ team ];
+	memset( &state, 0, sizeof( state ) );
+	state.valid = true;
+
+	std::stringstream entries( config ? config : "" );
+	std::string entry;
+	while ( std::getline( entries, entry, ';' ) )
+	{
+		size_t equals = entry.find( '=' );
+		if ( equals == std::string::npos )
+		{
+			continue;
+		}
+
+		std::string key = entry.substr( 0, equals );
+		std::string value = entry.substr( equals + 1 );
+
+		if ( key == "cp" )
+		{
+			state.completedPurchases = atoi( value.c_str() );
+			continue;
+		}
+
+		if ( key == "bp" )
+		{
+			state.bpPurchased = atoi( value.c_str() );
+			continue;
+		}
+
+		if ( key == "tb" )
+		{
+			state.totalBudget = atoi( value.c_str() );
+			continue;
+		}
+
+		if ( key == "sb" )
+		{
+			state.spentBudget = atoi( value.c_str() );
+			continue;
+		}
+
+		if ( key == "ic" || key == "rc" )
+		{
+			int* target = key == "ic" ? state.investedCredits : state.repeatCounts;
+			std::stringstream pairs( value );
+			std::string pair;
+			while ( std::getline( pairs, pair, ',' ) )
+			{
+				size_t colon = pair.find( ':' );
+				if ( colon == std::string::npos )
+				{
+					continue;
+				}
+
+				int index = atoi( pair.substr( 0, colon ).c_str() );
+				int amount = atoi( pair.substr( colon + 1 ).c_str() );
+				if ( index < 0 || index >= MAX_OVERLOAD_PURCHASES )
+				{
+					continue;
+				}
+
+				target[ index ] = amount;
+			}
+			continue;
+		}
+
+		if ( key == "op" )
+		{
+			std::stringstream indices( value );
+			std::string token;
+			while ( std::getline( indices, token, ',' ) )
+			{
+				int index = atoi( token.c_str() );
+				if ( index < 0 || index >= MAX_OVERLOAD_PURCHASES )
+				{
+					continue;
+				}
+
+				state.ownedPurchases[ index ] = true;
+			}
+		}
+	}
 }
 
 /*
@@ -163,9 +256,6 @@ static void CG_ParseGameplayCvars()
 	const char *info = CG_ConfigString( CS_GAMEPLAY_CVARS );
 
 	cgs.devolveMaxBaseDistance = atof( Info_ValueForKey( info, "g_devolveMaxBaseDistance" ) );
-
-	cgs.momentumHalfLife  = atof( Info_ValueForKey( info, "g_momentumHalfLife" ) );
-	cgs.unlockableMinTime = atof( Info_ValueForKey( info, "g_unlockableMinTime" ) );
 
 	cgs.buildPointBudgetPerMiner       = atof( Info_ValueForKey( info, "g_BPBudgetPerMiner" ) );
 	cgs.buildPointRecoveryInitialRate  = atof( Info_ValueForKey( info, "g_BPRecoveryInitialRate" ) );
@@ -285,6 +375,10 @@ void CG_ConfigStringModified( int num )
 		{
 			Sys::Drop( "Failed to apply attribute config: %s", error.c_str() );
 		}
+	}
+	else if ( num >= CS_OVERLOAD && num < CS_OVERLOAD + NUM_TEAMS )
+	{
+		CG_ParseTeamEconomyConfig( (team_t)( num - CS_OVERLOAD ), str );
 	}
 	else if ( num >= CS_VOTE_TIME && num < CS_VOTE_TIME + NUM_TEAMS )
 	{

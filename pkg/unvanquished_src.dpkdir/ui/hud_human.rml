@@ -176,7 +176,7 @@
 				left: 2%;
 			}
 
-			div#momentum {
+			div#overload {
 				position: absolute;
 				width: 40%;
 				height: 6%;
@@ -187,7 +187,7 @@
 				vertical-align: bottom;
 			}
 
-			momentum_bar {
+			overload_bar {
 				width: 100%;
 				height: 50%;
 				background-color: #6efbff20; /* General bar color */
@@ -204,7 +204,7 @@
 				cell-color: #22888860;
 				color: #88ffff90;
 
-				momentum-border-width: 0;
+				overload-border-width: 0;
 			}
 
 			usable_buildable {
@@ -277,9 +277,9 @@
 			<health class="health" />
 			<progress class="health" src="health" /></div>
 		</div>
-		<div id="momentum">
+		<div id="overload">
 			<unlocked_items/>
-			<momentum_bar/>
+			<overload_bar/>
 		</div>
 		<div id="items">
 			<usable_buildable>

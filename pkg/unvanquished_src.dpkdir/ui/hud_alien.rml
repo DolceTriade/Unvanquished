@@ -160,7 +160,7 @@
 				color: red;
 			}
 
-			div#momentum {
+			div#overload {
 				position: absolute;
 				width: 40%;
 				height: 6%;
@@ -171,7 +171,7 @@
 				vertical-align: bottom;
 			}
 
-			momentum_bar {
+			overload_bar {
 				width: 100%;
 				height: 50%;
 				background-color: #3a232355; /* General bar color */
@@ -188,7 +188,7 @@
 				cell-color: #93141466;
 				color: #703030ff;
 
-				momentum-border-width: 0;
+				overload-border-width: 0;
 			}
 
 			div#items {
@@ -225,9 +225,9 @@
 	</head>
 	<body id="hud_alien">
 		<alien_sense />
-		<div id="momentum">
+		<div id="overload">
 			<unlocked_items/>
-			<momentum_bar/>
+			<overload_bar/>
 		</div>
 		<div id="items">
 			<usable_buildable>

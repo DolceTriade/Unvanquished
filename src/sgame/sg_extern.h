@@ -88,16 +88,6 @@ extern  Cvar::Callback<Cvar::Cvar<int>> g_buildPointInitialBudget;
 extern  Cvar::Callback<Cvar::Cvar<int>> g_BPInitialBudgetHumans;
 extern  Cvar::Callback<Cvar::Cvar<int>> g_BPInitialBudgetAliens;
 
-extern Cvar::Range<Cvar::Cvar<int>> g_debugMomentum;
-extern Cvar::Cvar<float> g_momentumHalfLife;
-extern Cvar::Cvar<float> g_momentumRewardDoubleTime;
-extern Cvar::Cvar<float> g_unlockableMinTime;
-extern Cvar::Cvar<float> g_momentumBaseMod;
-extern Cvar::Cvar<float> g_momentumKillMod;
-extern Cvar::Cvar<float> g_momentumBuildMod;
-extern Cvar::Cvar<float> g_momentumDeconMod;
-extern Cvar::Cvar<float> g_momentumDestroyMod;
-
 extern Cvar::Cvar<bool> g_humanAllowBuilding;
 extern Cvar::Cvar<bool> g_alienAllowBuilding;
 extern Cvar::Callback<Cvar::Cvar<bool>> g_indestructibleBuildables;
@@ -213,7 +203,6 @@ extern Cvar::Cvar<float> g_bot_fov;
 extern Cvar::Cvar<int> g_bot_chasetime;
 extern Cvar::Cvar<int> g_bot_reactiontime;
 extern Cvar::Cvar<bool> g_bot_infiniteFunds;
-extern Cvar::Cvar<bool> g_bot_infiniteMomentum;
 extern Cvar::Cvar<int> g_bot_aliensenseRange;
 extern Cvar::Modified<Cvar::Cvar<int>> g_bot_defaultFill;
 extern Cvar::Cvar<bool> g_bot_navmeshReduceTypes;

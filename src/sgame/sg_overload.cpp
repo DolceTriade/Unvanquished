@@ -24,37 +24,73 @@ along with Unvanquished. If not, see <http://www.gnu.org/licenses/>.
 
 #include "common/Common.h"
 #include "sg_local.h"
+#include "shared/bg_attributes.h"
+
+#include <limits>
+#include <sstream>
+#include <vector>
 
 namespace {
 
 enum class overloadPurchaseKind_t
 {
-	MULTIPLIER,
 	BP_BUNDLE,
-	UNLOCK_TIER,
+	UNLOCK,
+	UPGRADE,
+};
+
+enum class effectTarget_t
+{
+	GAMEPLAY,
+	ATTRIBUTE,
+};
+
+enum class effectValueType_t
+{
+	INTEGER,
+	FLOAT,
+};
+
+struct overloadEffect_t
+{
+	effectTarget_t      target;
+	effectValueType_t   valueType;
+	int                 gameplayIndex;
+	bgAttributeFamily_t attributeFamily;
+	int                 attributeObject;
+	int                 attributeField;
+	double              baseline;
+	double              step;
+	double              minValue;
+	double              maxValue;
 };
 
 struct overloadPurchaseDef_t
 {
-	const char*            name;
-	const char*            description;
 	overloadPurchaseKind_t kind;
-	int                    bankCost;
-	int                    progressRequirement;
-	int                    amount;
-	bool                   repeatable;
+	team_t                 team;
+	std::string            thing;
+	std::string            stat;
+	std::string            description;
+	int                    requiredCompletedCount;
+	int                    baseCost;
+	int                    costStep;
+	int                    bundleAmount;
+	int                    maxRanks;
+	bgAttributeFamily_t    unlockFamily;
+	int                    unlockObject;
+	int                    unlockField;
+	std::vector<overloadEffect_t> effects;
 };
 
-constexpr int OVERLOAD_LEGACY_STAGE_VALUE = 100;
+std::vector<overloadPurchaseDef_t> overloadPurchases;
+bool overloadCatalogReady = false;
 
-const overloadPurchaseDef_t overloadPurchases[] =
-{
-	{ "bp_25",       "Add 25 team BP",                overloadPurchaseKind_t::BP_BUNDLE,   350,   0,  25, true  },
-	{ "multiplier",  "Increase future combat income", overloadPurchaseKind_t::MULTIPLIER, 500,   0,   1, true  },
-	{ "tier_1",      "Raise the team's unlock tier",  overloadPurchaseKind_t::UNLOCK_TIER, 900, 100,   1, false },
-};
-
-static_assert( ARRAY_LEN( overloadPurchases ) <= MAX_OVERLOAD_PURCHASES, "purchase catalog exceeds storage" );
+constexpr int OVERLOAD_STAGE2_COUNT = 3;
+constexpr int OVERLOAD_STAGE3_COUNT = 6;
+constexpr int OVERLOAD_BP_BUNDLE_COST = 350;
+constexpr int OVERLOAD_BP_BUNDLE_AMOUNT = 25;
+constexpr int OVERLOAD_UNCAPPED_RANKS = std::numeric_limits<int>::max();
 
 static int InitialBudgetForTeam( team_t team )
 {
@@ -76,13 +112,113 @@ static TeamEconomyState& TeamEconomy( team_t team )
 	return level.team[ team ].economy;
 }
 
-static void NotifyLegacyStageSensors( team_t team, int oldProgress, int newProgress )
+static std::string EncodeIndexValuePairs( const int* values )
 {
-	for ( int stage = 1; stage < 3; stage++ )
+	std::ostringstream stream;
+	bool first = true;
+
+	for ( int i = 0; i < MAX_OVERLOAD_PURCHASES; ++i )
 	{
-		int threshold = stage * OVERLOAD_LEGACY_STAGE_VALUE;
-		bool wasPast = oldProgress >= threshold;
-		bool isPast  = newProgress >= threshold;
+		if ( values[ i ] == 0 )
+		{
+			continue;
+		}
+
+		if ( !first )
+		{
+			stream << ',';
+		}
+
+		stream << i << ':' << values[ i ];
+		first = false;
+	}
+
+	return stream.str();
+}
+
+static std::string EncodeOwnedPurchases( const bool* values )
+{
+	std::ostringstream stream;
+	bool first = true;
+
+	for ( int i = 0; i < MAX_OVERLOAD_PURCHASES; ++i )
+	{
+		if ( !values[ i ] )
+		{
+			continue;
+		}
+
+		if ( !first )
+		{
+			stream << ',';
+		}
+
+		stream << i;
+		first = false;
+	}
+
+	return stream.str();
+}
+
+static void PublishOverloadStateInternal( team_t team )
+{
+	if ( !G_IsPlayableTeam( team ) )
+	{
+		return;
+	}
+
+	const TeamEconomyState& economy = TeamEconomy( team );
+	std::ostringstream stream;
+	stream << "cp=" << economy.completedPurchases
+	       << ";bp=" << economy.bpPurchased
+	       << ";tb=" << level.team[ team ].totalBudget
+	       << ";sb=" << level.team[ team ].spentBudget
+	       << ";ic=" << EncodeIndexValuePairs( economy.investedCredits )
+	       << ";rc=" << EncodeIndexValuePairs( economy.repeatCounts )
+	       << ";op=" << EncodeOwnedPurchases( economy.ownedPurchases );
+
+	std::string config = stream.str();
+	if ( config.size() >= BIG_INFO_STRING )
+	{
+		Sys::Error( "team economy configstring exceeded BIG_INFO_STRING (%zu >= %d)",
+		            config.size(), BIG_INFO_STRING );
+	}
+
+	trap_SetConfigstring( CS_OVERLOAD + team, config.c_str() );
+}
+
+static void PublishAllTeamEconomyStates()
+{
+	for ( team_t team = TEAM_NONE; ( team = G_IterateTeams( team ) ); )
+	{
+		::G_PublishOverloadState( team );
+	}
+}
+
+static int StageForCompletedPurchases( int completedPurchases )
+{
+	if ( completedPurchases >= OVERLOAD_STAGE3_COUNT )
+	{
+		return 3;
+	}
+
+	if ( completedPurchases >= OVERLOAD_STAGE2_COUNT )
+	{
+		return 2;
+	}
+
+	return 1;
+}
+
+static void NotifyLegacyStageSensors( team_t team, int oldCompletedPurchases, int newCompletedPurchases )
+{
+	int oldStage = StageForCompletedPurchases( oldCompletedPurchases );
+	int newStage = StageForCompletedPurchases( newCompletedPurchases );
+
+	for ( int stage = 2; stage <= 3; ++stage )
+	{
+		bool wasPast = oldStage >= stage;
+		bool isPast  = newStage >= stage;
 
 		if ( wasPast == isPast )
 		{
@@ -91,66 +227,793 @@ static void NotifyLegacyStageSensors( team_t team, int oldProgress, int newProgr
 
 		if ( isPast )
 		{
-			G_notify_sensor_stage( team, stage - 1, stage );
+			G_notify_sensor_stage( team, stage - 2, stage - 1 );
 		}
 		else
 		{
-			G_notify_sensor_stage( team, stage, stage - 1 );
+			G_notify_sensor_stage( team, stage - 1, stage - 2 );
 		}
 	}
 }
 
 static void SyncOverloadProgress( team_t team )
 {
-	level.team[ team ].momentum = G_OverloadProgressValue( team );
+	int progress = G_OverloadProgressValue( team );
+	level.team[ team ].overloadProgress = progress;
+
+	for ( int playerNum = 0; playerNum < level.maxclients; ++playerNum )
+	{
+		gclient_t *client = level.clients + playerNum;
+		if ( client->pers.connected != CON_CONNECTED || client->pers.team != team )
+		{
+			continue;
+		}
+
+		client->ps.persistant[ PERS_OVERLOAD ] = (short)( progress * 10 );
+	}
+
 	G_UpdateUnlockables();
 }
 
-static const overloadPurchaseDef_t* FindPurchase( Str::StringRef name, int* purchaseIndex = nullptr )
+static void TeamCenterPrint( team_t team, const std::string& message )
 {
-	for ( size_t i = 0; i < ARRAY_LEN( overloadPurchases ); i++ )
+	if ( message.empty() )
 	{
-		if ( name == overloadPurchases[ i ].name )
+		return;
+	}
+
+	G_TeamCommand( team, va( "cp %s", Quote( message.c_str() ) ) );
+}
+
+static std::string UnlockableDisplayName( unlockableType_t type, int itemNum )
+{
+	switch ( type )
+	{
+		case UNLT_WEAPON:    return BG_Weapon( itemNum )->humanName;
+		case UNLT_UPGRADE:   return BG_Upgrade( itemNum )->humanName;
+		case UNLT_BUILDABLE: return BG_Buildable( itemNum )->humanName;
+		case UNLT_CLASS:     return BG_ClassModelConfig( itemNum )->humanName;
+		case UNLT_NUM_UNLOCKABLETYPES: break;
+	}
+
+	Sys::Error( "UnlockableDisplayName: unknown unlockable type" );
+}
+
+static const char* CanonicalThingName( const char* thing )
+{
+	if ( !Q_stricmp( thing, "basilisk" ) )
+	{
+		return "mantis";
+	}
+
+	if ( !Q_stricmp( thing, "adv_basilisk" ) )
+	{
+		return "adv_mantis";
+	}
+
+	return thing;
+}
+
+static void CaptureGameplayEffectBaseline( overloadEffect_t& effect )
+{
+	const gameplayVarInfo_t* info = BG_GameplayVar( effect.gameplayIndex );
+	if ( !info )
+	{
+		Sys::Error( "invalid gameplay effect index %d", effect.gameplayIndex );
+	}
+
+	if ( info->type == GAMEPLAY_INTEGER )
+	{
+		effect.valueType = effectValueType_t::INTEGER;
+		effect.baseline = *static_cast<int*>( info->storage );
+	}
+	else
+	{
+		effect.valueType = effectValueType_t::FLOAT;
+		effect.baseline = *static_cast<float*>( info->storage );
+	}
+}
+
+static void CaptureAttributeEffectBaseline( overloadEffect_t& effect )
+{
+	bgAttributeValue_t value{};
+	std::string error;
+
+	if ( !BG_GetAttributeValue( effect.attributeFamily, effect.attributeObject, effect.attributeField, &value, &error ) )
+	{
+		Sys::Error( "failed to capture attribute baseline: %s", error.c_str() );
+	}
+
+	const bgAttributeFieldInfo_t* field = BG_AttributeField( effect.attributeFamily, effect.attributeField );
+	if ( !field )
+	{
+		Sys::Error( "invalid attribute field %d", effect.attributeField );
+	}
+
+	if ( field->type == BG_ATTR_INTEGER )
+	{
+		effect.valueType = effectValueType_t::INTEGER;
+		effect.baseline = value.integer;
+	}
+	else if ( field->type == BG_ATTR_FLOAT )
+	{
+		effect.valueType = effectValueType_t::FLOAT;
+		effect.baseline = value.number;
+	}
+	else
+	{
+		Sys::Error( "bool attributes are unsupported for overload effects" );
+	}
+}
+
+static overloadEffect_t GameplayEffect( const char* gameplayVarName, double step, double minValue = -std::numeric_limits<double>::infinity(), double maxValue = std::numeric_limits<double>::infinity() )
+{
+	int gameplayIndex = BG_FindGameplayVarByName( gameplayVarName );
+	if ( gameplayIndex < 0 )
+	{
+		Sys::Error( "unknown gameplay variable %s", gameplayVarName );
+	}
+
+	overloadEffect_t effect{};
+	effect.target = effectTarget_t::GAMEPLAY;
+	effect.gameplayIndex = gameplayIndex;
+	effect.attributeFamily = BG_NUM_ATTRIBUTE_FAMILIES;
+	effect.attributeObject = -1;
+	effect.attributeField = -1;
+	effect.step = step;
+	effect.minValue = minValue;
+	effect.maxValue = maxValue;
+	CaptureGameplayEffectBaseline( effect );
+	return effect;
+}
+
+static overloadEffect_t AttributeEffect( bgAttributeFamily_t family, const char* objectName, const char* fieldName, double step,
+                                         double minValue = -std::numeric_limits<double>::infinity(),
+                                         double maxValue = std::numeric_limits<double>::infinity() )
+{
+	int objectIndex = BG_FindAttributeObject( family, objectName );
+	int fieldIndex = BG_FindAttributeField( family, fieldName );
+	if ( fieldIndex < 0 )
+	{
+		if ( !Q_stricmp( fieldName, "maxClips" ) )
+		{
+			fieldIndex = BG_FindAttributeField( family, "clips" );
+		}
+		else if ( !Q_stricmp( fieldName, "maxAmmo" ) )
+		{
+			fieldIndex = BG_FindAttributeField( family, "ammo" );
+		}
+		else if ( !Q_stricmp( fieldName, "unlockThreshold" ) )
+		{
+			fieldIndex = BG_FindAttributeField( family, "unlock_threshold" );
+		}
+	}
+	if ( objectIndex < 0 || fieldIndex < 0 )
+	{
+		Sys::Error( "unknown attribute target %s.%s", objectName, fieldName );
+	}
+
+	overloadEffect_t effect{};
+	effect.target = effectTarget_t::ATTRIBUTE;
+	effect.gameplayIndex = -1;
+	effect.attributeFamily = family;
+	effect.attributeObject = objectIndex;
+	effect.attributeField = fieldIndex;
+	effect.step = step;
+	effect.minValue = minValue;
+	effect.maxValue = maxValue;
+	CaptureAttributeEffectBaseline( effect );
+	return effect;
+}
+
+static int DefaultUpgradeBaseCost( int requiredCompletedCount )
+{
+	return 250 + requiredCompletedCount * 50;
+}
+
+static int UnlockCost( bgAttributeFamily_t family, int objectIndex, int requiredCompletedCount )
+{
+	int intrinsic = 0;
+
+	switch ( family )
+	{
+		case BG_ATTR_WEAPON: intrinsic = BG_Weapon( objectIndex + 1 )->price; break;
+		case BG_ATTR_UPGRADE: intrinsic = BG_Upgrade( objectIndex + 1 )->price; break;
+		case BG_ATTR_BUILDABLE: intrinsic = BG_Buildable( objectIndex + 1 )->buildPoints * 10; break;
+		case BG_ATTR_CLASS: intrinsic = BG_Class( objectIndex )->price / 2; break;
+		default: intrinsic = 0; break;
+	}
+
+	return std::max( 200 + requiredCompletedCount * 50, intrinsic );
+}
+
+static void AddUpgrade( team_t team, int requiredCompletedCount, int baseCost, int costStep, int maxRanks,
+                        const char* thing, const char* stat, const char* description,
+                        std::initializer_list<overloadEffect_t> effects )
+{
+	overloadPurchaseDef_t entry{};
+	entry.kind = overloadPurchaseKind_t::UPGRADE;
+	entry.team = team;
+	entry.thing = thing;
+	entry.stat = stat;
+	entry.description = description;
+	entry.requiredCompletedCount = requiredCompletedCount;
+	entry.baseCost = baseCost;
+	entry.costStep = costStep;
+	entry.bundleAmount = 0;
+	entry.maxRanks = maxRanks;
+	entry.unlockFamily = BG_NUM_ATTRIBUTE_FAMILIES;
+	entry.unlockObject = -1;
+	entry.unlockField = -1;
+	entry.effects.assign( effects.begin(), effects.end() );
+	overloadPurchases.push_back( std::move( entry ) );
+}
+
+static void AddUnlock( team_t team, int requiredCompletedCount, bgAttributeFamily_t family, int objectIndex,
+                       int unlockField, const char* thing, const char* description )
+{
+	overloadPurchaseDef_t entry{};
+	entry.kind = overloadPurchaseKind_t::UNLOCK;
+	entry.team = team;
+	entry.thing = thing;
+	entry.description = description;
+	entry.requiredCompletedCount = requiredCompletedCount;
+	entry.baseCost = UnlockCost( family, objectIndex, requiredCompletedCount );
+	entry.costStep = 0;
+	entry.bundleAmount = 0;
+	entry.maxRanks = 1;
+	entry.unlockFamily = family;
+	entry.unlockObject = objectIndex;
+	entry.unlockField = unlockField;
+	overloadPurchases.push_back( std::move( entry ) );
+}
+
+static int FindUnlockThresholdField( bgAttributeFamily_t family )
+{
+	int field = BG_FindAttributeField( family, "unlock_threshold" );
+	if ( field >= 0 )
+	{
+		return field;
+	}
+
+	// Tolerate legacy camelCase naming if a family ever exposes it that way.
+	return BG_FindAttributeField( family, "unlockThreshold" );
+}
+
+static void AddUnlockEntriesForFamily( bgAttributeFamily_t family, unlockableType_t unlockableType, int start, int end )
+{
+	const int unlockField = FindUnlockThresholdField( family );
+	if ( unlockField < 0 )
+	{
+		Sys::Error( "unlockThreshold field missing for family %d", family );
+	}
+
+	for ( int itemNum = start; itemNum < end; ++itemNum )
+	{
+		team_t team = TEAM_NONE;
+		int unlockThreshold = 0;
+		const char* thing = nullptr;
+
+		switch ( unlockableType )
+		{
+			case UNLT_WEAPON:
+				team = BG_Weapon( itemNum )->team;
+				unlockThreshold = BG_Weapon( itemNum )->unlockThreshold;
+				thing = BG_Weapon( itemNum )->name;
+				break;
+
+			case UNLT_UPGRADE:
+				team = BG_Upgrade( itemNum )->team;
+				unlockThreshold = BG_Upgrade( itemNum )->unlockThreshold;
+				thing = BG_Upgrade( itemNum )->name;
+				break;
+
+			case UNLT_BUILDABLE:
+				team = BG_Buildable( itemNum )->team;
+				unlockThreshold = BG_Buildable( itemNum )->unlockThreshold;
+				thing = BG_Buildable( itemNum )->name;
+				break;
+
+			case UNLT_CLASS:
+				team = BG_Class( itemNum )->team;
+				unlockThreshold = BG_Class( itemNum )->unlockThreshold;
+				thing = BG_Class( itemNum )->name;
+				break;
+
+			case UNLT_NUM_UNLOCKABLETYPES:
+				Sys::Error( "AddUnlockEntriesForFamily: invalid unlockable type" );
+		}
+
+		if ( !G_IsPlayableTeam( team ) || unlockThreshold <= 0 )
+		{
+			continue;
+		}
+
+		const int objectIndex = BG_FindAttributeObject( family, thing );
+		if ( objectIndex < 0 )
+		{
+			Sys::Error( "could not resolve attribute object for %s", thing );
+		}
+
+		AddUnlock( team, 0, family, objectIndex, unlockField,
+		           thing, UnlockableDisplayName( unlockableType, itemNum ).c_str() );
+	}
+}
+
+static void BuildOverloadCatalog()
+{
+	if ( overloadCatalogReady )
+	{
+		return;
+	}
+
+	overloadPurchases.clear();
+
+	overloadPurchaseDef_t bpBundle{};
+	bpBundle.kind = overloadPurchaseKind_t::BP_BUNDLE;
+	bpBundle.team = TEAM_NONE;
+	bpBundle.thing = "bp_25";
+	bpBundle.description = "Add 25 team BP";
+	bpBundle.requiredCompletedCount = 0;
+	bpBundle.baseCost = OVERLOAD_BP_BUNDLE_COST;
+	bpBundle.costStep = 0;
+	bpBundle.bundleAmount = OVERLOAD_BP_BUNDLE_AMOUNT;
+	bpBundle.maxRanks = std::numeric_limits<int>::max();
+	bpBundle.unlockFamily = BG_NUM_ATTRIBUTE_FAMILIES;
+	bpBundle.unlockObject = -1;
+	bpBundle.unlockField = -1;
+	overloadPurchases.push_back( bpBundle );
+
+	AddUnlockEntriesForFamily( BG_ATTR_WEAPON, UNLT_WEAPON, WP_NONE + 1, WP_NUM_WEAPONS );
+	AddUnlockEntriesForFamily( BG_ATTR_UPGRADE, UNLT_UPGRADE, UP_NONE + 1, UP_NUM_UPGRADES );
+	AddUnlockEntriesForFamily( BG_ATTR_BUILDABLE, UNLT_BUILDABLE, BA_NONE + 1, BA_NUM_BUILDABLES );
+	AddUnlockEntriesForFamily( BG_ATTR_CLASS, UNLT_CLASS, PCL_NONE + 1, PCL_NUM_CLASSES );
+
+	AddUpgrade( TEAM_HUMANS, 0, DefaultUpgradeBaseCost( 0 ), 100, OVERLOAD_UNCAPPED_RANKS, "rifle", "damage", "Rifle Damage",
+	            { GameplayEffect( "RIFLE_DMG", 3.0 ) } );
+	AddUpgrade( TEAM_HUMANS, 0, DefaultUpgradeBaseCost( 0 ), 100, OVERLOAD_UNCAPPED_RANKS, "rifle", "clips", "Rifle Clips",
+	            { AttributeEffect( BG_ATTR_WEAPON, "rifle", "clips", 1.0, 0.0 ) } );
+	AddUpgrade( TEAM_HUMANS, 0, DefaultUpgradeBaseCost( 0 ), 100, OVERLOAD_UNCAPPED_RANKS, "shotgun", "damage", "Shotgun Damage",
+	            { GameplayEffect( "SHOTGUN_DMG", 1.0 ) } );
+	AddUpgrade( TEAM_HUMANS, 0, DefaultUpgradeBaseCost( 0 ), 100, OVERLOAD_UNCAPPED_RANKS, "shotgun", "clips", "Shotgun Clips",
+	            { AttributeEffect( BG_ATTR_WEAPON, "shotgun", "clips", 1.0, 0.0 ) } );
+	AddUpgrade( TEAM_HUMANS, 0, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), 125, OVERLOAD_UNCAPPED_RANKS, "lasgun", "damage", "Lasgun Damage",
+	            { GameplayEffect( "LASGUN_DAMAGE", 3.0 ) } );
+	AddUpgrade( TEAM_HUMANS, 0, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), 125, OVERLOAD_UNCAPPED_RANKS, "lasgun", "ammo", "Lasgun Ammo",
+	            { AttributeEffect( BG_ATTR_WEAPON, "lgun", "ammo", 25.0, 1.0 ) } );
+	AddUpgrade( TEAM_HUMANS, 0, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), 125, OVERLOAD_UNCAPPED_RANKS, "chaingun", "damage", "Chaingun Damage",
+	            { GameplayEffect( "CHAINGUN_DMG", 2.0 ) } );
+	AddUpgrade( TEAM_HUMANS, 0, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), 125, OVERLOAD_UNCAPPED_RANKS, "chaingun", "clips", "Chaingun Clips",
+	            { AttributeEffect( BG_ATTR_WEAPON, "chaingun", "clips", 1.0, 0.0 ) } );
+	AddUpgrade( TEAM_HUMANS, 0, DefaultUpgradeBaseCost( OVERLOAD_STAGE3_COUNT ), 150, OVERLOAD_UNCAPPED_RANKS, "lcannon", "damage", "Lucifer Cannon Damage",
+	            { GameplayEffect( "LCANNON_DAMAGE", 15.0 ) } );
+	AddUpgrade( TEAM_HUMANS, 0, DefaultUpgradeBaseCost( OVERLOAD_STAGE3_COUNT ), 150, OVERLOAD_UNCAPPED_RANKS, "lcannon", "ammo", "Lucifer Cannon Ammo",
+	            { AttributeEffect( BG_ATTR_WEAPON, "lcannon", "ammo", 10.0, 1.0 ) } );
+	AddUpgrade( TEAM_HUMANS, 0, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), 125, OVERLOAD_UNCAPPED_RANKS, "jetpack", "fuel", "Jetpack Fuel",
+	            { GameplayEffect( "JETPACK_FUEL_MAX", 2500.0, 1.0 ) } );
+	AddUpgrade( TEAM_HUMANS, 0, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), 125, OVERLOAD_UNCAPPED_RANKS, "jetpack", "recharge", "Jetpack Recharge",
+	            { GameplayEffect( "JETPACK_FUEL_RESTORE", 1.0, 1.0 ) } );
+	AddUpgrade( TEAM_HUMANS, 0, DefaultUpgradeBaseCost( 0 ), 100, OVERLOAD_UNCAPPED_RANKS, "medkit", "startup", "Medkit Startup",
+	            { GameplayEffect( "MEDKIT_STARTUP_SPEED", 50.0 ) } );
+	AddUpgrade( TEAM_HUMANS, 0, DefaultUpgradeBaseCost( 0 ), 100, OVERLOAD_UNCAPPED_RANKS, "medkit", "poison", "Medkit Poison Protection",
+	            { GameplayEffect( "MEDKIT_POISON_IMMUNITY_TIME", 1000.0, 0.0 ) } );
+	AddUpgrade( TEAM_HUMANS, 0, DefaultUpgradeBaseCost( 0 ), 100, OVERLOAD_UNCAPPED_RANKS, "mgturret", "range", "Machinegun Turret Range",
+	            { GameplayEffect( "MGTURRET_RANGE", 25.0 ) } );
+	AddUpgrade( TEAM_HUMANS, 0, DefaultUpgradeBaseCost( 0 ), 100, OVERLOAD_UNCAPPED_RANKS, "mgturret", "repeat", "Machinegun Turret Rate",
+	            { GameplayEffect( "MGTURRET_ATTACK_PERIOD", -10.0, 25.0 ) } );
+	AddUpgrade( TEAM_HUMANS, 0, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), 125, OVERLOAD_UNCAPPED_RANKS, "rocketpod", "range", "Rocketpod Range",
+	            { GameplayEffect( "ROCKETPOD_RANGE", 80.0 ) } );
+	AddUpgrade( TEAM_HUMANS, 0, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), 125, OVERLOAD_UNCAPPED_RANKS, "rocketpod", "repeat", "Rocketpod Rate",
+	            { GameplayEffect( "ROCKETPOD_ATTACK_PERIOD", -75.0, 250.0 ) } );
+
+	AddUpgrade( TEAM_ALIENS, 0, DefaultUpgradeBaseCost( 0 ), 100, OVERLOAD_UNCAPPED_RANKS, "dretch", "damage", "Dretch Damage",
+	            { GameplayEffect( "LEVEL0_BITE_DMG", 3.0 ) } );
+	AddUpgrade( TEAM_ALIENS, 0, DefaultUpgradeBaseCost( 0 ), 100, OVERLOAD_UNCAPPED_RANKS, "dretch", "range", "Dretch Range",
+	            { GameplayEffect( "LEVEL0_BITE_RANGE", 5.0 ) } );
+	AddUpgrade( TEAM_ALIENS, 0, DefaultUpgradeBaseCost( 0 ), 100, OVERLOAD_UNCAPPED_RANKS, "mantis", "damage", "Mantis Damage",
+	            { GameplayEffect( "LEVEL2_CLAW_DMG", 4.0 ) } );
+	AddUpgrade( TEAM_ALIENS, 0, DefaultUpgradeBaseCost( 0 ), 100, OVERLOAD_UNCAPPED_RANKS, "mantis", "range", "Mantis Range",
+	            { GameplayEffect( "LEVEL2_CLAW_RANGE", 5.0 ) } );
+	AddUpgrade( TEAM_ALIENS, 0, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), 125, OVERLOAD_UNCAPPED_RANKS, "adv_mantis", "damage", "Advanced Mantis Zap Damage",
+	            { GameplayEffect( "LEVEL2_AREAZAP_DMG", 4.0 ) } );
+	AddUpgrade( TEAM_ALIENS, 0, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), 125, OVERLOAD_UNCAPPED_RANKS, "adv_mantis", "range", "Advanced Mantis Zap Range",
+	            { GameplayEffect( "LEVEL2_AREAZAP_RANGE", 10.0 ) } );
+	AddUpgrade( TEAM_ALIENS, 0, DefaultUpgradeBaseCost( 0 ), 100, OVERLOAD_UNCAPPED_RANKS, "marauder", "damage", "Marauder Damage",
+	            { GameplayEffect( "LEVEL2_AREAZAP_DMG", 4.0 ) } );
+	AddUpgrade( TEAM_ALIENS, 0, DefaultUpgradeBaseCost( 0 ), 100, OVERLOAD_UNCAPPED_RANKS, "marauder", "range", "Marauder Range",
+	            { GameplayEffect( "LEVEL2_AREAZAP_RANGE", 10.0 ) } );
+	AddUpgrade( TEAM_ALIENS, 0, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), 125, OVERLOAD_UNCAPPED_RANKS, "dragoon", "damage", "Dragoon Damage",
+	            { GameplayEffect( "LEVEL3_CLAW_DMG", 5.0 ) } );
+	AddUpgrade( TEAM_ALIENS, 0, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), 125, OVERLOAD_UNCAPPED_RANKS, "dragoon", "pounce_damage", "Dragoon Pounce Damage",
+	            { GameplayEffect( "LEVEL3_POUNCE_DMG", 10.0 ) } );
+	AddUpgrade( TEAM_ALIENS, 0, DefaultUpgradeBaseCost( OVERLOAD_STAGE3_COUNT ), 150, OVERLOAD_UNCAPPED_RANKS, "adv_dragoon", "damage", "Advanced Dragoon Damage",
+	            { GameplayEffect( "LEVEL3_CLAW_DMG", 5.0 ) } );
+	AddUpgrade( TEAM_ALIENS, 0, DefaultUpgradeBaseCost( OVERLOAD_STAGE3_COUNT ), 150, OVERLOAD_UNCAPPED_RANKS, "adv_dragoon", "pounce_range", "Advanced Dragoon Pounce Range",
+	            { GameplayEffect( "LEVEL3_POUNCE_UPG_RANGE", 15.0 ) } );
+	AddUpgrade( TEAM_ALIENS, 0, DefaultUpgradeBaseCost( OVERLOAD_STAGE3_COUNT ), 150, OVERLOAD_UNCAPPED_RANKS, "tyrant", "damage", "Tyrant Damage",
+	            { GameplayEffect( "LEVEL4_CLAW_DMG", 8.0 ) } );
+	AddUpgrade( TEAM_ALIENS, 0, DefaultUpgradeBaseCost( OVERLOAD_STAGE3_COUNT ), 150, OVERLOAD_UNCAPPED_RANKS, "tyrant", "trample_damage", "Tyrant Trample Damage",
+	            { GameplayEffect( "LEVEL4_TRAMPLE_DMG", 10.0 ) } );
+
+	if ( overloadPurchases.size() > MAX_OVERLOAD_PURCHASES )
+	{
+		Sys::Error( "Overload purchase catalog exceeds MAX_OVERLOAD_PURCHASES (%zu > %d)",
+		            overloadPurchases.size(), MAX_OVERLOAD_PURCHASES );
+	}
+
+	overloadCatalogReady = true;
+}
+
+static bool EntryMatches( const overloadPurchaseDef_t& entry, const Cmd::Args& args )
+{
+	if ( entry.kind == overloadPurchaseKind_t::BP_BUNDLE )
+	{
+		return args.Argc() >= 2 && !Q_stricmp( args.Argv( 1 ).c_str(), entry.thing.c_str() );
+	}
+
+	if ( entry.kind == overloadPurchaseKind_t::UNLOCK )
+	{
+		const char* requestedThing = CanonicalThingName( args.Argv( 2 ).c_str() );
+		return args.Argc() >= 3 &&
+		       !Q_stricmp( args.Argv( 1 ).c_str(), "unlock" ) &&
+		       !Q_stricmp( requestedThing, entry.thing.c_str() );
+	}
+
+	const char* requestedThing = CanonicalThingName( args.Argv( 2 ).c_str() );
+	return args.Argc() >= 4 &&
+	       !Q_stricmp( args.Argv( 1 ).c_str(), "upgrade" ) &&
+	       !Q_stricmp( requestedThing, entry.thing.c_str() ) &&
+	       !Q_stricmp( args.Argv( 3 ).c_str(), entry.stat.c_str() );
+}
+
+static const overloadPurchaseDef_t* FindPurchase( team_t team, const Cmd::Args& args, int* purchaseIndex = nullptr )
+{
+	BuildOverloadCatalog();
+
+	for ( size_t i = 0; i < overloadPurchases.size(); ++i )
+	{
+		const overloadPurchaseDef_t& entry = overloadPurchases[ i ];
+		if ( entry.team != TEAM_NONE && entry.team != team )
+		{
+			continue;
+		}
+
+		if ( EntryMatches( entry, args ) )
 		{
 			if ( purchaseIndex )
 			{
 				*purchaseIndex = i;
 			}
-			return &overloadPurchases[ i ];
+			return &entry;
 		}
 	}
 
 	return nullptr;
 }
 
-static void ApplyPurchase( team_t team, int purchaseIndex, const overloadPurchaseDef_t& purchase )
+static bool EntryIsAvailable( team_t team, const overloadPurchaseDef_t& entry )
 {
-	TeamEconomyState& economy = TeamEconomy( team );
-
-	economy.repeatCounts[ purchaseIndex ]++;
-	economy.ownedPurchases[ purchaseIndex ] = true;
-
-	switch ( purchase.kind )
+	if ( entry.team != TEAM_NONE && entry.team != team )
 	{
-		case overloadPurchaseKind_t::MULTIPLIER:
-			economy.multiplierLevel += purchase.amount;
-			economy.rewardMultiplier = 1.0f + 0.25f * economy.multiplierLevel;
-			break;
-
-		case overloadPurchaseKind_t::BP_BUNDLE:
-			economy.bpPurchased += purchase.amount;
-			level.team[ team ].totalBudget += purchase.amount;
-			break;
-
-		case overloadPurchaseKind_t::UNLOCK_TIER:
-			economy.tier += purchase.amount;
-			break;
+		return false;
 	}
 
-	SyncOverloadProgress( team );
+	const TeamEconomyState& economy = TeamEconomy( team );
+	const size_t index = &entry - overloadPurchases.data();
+
+	if ( economy.completedPurchases < entry.requiredCompletedCount )
+	{
+		return false;
+	}
+
+	if ( entry.kind == overloadPurchaseKind_t::UNLOCK )
+	{
+		return !economy.ownedPurchases[ index ];
+	}
+
+	return economy.repeatCounts[ index ] < entry.maxRanks;
+}
+
+static int RemainingSpendCapacity( const overloadPurchaseDef_t& entry, int entryIndex, team_t team )
+{
+	if ( entry.kind == overloadPurchaseKind_t::BP_BUNDLE )
+	{
+		return std::numeric_limits<int>::max();
+	}
+
+	const TeamEconomyState& economy = TeamEconomy( team );
+	int currentRank = economy.repeatCounts[ entryIndex ];
+	int invested = economy.investedCredits[ entryIndex ];
+
+	if ( entry.kind == overloadPurchaseKind_t::UNLOCK )
+	{
+		return std::max( 0, entry.baseCost - invested );
+	}
+
+	if ( entry.maxRanks == OVERLOAD_UNCAPPED_RANKS )
+	{
+		return std::numeric_limits<int>::max();
+	}
+
+	int remaining = -invested;
+	for ( int rank = currentRank; rank < entry.maxRanks; ++rank )
+	{
+		remaining += entry.baseCost + rank * entry.costStep;
+	}
+
+	return std::max( 0, remaining );
+}
+
+static int RanksCompletedFromSpend( const overloadPurchaseDef_t& entry, int currentRank, int& investedCredits )
+{
+	if ( entry.kind == overloadPurchaseKind_t::UNLOCK )
+	{
+		if ( investedCredits >= entry.baseCost )
+		{
+			investedCredits = 0;
+			return 1;
+		}
+		return 0;
+	}
+
+	if ( entry.kind == overloadPurchaseKind_t::BP_BUNDLE )
+	{
+		const int completed = investedCredits / entry.baseCost;
+		investedCredits %= entry.baseCost;
+		return completed;
+	}
+
+	int completed = 0;
+	while ( currentRank + completed < entry.maxRanks )
+	{
+		int threshold = entry.baseCost + ( currentRank + completed ) * entry.costStep;
+		if ( investedCredits < threshold )
+		{
+			break;
+		}
+
+		investedCredits -= threshold;
+		++completed;
+	}
+
+	return completed;
+}
+
+static double ClampEffectValue( const overloadEffect_t& effect, double value )
+{
+	return std::max( effect.minValue, std::min( effect.maxValue, value ) );
+}
+
+static bool SameEffectTarget( const overloadEffect_t& lhs, const overloadEffect_t& rhs )
+{
+	return lhs.target == rhs.target &&
+	       lhs.valueType == rhs.valueType &&
+	       lhs.gameplayIndex == rhs.gameplayIndex &&
+	       lhs.attributeFamily == rhs.attributeFamily &&
+	       lhs.attributeObject == rhs.attributeObject &&
+	       lhs.attributeField == rhs.attributeField;
+}
+
+static double EffectiveEffectValue( const overloadEffect_t& effect, team_t team )
+{
+	double value = effect.baseline;
+	const TeamEconomyState& economy = TeamEconomy( team );
+
+	for ( size_t i = 0; i < overloadPurchases.size(); ++i )
+	{
+		const overloadPurchaseDef_t& entry = overloadPurchases[ i ];
+		if ( entry.kind != overloadPurchaseKind_t::UPGRADE || entry.team != team )
+		{
+			continue;
+		}
+
+		for ( const overloadEffect_t& candidate : entry.effects )
+		{
+			if ( SameEffectTarget( effect, candidate ) )
+			{
+				value += candidate.step * economy.repeatCounts[ i ];
+			}
+		}
+	}
+
+	return ClampEffectValue( effect, value );
+}
+
+static void ApplyEffectValue( const overloadEffect_t& effect, team_t team, bool& gameplayDirty, bool& attributeDirty )
+{
+	double value = EffectiveEffectValue( effect, team );
+	std::string error;
+
+	if ( effect.target == effectTarget_t::GAMEPLAY )
+	{
+		if ( effect.valueType == effectValueType_t::INTEGER )
+		{
+			if ( !BG_SetGameplayInt( effect.gameplayIndex, (int)lround( value ), true, &error ) )
+			{
+				Sys::Error( "failed to set gameplay override: %s", error.c_str() );
+			}
+		}
+		else
+		{
+			if ( !BG_SetGameplayFloat( effect.gameplayIndex, (float)value, true, &error ) )
+			{
+				Sys::Error( "failed to set gameplay override: %s", error.c_str() );
+			}
+		}
+
+		gameplayDirty = true;
+		return;
+	}
+
+	if ( effect.valueType == effectValueType_t::INTEGER )
+	{
+		if ( !BG_SetAttributeInt( effect.attributeFamily, effect.attributeObject, effect.attributeField,
+		                          (int)lround( value ), true, &error ) )
+		{
+			Sys::Error( "failed to set attribute override: %s", error.c_str() );
+		}
+	}
+	else
+	{
+		if ( !BG_SetAttributeFloat( effect.attributeFamily, effect.attributeObject, effect.attributeField,
+		                            (float)value, true, &error ) )
+		{
+			Sys::Error( "failed to set attribute override: %s", error.c_str() );
+		}
+	}
+
+	attributeDirty = true;
+}
+
+static void ApplyEntryState( const overloadPurchaseDef_t& entry, int entryIndex, team_t team, bool& gameplayDirty, bool& attributeDirty )
+{
+	const TeamEconomyState& economy = TeamEconomy( team );
+
+	if ( entry.kind == overloadPurchaseKind_t::UNLOCK )
+	{
+		std::string error;
+
+		if ( economy.ownedPurchases[ entryIndex ] )
+		{
+			if ( !BG_SetAttributeInt( entry.unlockFamily, entry.unlockObject, entry.unlockField, 0, true, &error ) )
+			{
+				Sys::Error( "failed to unlock overload purchase: %s", error.c_str() );
+			}
+		}
+		else
+		{
+			if ( !BG_ResetAttributeValue( entry.unlockFamily, entry.unlockObject, entry.unlockField, true, &error ) )
+			{
+				Sys::Error( "failed to reset overload unlock state: %s", error.c_str() );
+			}
+		}
+
+		attributeDirty = true;
+		return;
+	}
+
+	if ( entry.kind == overloadPurchaseKind_t::BP_BUNDLE )
+	{
+		return;
+	}
+
+	for ( const overloadEffect_t& effect : entry.effects )
+	{
+		ApplyEffectValue( effect, team, gameplayDirty, attributeDirty );
+	}
+}
+
+static void ApplyAllOverloadState()
+{
+	BuildOverloadCatalog();
+
+	bool gameplayDirty = false;
+	bool attributeDirty = false;
+
+	for ( size_t i = 0; i < overloadPurchases.size(); ++i )
+	{
+		for ( team_t team = TEAM_NONE; ( team = G_IterateTeams( team ) ); )
+		{
+			const overloadPurchaseDef_t& entry = overloadPurchases[ i ];
+			if ( entry.team != TEAM_NONE && entry.team != team )
+			{
+				continue;
+			}
+
+			ApplyEntryState( entry, i, team, gameplayDirty, attributeDirty );
+		}
+	}
+
+	if ( gameplayDirty )
+	{
+		BG_PublishGameplayConfig();
+	}
+
+	if ( attributeDirty )
+	{
+		BG_PublishAttributeConfig();
+	}
+}
+
+static void AnnounceAvailability( team_t team, int oldCompletedPurchases, int newCompletedPurchases )
+{
+	if ( newCompletedPurchases <= oldCompletedPurchases )
+	{
+		return;
+	}
+
+	const int oldStage = StageForCompletedPurchases( oldCompletedPurchases );
+	const int newStage = StageForCompletedPurchases( newCompletedPurchases );
+	if ( oldStage != newStage )
+	{
+		TeamCenterPrint( team, Str::Format( "Overload stage %d reached.", newStage ) );
+	}
+}
+
+static int ParseSpend( const Cmd::Args& args, std::string* error )
+{
+	if ( args.Argc() < 3 )
+	{
+		if ( error ) *error = "missing spend amount";
+		return -1;
+	}
+
+	const char* token = args.Argv( args.Argc() - 1 ).c_str();
+	int spend = atoi( token );
+	if ( spend <= 0 )
+	{
+		if ( error ) *error = "spend must be positive";
+		return -1;
+	}
+
+	return spend;
+}
+
+static std::string PurchaseProgressMessage( const overloadPurchaseDef_t& entry, int entryIndex, team_t team, int actualSpend,
+                                            int completionsApplied, int totalGranted )
+{
+	const TeamEconomyState& economy = TeamEconomy( team );
+
+	if ( entry.kind == overloadPurchaseKind_t::BP_BUNDLE )
+	{
+		if ( totalGranted > 0 )
+		{
+			return Str::Format( "%s: spent %d credits, gained %d BP", entry.thing, actualSpend, totalGranted );
+		}
+
+		return Str::Format( "%s: invested %d/%d", entry.thing, economy.investedCredits[ entryIndex ], entry.baseCost );
+	}
+
+	if ( entry.kind == overloadPurchaseKind_t::UNLOCK )
+	{
+		if ( completionsApplied > 0 )
+		{
+			return Str::Format( "unlocked %s", entry.description );
+		}
+
+		return Str::Format( "%s unlock: invested %d/%d", entry.thing, economy.investedCredits[ entryIndex ], entry.baseCost );
+	}
+
+	if ( completionsApplied > 0 )
+	{
+		return Str::Format( "%s %s rank %d", entry.thing, entry.stat, economy.repeatCounts[ entryIndex ] );
+	}
+
+	int nextCost = entry.baseCost + economy.repeatCounts[ entryIndex ] * entry.costStep;
+	return Str::Format( "%s %s: invested %d/%d", entry.thing, entry.stat, economy.investedCredits[ entryIndex ], nextCost );
 }
 
 } // namespace
+
+void G_PublishOverloadState( team_t team )
+{
+	if ( !G_IsPlayableTeam( team ) )
+	{
+		return;
+	}
+
+	PublishOverloadStateInternal( team );
+}
 
 void G_UpdateBuildPointBudgets()
 {
@@ -165,30 +1028,28 @@ void G_UpdateBuildPointBudgets()
 
 void G_InitOverloadEconomy()
 {
+	BuildOverloadCatalog();
+
 	for ( team_t team = TEAM_NONE; ( team = G_IterateTeams( team ) ); )
 	{
 		level.team[ team ].totalBudget = InitialBudgetForTeam( team );
 		level.team[ team ].spentBudget = 0;
 		level.team[ team ].queuedBudget = 0;
+		level.team[ team ].overloadProgress = 0;
 
 		TeamEconomyState& economy = TeamEconomy( team );
-		economy.bankBalance = 0;
-		economy.progress = 0;
-		economy.milestone = 0;
-		economy.tier = 0;
+		economy.completedPurchases = 0;
 		economy.bpPurchased = 0;
-		economy.multiplierLevel = 0;
-		economy.rewardMultiplier = 1.0f;
+		memset( economy.investedCredits, 0, sizeof( economy.investedCredits ) );
 		memset( economy.repeatCounts, 0, sizeof( economy.repeatCounts ) );
 		memset( economy.ownedPurchases, 0, sizeof( economy.ownedPurchases ) );
 
-		SyncOverloadProgress( team );
-	}
+	SyncOverloadProgress( team );
+	G_PublishOverloadState( team );
 }
 
-float G_OverloadRewardMultiplier( team_t team )
-{
-	return G_IsPlayableTeam( team ) ? TeamEconomy( team ).rewardMultiplier : 1.0f;
+	ApplyAllOverloadState();
+	PublishAllTeamEconomyStates();
 }
 
 int G_OverloadProgressValue( team_t team )
@@ -198,64 +1059,144 @@ int G_OverloadProgressValue( team_t team )
 		return 0;
 	}
 
-	const TeamEconomyState& economy = TeamEconomy( team );
-	return economy.progress + economy.tier * OVERLOAD_LEGACY_STAGE_VALUE;
+	return TeamEconomy( team ).completedPurchases;
 }
 
-bool G_OverloadDonate( gentity_t *ent, int amount )
+bool G_OverloadUnlockPurchased( team_t team, bgAttributeFamily_t family, int objectIndex )
 {
-	if ( !ent || !ent->client || amount <= 0 )
+	if ( !G_IsPlayableTeam( team ) )
 	{
 		return false;
 	}
 
-	team_t team = (team_t) ent->client->pers.team;
-	if ( !G_IsPlayableTeam( team ) || ent->client->pers.credit < amount )
+	BuildOverloadCatalog();
+
+	const TeamEconomyState& economy = TeamEconomy( team );
+	for ( size_t i = 0; i < overloadPurchases.size(); ++i )
 	{
-		return false;
+		const overloadPurchaseDef_t& entry = overloadPurchases[ i ];
+		if ( entry.kind != overloadPurchaseKind_t::UNLOCK || entry.team != team )
+		{
+			continue;
+		}
+
+		if ( entry.unlockFamily == family && entry.unlockObject == objectIndex )
+		{
+			return economy.ownedPurchases[ i ];
+		}
 	}
 
-	G_AddCreditToClient( ent->client, -amount, false );
-	TeamEconomy( team ).bankBalance += amount;
-	return true;
+	return false;
 }
 
-bool G_OverloadPurchase( gentity_t *ent, Str::StringRef purchaseName )
+bool G_OverloadPurchase( gentity_t *ent, const Cmd::Args& args, std::string* message )
 {
 	if ( !ent || !ent->client )
 	{
+		if ( message ) *message = "invalid purchaser";
 		return false;
 	}
 
 	team_t team = (team_t) ent->client->pers.team;
 	if ( !G_IsPlayableTeam( team ) )
 	{
+		if ( message ) *message = "you are not on a playable team";
+		return false;
+	}
+
+	std::string error;
+	int spend = ParseSpend( args, &error );
+	if ( spend <= 0 )
+	{
+		if ( message ) *message = error;
 		return false;
 	}
 
 	int purchaseIndex = -1;
-	const overloadPurchaseDef_t* purchase = FindPurchase( purchaseName, &purchaseIndex );
-	if ( !purchase )
+	const overloadPurchaseDef_t* entry = FindPurchase( team, args, &purchaseIndex );
+	if ( !entry )
 	{
+		if ( message ) *message = "unknown team purchase";
 		return false;
 	}
 
 	TeamEconomyState& economy = TeamEconomy( team );
-	if ( !purchase->repeatable && economy.ownedPurchases[ purchaseIndex ] )
+	if ( !EntryIsAvailable( team, *entry ) )
 	{
+		if ( message ) *message = "purchase is not available";
 		return false;
 	}
 
-	if ( G_OverloadProgressValue( team ) < purchase->progressRequirement ||
-	     economy.bankBalance < purchase->bankCost )
+	if ( ent->client->pers.credit < spend )
 	{
+		if ( message ) *message = "not enough credits";
 		return false;
 	}
 
-	economy.bankBalance -= purchase->bankCost;
-	int oldProgress = G_OverloadProgressValue( team );
-	ApplyPurchase( team, purchaseIndex, *purchase );
-	int newProgress = G_OverloadProgressValue( team );
-	NotifyLegacyStageSensors( team, oldProgress, newProgress );
+	const int actualSpend = std::min( spend, RemainingSpendCapacity( *entry, purchaseIndex, team ) );
+	if ( actualSpend <= 0 )
+	{
+		if ( message ) *message = "purchase is already complete";
+		return false;
+	}
+
+	const int oldCompletedPurchases = economy.completedPurchases;
+	G_AddCreditToClient( ent->client, -actualSpend, false );
+	economy.investedCredits[ purchaseIndex ] += actualSpend;
+
+	int invested = economy.investedCredits[ purchaseIndex ];
+	int completionsApplied = RanksCompletedFromSpend( *entry, economy.repeatCounts[ purchaseIndex ], invested );
+	economy.investedCredits[ purchaseIndex ] = invested;
+
+	int totalGranted = 0;
+	if ( entry->kind == overloadPurchaseKind_t::BP_BUNDLE )
+	{
+		totalGranted = completionsApplied * entry->bundleAmount;
+		if ( totalGranted > 0 )
+		{
+			economy.repeatCounts[ purchaseIndex ] += completionsApplied;
+			economy.bpPurchased += totalGranted;
+			level.team[ team ].totalBudget += totalGranted;
+		}
+	}
+	else if ( entry->kind == overloadPurchaseKind_t::UNLOCK )
+	{
+		if ( completionsApplied > 0 )
+		{
+			economy.ownedPurchases[ purchaseIndex ] = true;
+			economy.repeatCounts[ purchaseIndex ] = 1;
+			economy.completedPurchases += 1;
+		}
+	}
+	else if ( completionsApplied > 0 )
+	{
+		economy.repeatCounts[ purchaseIndex ] += completionsApplied;
+		economy.completedPurchases += completionsApplied;
+	}
+
+	bool gameplayDirty = false;
+	bool attributeDirty = false;
+	ApplyEntryState( *entry, purchaseIndex, team, gameplayDirty, attributeDirty );
+
+	if ( gameplayDirty )
+	{
+		BG_PublishGameplayConfig();
+	}
+
+	if ( attributeDirty )
+	{
+		BG_PublishAttributeConfig();
+	}
+
+	SyncOverloadProgress( team );
+	G_PublishOverloadState( team );
+	NotifyLegacyStageSensors( team, oldCompletedPurchases, economy.completedPurchases );
+	AnnounceAvailability( team, oldCompletedPurchases, economy.completedPurchases );
+
+	if ( message )
+	{
+		*message = PurchaseProgressMessage( *entry, purchaseIndex, team, actualSpend, completionsApplied, totalGranted );
+	}
+
 	return true;
 }
