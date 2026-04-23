@@ -261,6 +261,8 @@ enum
   CS_CLIENTS_READY,
   CS_GAMEPLAY,
   CS_ATTRIBUTES,
+  CS_OVERLOAD = CS_ATTRIBUTES + 1, // NUM_TEAMS team economy payloads
+  CS_OVERLOAD_CATALOG = CS_OVERLOAD + NUM_TEAMS, // MAX_OVERLOAD_PURCHASES catalog payloads
   // Everything before CS_PLAYERS gets a CG_ConfigStringModified(n) event generated in CG_Init
 
   CS_PLAYERS,
@@ -269,8 +271,7 @@ enum
 
   CS_MUSIC = CS_PLAYERS + MAX_CLIENTS,
   CS_MESSAGE, // from the map worldspawn's message field
-  CS_OVERLOAD = CS_MESSAGE + 1, // NUM_TEAMS team economy payloads
-  CS_MODELS = CS_OVERLOAD + NUM_TEAMS,
+  CS_MODELS,
   CS_SOUNDS = CS_MODELS + MAX_MODELS,
   CS_SHADERS = CS_SOUNDS + MAX_SOUNDS,
   CS_GRADING_TEXTURES = CS_SHADERS + MAX_GAME_SHADERS,
@@ -923,7 +924,9 @@ enum dynMenu_t
   MN_H_NOBP,
   MN_H_NOTPOWERED,
   MN_H_ONEREACTOR,
-  MN_H_NOMOREDRILLS
+  MN_H_NOMOREDRILLS,
+
+  MN_OVERLOAD
 };
 
 // animations

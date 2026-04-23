@@ -369,6 +369,21 @@ static void HArmoury_Use( gentity_t *self, gentity_t*, gentity_t *activator )
 	G_TriggerMenu( activator->client->ps.clientNum, MN_H_ARMOURY );
 }
 
+static void MainStructure_Use( gentity_t *self, gentity_t*, gentity_t *activator )
+{
+	if ( !self->spawned || Entities::IsDead( self ) || !activator || !activator->client )
+	{
+		return;
+	}
+
+	if ( activator->client->pers.team != self->buildableTeam )
+	{
+		return;
+	}
+
+	G_TriggerMenu( activator->client->ps.clientNum, MN_OVERLOAD );
+}
+
 /**
  * @brief Set the power state of both team's buildables based only on main-structure support.
  */
@@ -1486,6 +1501,8 @@ static gentity_t *SpawnBuildable( gentity_t *builder, buildable_t buildable, con
 			break;
 
 		case BA_A_OVERMIND:
+			built->use = MainStructure_Use;
+			built->s.eFlags |= EF_USABLE;
 			break;
 
 		case BA_H_SPAWN:
@@ -1509,6 +1526,8 @@ static gentity_t *SpawnBuildable( gentity_t *builder, buildable_t buildable, con
 			break;
 
 		case BA_H_REACTOR:
+			built->use = MainStructure_Use;
+			built->s.eFlags |= EF_USABLE;
 			break;
 
 		default:

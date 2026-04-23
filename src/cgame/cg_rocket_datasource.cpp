@@ -36,6 +36,57 @@ Maryland 20850 USA.
 #include "cg_local.h"
 #include "shared/parse.h"
 
+static std::string OverloadCommandForEntry( const cgOverloadCatalogEntry_t& entry )
+{
+	if ( entry.kind == 0 )
+	{
+		return entry.thing;
+	}
+
+	if ( entry.kind == 1 )
+	{
+		return Str::Format( "unlock %s", entry.thing );
+	}
+
+	return Str::Format( "upgrade %s %s", entry.thing, entry.stat );
+}
+
+static std::string OverloadProgressForEntry( const cgOverloadCatalogEntry_t& entry, int index, const cgTeamEconomyState_t& state )
+{
+	if ( entry.kind == 0 )
+	{
+		return Str::Format( "%d / %d", state.investedCredits[ index ], entry.baseCost );
+	}
+
+	if ( entry.kind == 1 )
+	{
+		if ( state.ownedPurchases[ index ] )
+		{
+			return "Owned";
+		}
+
+		return Str::Format( "%d / %d", state.investedCredits[ index ], entry.baseCost );
+	}
+
+	int nextCost = entry.baseCost + state.repeatCounts[ index ] * entry.costStep;
+	return Str::Format( "Rank %d, %d / %d", state.repeatCounts[ index ], state.investedCredits[ index ], nextCost );
+}
+
+static const char* OverloadStatusForEntry( const cgOverloadCatalogEntry_t& entry, int index, const cgTeamEconomyState_t& state )
+{
+	if ( entry.kind == 1 && state.ownedPurchases[ index ] )
+	{
+		return "owned";
+	}
+
+	if ( state.investedCredits[ index ] > 0 )
+	{
+		return "partial";
+	}
+
+	return "available";
+}
+
 static bool AddToServerList( const char *name, const char *label, std::string version, std::string abiVersion, int clients, int bots,
 	int ping, int maxClients, char *mapName, char *addr, int netSrc )
 {
@@ -1448,6 +1499,52 @@ static void CG_Rocket_BuildAlienBuildList( const char *table )
 	CG_Rocket_BuildGenericBuildList( table, TEAM_ALIENS, "alienBuildList" );
 }
 
+static void CG_Rocket_BuildOverloadList( const char *table )
+{
+	static char buf[ MAX_STRING_CHARS ];
+
+	if ( rocketInfo.cstate.connState < connstate_t::CA_ACTIVE || Q_stricmp( table, "default" ) )
+	{
+		return;
+	}
+	Rocket_DSClearTable( "overloadList", "default" );
+
+	team_t team = CG_MyTeam();
+	if ( team != TEAM_ALIENS && team != TEAM_HUMANS )
+	{
+		return;
+	}
+
+	const cgTeamEconomyState_t& state = rocketInfo.teamEconomy[ team ];
+	for ( int i = 0; i < MAX_OVERLOAD_PURCHASES; ++i )
+	{
+		const cgOverloadCatalogEntry_t& entry = rocketInfo.overloadCatalog[ i ];
+		if ( !entry.valid )
+		{
+			continue;
+		}
+
+		if ( entry.team != TEAM_NONE && entry.team != team )
+		{
+			continue;
+		}
+
+		buf[ 0 ] = '\0';
+		Info_SetValueForKey( buf, "index", va( "%d", (int)i ), false );
+		Info_SetValueForKey( buf, "name", entry.displayName, false );
+		Info_SetValueForKey( buf, "kind", entry.kind == 0 ? "bp" :
+		                            entry.kind == 1 ? "unlock" : "upgrade", false );
+		Info_SetValueForKey( buf, "description", entry.description, false );
+		Info_SetValueForKey( buf, "command", OverloadCommandForEntry( entry ).c_str(), false );
+		Info_SetValueForKey( buf, "cost", va( "%d", entry.kind == 2
+			? entry.baseCost + state.repeatCounts[ i ] * entry.costStep
+			: entry.baseCost ), false );
+		Info_SetValueForKey( buf, "progress", OverloadProgressForEntry( entry, i, state ).c_str(), false );
+		Info_SetValueForKey( buf, "status", OverloadStatusForEntry( entry, i, state ), false );
+		Rocket_DSAddRow( "overloadList", "default", buf );
+	}
+}
+
 //////// beacon shit
 
 
@@ -1604,6 +1701,7 @@ static const dataSourceCmd_t dataSourceCmdList[] =
 	{ "humanBuildList", &CG_Rocket_BuildHumanBuildList, &nullSortFunc, &nullCleanFunc, &nullSetFunc, &nullFilterFunc, &nullExecFunc, &nullGetFunc },
 	{ "mapList", &CG_Rocket_BuildMapList, &nullSortFunc, &CG_Rocket_CleanUpMapList, &CG_Rocket_SetMapListIndex, &nullFilterFunc, &nullExecFunc, &nullGetFunc },
 	{ "modList", &CG_Rocket_BuildModList, &nullSortFunc, &CG_Rocket_CleanUpModList, &CG_Rocket_SetModListMod, &nullFilterFunc, &nullExecFunc, &nullGetFunc },
+	{ "overloadList", &CG_Rocket_BuildOverloadList, &nullSortFunc, &nullCleanFunc, &nullSetFunc, &nullFilterFunc, &nullExecFunc, &nullGetFunc },
 	{ "playerList", &CG_Rocket_BuildPlayerList, &CG_Rocket_SortPlayerList, &CG_Rocket_CleanUpPlayerList, &CG_Rocket_SetPlayerListPlayer, &nullFilterFunc, &nullExecFunc, &nullGetFunc },
 	{ "resolutions", &CG_Rocket_BuildResolutionList, &nullSortFunc, &CG_Rocket_CleanUpResolutionList, &CG_Rocket_SetResolutionListResolution, &nullFilterFunc, &nullExecFunc, &CG_Rocket_GetResolutionListIndex},
 	{ "server_browser", &CG_Rocket_BuildServerList, &CG_Rocket_SortServerList, &CG_Rocket_CleanUpServerList, &CG_Rocket_SetServerListServer, &CG_Rocket_FilterServerList, &CG_Rocket_ExecServerList, &nullGetFunc },

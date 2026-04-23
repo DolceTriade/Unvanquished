@@ -31,6 +31,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "common/Common.h"
 #include "cg_local.h"
+#include "rocket/rocket.h"
 #include "shared/bg_attributes.h"
 #include "shared/CommonProxies.h"
 
@@ -99,7 +100,48 @@ static void CG_PrintBPMessage_f()
 	cg.bpMessage = CG_Argv( 1 );
 }
 
-static void CG_ParseTeamEconomyConfig( team_t team, const char* config )
+void CG_ParseOverloadCatalogConfig( int index, const char* config )
+{
+	if ( index < 0 || index >= MAX_OVERLOAD_PURCHASES )
+	{
+		return;
+	}
+
+	cgOverloadCatalogEntry_t& entry = rocketInfo.overloadCatalog[ index ];
+	memset( &entry, 0, sizeof( entry ) );
+
+	if ( !config || !*config )
+	{
+		return;
+	}
+
+	const char* kind = Info_ValueForKey( config, "k" );
+	if ( !*kind )
+	{
+		return;
+	}
+
+	entry.valid = true;
+	entry.kind = !Q_stricmp( kind, "bp" ) ? 0 : !Q_stricmp( kind, "unlock" ) ? 1 : 2;
+	entry.team = (team_t) atoi( Info_ValueForKey( config, "t" ) );
+	entry.baseCost = atoi( Info_ValueForKey( config, "bc" ) );
+	entry.costStep = atoi( Info_ValueForKey( config, "cs" ) );
+	entry.bundleAmount = atoi( Info_ValueForKey( config, "ba" ) );
+	Q_strncpyz( entry.thing, Info_ValueForKey( config, "thing" ), sizeof( entry.thing ) );
+	Q_strncpyz( entry.stat, Info_ValueForKey( config, "stat" ), sizeof( entry.stat ) );
+	Q_strncpyz( entry.displayName, Info_ValueForKey( config, "name" ), sizeof( entry.displayName ) );
+	Q_strncpyz( entry.description, Info_ValueForKey( config, "desc" ), sizeof( entry.description ) );
+
+	if ( menuContext && rocketInfo.menu[ ROCKETMENU_OVERLOAD ].id )
+	{
+		if ( Rml::ElementDocument* document = menuContext->GetDocument( rocketInfo.menu[ ROCKETMENU_OVERLOAD ].id ) )
+		{
+			document->DispatchEvent( "refreshdata", {} );
+		}
+	}
+}
+
+void CG_ParseTeamEconomyConfig( team_t team, const char* config )
 {
 	if ( team != TEAM_ALIENS && team != TEAM_HUMANS )
 	{
@@ -186,6 +228,14 @@ static void CG_ParseTeamEconomyConfig( team_t team, const char* config )
 
 				state.ownedPurchases[ index ] = true;
 			}
+		}
+	}
+
+	if ( menuContext && rocketInfo.menu[ ROCKETMENU_OVERLOAD ].id )
+	{
+		if ( Rml::ElementDocument* document = menuContext->GetDocument( rocketInfo.menu[ ROCKETMENU_OVERLOAD ].id ) )
+		{
+			document->DispatchEvent( "refreshdata", {} );
 		}
 	}
 }
@@ -379,6 +429,10 @@ void CG_ConfigStringModified( int num )
 	else if ( num >= CS_OVERLOAD && num < CS_OVERLOAD + NUM_TEAMS )
 	{
 		CG_ParseTeamEconomyConfig( (team_t)( num - CS_OVERLOAD ), str );
+	}
+	else if ( num >= CS_OVERLOAD_CATALOG && num < CS_OVERLOAD_CATALOG + MAX_OVERLOAD_PURCHASES )
+	{
+		CG_ParseOverloadCatalogConfig( num - CS_OVERLOAD_CATALOG, str );
 	}
 	else if ( num >= CS_VOTE_TIME && num < CS_VOTE_TIME + NUM_TEAMS )
 	{
@@ -794,6 +848,10 @@ static void CG_Menu( int menuType, int arg )
 
 		case MN_A_INFEST:
 			menu = ROCKETMENU_ALIENEVOLVE;
+			break;
+
+		case MN_OVERLOAD:
+			menu = ROCKETMENU_OVERLOAD;
 			break;
 
 		case MN_A_CANTEVOLVE:
