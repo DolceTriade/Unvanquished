@@ -23,30 +23,7 @@ along with Foobar.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 #include "common/Common.h"
-#include "bg_public.h"
-
-#ifdef BUILD_SGAME
-#include "sgame/sg_local.h"
-#endif
-
-#ifdef BUILD_CGAME
-#include "cgame/cg_local.h"
-#endif
-
-// -----------
-// definitions
-// -----------
-
-struct unlockable_t
-{
-	int      type;
-	int      num;
-	team_t   team;
-	bool     unlocked;
-	bool     statusKnown;
-	int      unlockThreshold;
-	int      lockThreshold;
-};
+#include "bg_teamprogress.h"
 
 // ----
 // data
@@ -56,7 +33,7 @@ bool         unlockablesDataAvailable;
 int unlockablesTeamKnowledge; // bit mask of (1 << team)
 
 unlockable_t     unlockables[ NUM_UNLOCKABLES ];
-int              unlockablesMask[ NUM_TEAMS ];
+static int       unlockablesMask[ NUM_TEAMS ];
 
 int              unlockablesTypeOffset[ UNLT_NUM_UNLOCKABLETYPES ];
 
@@ -64,7 +41,7 @@ int              unlockablesTypeOffset[ UNLT_NUM_UNLOCKABLETYPES ];
 // local methods
 // -------------
 
-static const char *UnlockableHumanName( unlockable_t *unlockable )
+const char *UnlockableHumanName( unlockable_t *unlockable )
 {
 	switch ( unlockable->type )
 	{
@@ -76,80 +53,6 @@ static const char *UnlockableHumanName( unlockable_t *unlockable )
 
 	Sys::Error( "UnlockableHumanName: Unlockable has unknown type" );
 }
-
-#ifdef BUILD_CGAME
-static bool Disabled( unlockable_t *unlockable )
-{
-	switch ( unlockable->type )
-	{
-		case UNLT_WEAPON:    return BG_WeaponDisabled( unlockable->num );
-		case UNLT_UPGRADE:   return BG_UpgradeDisabled( unlockable->num );
-		case UNLT_BUILDABLE: return BG_BuildableDisabled( unlockable->num );
-		case UNLT_CLASS:     return BG_ClassDisabled( unlockable->num );
-	}
-
-	Sys::Error( "Disabled: Unlockable has unknown type" );
-}
-#endif // BUILD_CGAME
-
-#ifdef BUILD_CGAME
-static void InformUnlockableStatusChanges( int *statusChanges, int count )
-{
-	std::string text;
-	bool     firstPass = true, unlocked = true;
-
-	for ( int unlockableNum = 0; unlockableNum < NUM_UNLOCKABLES; unlockableNum++ )
-	{
-		unlockable_t *unlockable = &unlockables[ unlockableNum ];
-
-		if ( !statusChanges[ unlockableNum ] || Disabled( unlockable ) )
-		{
-			continue;
-		}
-
-		if ( firstPass )
-		{
-			if ( statusChanges[ unlockableNum ] > 0 )
-			{
-				text += Str::Format( "^2ITEM%s UNLOCKED: ^*", ( count > 1 ) ? "S" : "" );
-			}
-			else
-			{
-				unlocked = false;
-				text += Str::Format( "^1ITEM%s LOCKED: ^*", ( count > 1 ) ? "S" : "" );
-			}
-			firstPass = false;
-		}
-		else
-		{
-			text += ", ";
-		}
-
-		text += UnlockableHumanName( unlockable );
-	}
-
-	// TODO: Add sound for items being locked for each team
-	switch ( cg.snap->ps.persistant[ PERS_TEAM ] )
-	{
-		case TEAM_ALIENS:
-			if ( unlocked )
-			{
-				trap_S_StartLocalSound( cgs.media.weHaveEvolved, soundChannel_t::CHAN_ANNOUNCER );
-			}
-			break;
-
-		case TEAM_HUMANS:
-		default:
-			if ( unlocked )
-			{
-				trap_S_StartLocalSound( cgs.media.reinforcement, soundChannel_t::CHAN_ANNOUNCER );
-			}
-			break;
-	}
-
-	CG_CenterPrint( text.c_str(), 1.0f );
-}
-#endif // BUILD_CGAME
 
 static bool Unlocked( unlockableType_t type, int itemNum )
 {
@@ -170,12 +73,12 @@ static void CheckStatusKnowledge( unlockableType_t type, int itemNum )
 	}
 }
 
-static float UnlockToLockThreshold( float unlockThreshold )
+float UnlockToLockThreshold( float unlockThreshold )
 {
 	return unlockThreshold;
 }
 
-static int NormalizeUnlockThreshold( int unlockThreshold )
+int NormalizeUnlockThreshold( int unlockThreshold )
 {
 	if ( unlockThreshold <= 0 )
 	{
@@ -183,6 +86,26 @@ static int NormalizeUnlockThreshold( int unlockThreshold )
 	}
 
 	return unlockThreshold >= 200 ? 6 : 3;
+}
+
+void BG_ClearUnlockablesMasks()
+{
+	memset( unlockablesMask, 0, sizeof( unlockablesMask ) );
+}
+
+void BG_ResetUnlockablesMask( team_t team )
+{
+	unlockablesMask[ team ] = 0;
+}
+
+void BG_SetUnlockablesMaskBit( team_t team, int bit )
+{
+	unlockablesMask[ team ] |= ( 1 << bit );
+}
+
+void BG_SetUnlockablesMask( team_t team, int mask )
+{
+	unlockablesMask[ team ] = mask;
 }
 
 // ----------
@@ -195,16 +118,12 @@ void BG_InitUnlockackables()
 	unlockablesTeamKnowledge = 0;
 
 	memset( unlockables, 0, sizeof( unlockables ) );
-	memset( unlockablesMask, 0, sizeof( unlockablesMask ) );
+	BG_ClearUnlockablesMasks();
 
 	unlockablesTypeOffset[ UNLT_WEAPON ]    = 0;
 	unlockablesTypeOffset[ UNLT_UPGRADE ]   = WP_NUM_WEAPONS;
 	unlockablesTypeOffset[ UNLT_BUILDABLE ] = unlockablesTypeOffset[ UNLT_UPGRADE ]   + UP_NUM_UPGRADES;
 	unlockablesTypeOffset[ UNLT_CLASS ]     = unlockablesTypeOffset[ UNLT_BUILDABLE ] + BA_NUM_BUILDABLES;
-
-#ifdef BUILD_SGAME
-	G_UpdateUnlockables();
-#endif
 }
 
 void BG_ImportUnlockablesFromMask( int team, int mask )
@@ -227,13 +146,10 @@ void BG_ImportUnlockablesFromMask( int team, int mask )
 
 	// cache input
 	lastMask = mask;
-	lastTeam = (team_t) team;
+	lastTeam = static_cast<team_t>( team );
 
-#ifdef BUILD_CGAME
-	// no status change yet
 	int statusChanges[ NUM_UNLOCKABLES ]{};
 	int statusChangeCount = 0;
-#endif
 
 	for ( unlockableNum = 0; unlockableNum < NUM_UNLOCKABLES; unlockableNum++ )
 	{
@@ -291,15 +207,12 @@ void BG_ImportUnlockablesFromMask( int team, int mask )
 		{
 			newStatus = mask & ( 1 << teamUnlockableNum );
 
-#ifdef BUILD_CGAME
-			// notify client about single status change
 			if ( unlockablesTeamKnowledge == (1 << team) && unlockable->statusKnown &&
 			     unlockable->unlocked != newStatus )
 			{
 				statusChanges[ unlockableNum ] = newStatus ? 1 : -1;
 				statusChangeCount++;
 			}
-#endif
 
 			unlockable->statusKnown = true;
 			unlockable->unlocked    = newStatus;
@@ -315,20 +228,17 @@ void BG_ImportUnlockablesFromMask( int team, int mask )
 		itemNum++;
 	}
 
-#ifdef BUILD_CGAME
-	// notify client about all status changes
 	if ( statusChangeCount )
 	{
-		InformUnlockableStatusChanges( statusChanges, statusChangeCount );
+		BG_TeamProgressNotifyStatusChanges( statusChanges, statusChangeCount );
 	}
-#endif
 
 	// we only know the state for one team
 	unlockablesDataAvailable = true;
 	unlockablesTeamKnowledge = 1 << team;
 
 	// save mask for later use
-	unlockablesMask[ team ] = mask;
+	BG_SetUnlockablesMask( static_cast<team_t>( team ), mask );
 }
 
 int BG_UnlockablesMask( int team )
@@ -433,152 +343,3 @@ unlockThresholdIterator_t BG_IterateUnlockThresholds( unlockThresholdIterator_t 
 
 	return finished;
 }
-
-// ------------
-// GAME methods
-// ------------
-
-#ifdef BUILD_SGAME
-static bgAttributeFamily_t UnlockableFamily( int unlockableType )
-{
-	switch ( unlockableType )
-	{
-		case UNLT_WEAPON: return BG_ATTR_WEAPON;
-		case UNLT_UPGRADE: return BG_ATTR_UPGRADE;
-		case UNLT_BUILDABLE: return BG_ATTR_BUILDABLE;
-		case UNLT_CLASS: return BG_ATTR_CLASS;
-		default: Sys::Error( "UnlockableFamily: Unknown unlockable type" );
-	}
-}
-
-static void UpdateUnlockablesMask()
-{
-	int    unlockable, unlockableNum[ NUM_TEAMS ];
-	int    team;
-
-	for ( team = TEAM_NONE + 1; team < NUM_TEAMS; team++ )
-	{
-		unlockableNum[ team ] = 0;
-		unlockablesMask[ team ] = 0;
-	}
-
-	for ( unlockable = 0; unlockable < NUM_UNLOCKABLES; unlockable++ )
-	{
-		if ( unlockables[ unlockable ].unlockThreshold )
-		{
-			team = unlockables[ unlockable ].team;
-
-			if ( unlockableNum[ team ] > 15 ) // 16 bit available for transmission
-			{
-				Sys::Error( "UpdateUnlockablesMask: Number of unlockable items for a team exceeded" );
-			}
-
-			if ( !unlockables[ unlockable ].statusKnown )
-			{
-				Sys::Error( "UpdateUnlockablesMask: Called before G_UpdateUnlockables" );
-			}
-
-			if ( unlockables[ unlockable ].unlocked )
-			{
-				unlockablesMask[ team ] |= ( 1 << unlockableNum[ team ] );
-			}
-
-			unlockableNum[ team ]++;
-		}
-	}
-}
-#endif
-
-#ifdef BUILD_SGAME
-void G_UpdateUnlockables()
-{
-	int              itemNum = 0, unlockableNum, unlockThreshold;
-	unlockable_t     *unlockable;
-	int              unlockableType = 0;
-	team_t           team;
-
-	for ( unlockableNum = 0; unlockableNum < NUM_UNLOCKABLES; unlockableNum++ )
-	{
-		unlockable = &unlockables[ unlockableNum ];
-
-		// also iterate over item types, itemNum is a per-type counter
-		while ( unlockableType < UNLT_NUM_UNLOCKABLETYPES - 1 &&
-		        unlockableNum == unlockablesTypeOffset[ unlockableType + 1 ] )
-		{
-			unlockableType++;
-			itemNum = 0;
-		}
-
-		switch ( unlockableType )
-		{
-			case UNLT_WEAPON:
-				team            = BG_Weapon( itemNum )->team;
-				unlockThreshold = BG_Weapon( itemNum )->unlockThreshold;
-				break;
-
-			case UNLT_UPGRADE:
-				team            = BG_Upgrade( itemNum )->team;
-				unlockThreshold = BG_Upgrade( itemNum )->unlockThreshold;
-				break;
-
-			case UNLT_BUILDABLE:
-				team            = BG_Buildable( itemNum )->team;
-				unlockThreshold = BG_Buildable( itemNum )->unlockThreshold;
-				break;
-
-			case UNLT_CLASS:
-				team            = BG_Class( itemNum )->team;
-				unlockThreshold = BG_Class( itemNum )->unlockThreshold;
-				break;
-
-			default:
-				Sys::Error( "G_UpdateUnlockables: Unknown unlockable type" );
-		}
-
-		int rawThreshold = std::max( unlockThreshold, 0 );
-		unlockThreshold = NormalizeUnlockThreshold( rawThreshold );
-
-		unlockable->type            = unlockableType;
-		unlockable->num             = itemNum;
-		unlockable->team            = team;
-		unlockable->statusKnown     = true;
-		unlockable->unlockThreshold = unlockThreshold;
-		unlockable->lockThreshold   = UnlockToLockThreshold( unlockThreshold );
-
-		// Overload unlocks gated content only by explicit team purchases.
-		if ( rawThreshold == 0 )
-		{
-			unlockable->unlocked = true;
-		}
-		else
-		{
-			unlockable->unlocked = G_OverloadUnlockPurchased( team, UnlockableFamily( unlockableType ), itemNum - 1 );
-		}
-
-		itemNum++;
-
-		/*Log::Notice( "G_UpdateUnlockables: Team %s, Type %s, Item %s, Momentum %d, Threshold %d, "
-		            "Unlocked %d, Synchronize %d\n",
-		            BG_TeamName( team ), UnlockableTypeName( unlockable ), UnlockableName( unlockable ),
-		            overloadProgress, unlockThreshold, unlockable->unlocked, unlockable->synchronize );*/
-	}
-
-	// GAME knows about all teams
-	unlockablesDataAvailable = true;
-	unlockablesTeamKnowledge = ~0;
-
-	// generate masks for network transmission
-	UpdateUnlockablesMask();
-}
-#endif
-
-// -------------
-// CGAME methods
-// -------------
-
-#ifdef BUILD_CGAME
-void CG_UpdateUnlockables( playerState_t *ps )
-{
-	BG_ImportUnlockablesFromMask( ps->persistant[ PERS_TEAM ], ps->persistant[ PERS_UNLOCKABLES ] );
-}
-#endif

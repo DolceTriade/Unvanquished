@@ -150,6 +150,7 @@ set(CGAMELIST
     ${GAMELOGIC_DIR}/cgame/cg_snapshot.cpp
     ${GAMELOGIC_DIR}/cgame/cg_trails.cpp
     ${GAMELOGIC_DIR}/cgame/cg_tutorial.cpp
+    ${GAMELOGIC_DIR}/cgame/cg_teamprogress.cpp
     ${GAMELOGIC_DIR}/cgame/cg_ui.h
     ${GAMELOGIC_DIR}/cgame/cg_utils.cpp
     ${GAMELOGIC_DIR}/cgame/cg_view.cpp
@@ -238,6 +239,7 @@ set(SGAMELIST
     ${GAMELOGIC_DIR}/sgame/sg_physics.cpp
     ${GAMELOGIC_DIR}/sgame/sg_public.h
     ${GAMELOGIC_DIR}/sgame/sg_session.cpp
+    ${GAMELOGIC_DIR}/sgame/sg_teamprogress.cpp
     ${GAMELOGIC_DIR}/sgame/sg_spawn.cpp
     ${GAMELOGIC_DIR}/sgame/sg_spawn.h
     ${GAMELOGIC_DIR}/sgame/sg_spawn_afx.cpp
