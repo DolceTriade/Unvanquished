@@ -1277,13 +1277,15 @@ public:
 
 			if ( show )
 			{
-				usableBuildable = NON_BUILDABLE_USABLE_ENTITY;
+				usableBuildable = es.eType == entityType_t::ET_BUILDABLE
+					? es.modelindex
+					: NON_BUILDABLE_USABLE_ENTITY;
 
 				if ( es.eType == entityType_t::ET_BUILDABLE
 						&& es.modelindex == BA_H_ARMOURY
-						&& Distance( cg.predictedPlayerState.origin, es.origin ) < ENTITY_USE_RANGE - 0.2f ) // use an epsilon to account for rounding errors
+						&& Distance( cg.predictedPlayerState.origin, es.origin ) >= ENTITY_USE_RANGE - 0.2f ) // use an epsilon to account for rounding errors
 				{
-					usableBuildable = es.modelindex;
+					show = false;
 				}
 			}
 		}
@@ -1303,7 +1305,7 @@ public:
 				}
 
 				show = true;
-				usableBuildable = es.eType == entityType_t::ET_BUILDABLE && es.modelindex == BA_H_ARMOURY
+				usableBuildable = es.eType == entityType_t::ET_BUILDABLE
 					? es.modelindex
 					: NON_BUILDABLE_USABLE_ENTITY;
 				break;
@@ -3401,96 +3403,6 @@ static void CG_Rocket_DrawChatType()
 	}
 }
 
-#define OVERLOAD_BAR_MARKWIDTH 0.5f
-#define OVERLOAD_PROGRESS_MAX  6.0f
-
-static void CG_Rocket_DrawPlayerOverloadBar()
-{
-	// data
-	rectDef_t     rect;
-	Color::Color  foreColor, backColor, lockedColor, unlockedColor;
-	float         fraction, borderSize;
-	int           threshold;
-	bool      unlocked;
-
-	unlockThresholdIterator_t unlockableIter = { -1, 0 };
-
-	// display
-	Color::Color  color;
-	float         x, y, w, h, b;
-	bool      vertical;
-
-	CG_GetRocketElementRect( &rect );
-	CG_GetRocketElementBGColor( backColor );
-	CG_GetRocketElementColor( foreColor );
-	Rocket_GetProperty( "overload-border-width", &borderSize, sizeof( borderSize ), rocketVarType_t::ROCKET_FLOAT );
-	Rocket_GetProperty( "locked-marker-color", &lockedColor, sizeof(Color::Color), rocketVarType_t::ROCKET_COLOR );
-	Rocket_GetProperty( "unlocked-marker-color", &unlockedColor, sizeof(Color::Color), rocketVarType_t::ROCKET_COLOR );
-
-
-	team_t team = CG_MyTeam();
-	float overloadProgress = cg.predictedPlayerState.persistant[ PERS_OVERLOAD ] / 10.0f;
-
-	x = rect.x;
-	y = rect.y;
-	w = rect.w;
-	h = rect.h;
-	b = 1.0f;
-
-	vertical = ( h > w );
-
-	// draw border
-	CG_DrawRect( x, y, w, h, borderSize, backColor );
-
-	// adjust rect to draw inside border
-	x += b;
-	y += b;
-	w -= 2.0f * b;
-	h -= 2.0f * b;
-
-	// draw background
-	color = backColor;
-	color.SetAlpha( color.Alpha() * 0.5f );
-	CG_FillRect( x, y, w, h, color );
-
-	// draw overload progress bar
-	fraction = Math::Clamp( overloadProgress / OVERLOAD_PROGRESS_MAX, 0.0f, 1.0f );
-
-	if ( vertical )
-	{
-		CG_FillRect( x, y + h * ( 1.0f - fraction ), w, h * fraction, foreColor );
-	}
-
-	else
-	{
-		CG_FillRect( x, y, w * fraction, h, foreColor );
-	}
-
-	// draw threshold markers
-	while ( ( unlockableIter = BG_IterateUnlockThresholds( unlockableIter, team, &threshold, &unlocked ) ),
-			( unlockableIter.num >= 0 ) )
-	{
-		fraction = threshold / OVERLOAD_PROGRESS_MAX;
-
-		if ( fraction > 1.0f )
-		{
-			fraction = 1.0f;
-		}
-
-		if ( vertical )
-		{
-			CG_FillRect( x, y + h * ( 1.0f - fraction ), w, OVERLOAD_BAR_MARKWIDTH, unlocked ? unlockedColor : lockedColor );
-		}
-
-		else
-		{
-			CG_FillRect( x + w * fraction, y, OVERLOAD_BAR_MARKWIDTH, h, unlocked ? unlockedColor : lockedColor );
-		}
-	}
-
-	trap_R_ClearColor();
-}
-
 static void CG_Rocket_DrawMineRate()
 {
 	int totalBudget  = cg.snap->ps.persistant[ PERS_TOTALBUDGET ];
@@ -3506,122 +3418,6 @@ static void CG_Rocket_DrawMineRate()
 		Rocket_SetInnerRMLRaw( va( "The full budget of %d BP is available.",
 		                       totalBudget) );
 	}
-}
-
-static qhandle_t CG_GetUnlockableIcon( int num )
-{
-	int index = BG_UnlockableTypeIndex( num );
-
-	switch ( BG_UnlockableType( num ) )
-	{
-		case UNLT_WEAPON:
-			return cg_weapons[ index ].weaponIcon;
-
-		case UNLT_UPGRADE:
-			return cg_upgrades[ index ].upgradeIcon;
-
-		case UNLT_BUILDABLE:
-			return cg_buildables[ index ].buildableIcon;
-
-		case UNLT_CLASS:
-			return cg_classes[ index ].classIcon;
-
-		default:
-			return 0;
-	}
-}
-
-static void CG_Rocket_DrawPlayerUnlockedItems() {
-	uint counts = 0;
-	uint count[32] = { 0 };
-	int thresholds[32];
-	int prevThreshold = 0;
-	uint icons = 0;
-	uint prevIcons = 0;
-	struct {
-		qhandle_t shader;
-		bool unlocked;
-	} icon[NUM_UNLOCKABLES]; // more than enough(!)
-	team_t team = CG_MyTeam();
-	unlockThresholdIterator_t unlockableIter = { -1, 1 }, previousIter;
-	for ( ;; ) {
-		qhandle_t shader;
-		int threshold;
-		bool unlocked;
-
-		previousIter = unlockableIter;
-		unlockableIter = BG_IterateUnlockThresholds( unlockableIter, team, &threshold, &unlocked );
-
-		if ( previousIter.threshold != unlockableIter.threshold && icons ) {
-			count[ counts++ ] = icons - prevIcons;
-			prevIcons = icons;
-		}
-
-		if( threshold != prevThreshold ) {
-			thresholds[counts] = threshold - prevThreshold;
-			prevThreshold = threshold;
-		}
-
-		// maybe exit the loop?
-		if ( unlockableIter.num < 0 ) {
-			break;
-		}
-
-		// okay, next icon
-		shader = CG_GetUnlockableIcon( unlockableIter.num );
-
-		if ( shader ) {
-			icon[icons].shader = shader;
-			icon[icons].unlocked = unlocked;
-			icons++;
-		}
-	}
-
-	rectDef_t rect;
-	float borderSize;
-	Color::Color foreColour, backColour;
-	CG_GetRocketElementRect( &rect );
-	Rocket_GetProperty( "cell-color", &backColour, sizeof( Color::Color ), rocketVarType_t::ROCKET_COLOR );
-	CG_GetRocketElementColor( foreColour );
-	Rocket_GetProperty( "overload-border-width", &borderSize, sizeof( borderSize ), rocketVarType_t::ROCKET_FLOAT );
-
-	float w = rect.w - 2 * borderSize;
-	float h = rect.h - 2 * borderSize;
-
-	bool vertical = ( h > w );
-
-	float ih = vertical ? w : h;
-	float iw = ih * cgs.aspectScale;
-
-	float x = rect.x + borderSize;
-	float y = rect.y + borderSize + ( h - ih ) * vertical;
-
-	uint currentIcon = 0;
-	float barX = x;
-	float barY = y;
-	for ( uint i = 0; i < counts; ++i )
-	{
-		if ( vertical ) {
-				barY += ( thresholds[i] / OVERLOAD_PROGRESS_MAX ) * h;
-			} else {
-				barX += ( thresholds[i] / OVERLOAD_PROGRESS_MAX ) * w;
-			}
-
-		float unlockableX = vertical ? barX : barX - count[i] * iw / 2;
-		float unlockableY = vertical ? barY - count[i] * ih / 2 : barY;
-		for ( uint j = 0; j < count[i]; j++ ) {
-			trap_R_SetColor( icon[currentIcon].unlocked ? foreColour : backColour );
-			CG_DrawPic( unlockableX, unlockableY, iw, ih, icon[currentIcon].shader );
-			if ( vertical ) {
-				unlockableY += ih;
-			} else {
-				unlockableX += iw;
-			}
-			currentIcon++;
-		}
-	}
-
-	trap_R_ClearColor();
 }
 
 static void CG_Rocket_DrawVote_internal( team_t team )
@@ -3882,11 +3678,9 @@ static const elementRenderCmd_t elementRenderCmdList[] =
 	{ "loadingText", &CG_Rocket_DrawLoadingText, nullptr, ELEMENT_ALL },
 	{ "mine_rate", &CG_Rocket_DrawMineRate, nullptr, ELEMENT_BOTH },
 	{ "minimap", nullptr, &CG_Rocket_DrawMinimap, ELEMENT_ALL },
-	{ "overload_bar", nullptr, &CG_Rocket_DrawPlayerOverloadBar, ELEMENT_BOTH },
 	{ "motd", &CG_Rocket_DrawMOTD, nullptr, ELEMENT_ALL },
 	{ "progress_value", &CG_Rocket_DrawProgressValue, nullptr, ELEMENT_ALL },
 	{ "tutorial", &CG_Rocket_DrawTutorial, nullptr, ELEMENT_GAME },
-	{ "unlocked_items", nullptr, &CG_Rocket_DrawPlayerUnlockedItems, ELEMENT_BOTH },
 	{ "version", &CG_Rocket_DrawVersion, nullptr, ELEMENT_ALL },
 	{ "votes", &CG_Rocket_DrawVote, nullptr, ELEMENT_GAME },
 	{ "votes_team", &CG_Rocket_DrawTeamVote, nullptr, ELEMENT_BOTH },
