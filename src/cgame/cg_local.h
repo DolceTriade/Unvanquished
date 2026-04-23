@@ -1332,6 +1332,7 @@ enum rocketMenuType_t {
 	ROCKETMENU_HUMANBUILD,
 	ROCKETMENU_ARMOURYBUY,
 	ROCKETMENU_ALIENEVOLVE,
+	ROCKETMENU_OVERLOAD,
 	ROCKETMENU_CHAT,
 	ROCKETMENU_BEACONS,
 	ROCKETMENU_ERROR,
@@ -1460,6 +1461,20 @@ struct cgTeamEconomyState_t
 	bool ownedPurchases[ MAX_OVERLOAD_PURCHASES ];
 };
 
+struct cgOverloadCatalogEntry_t
+{
+	bool valid;
+	int kind;
+	team_t team;
+	int baseCost;
+	int costStep;
+	int bundleAmount;
+	char thing[ 64 ];
+	char stat[ 64 ];
+	char displayName[ 128 ];
+	char description[ 256 ];
+};
+
 struct rocketInfo_t
 {
 	int currentNetSrc;
@@ -1478,6 +1493,7 @@ struct rocketInfo_t
 	int cursorFreezeTime = -1; // mouse input is ignored and cursor is locked in place when cursorFreezeTime = realtime
 	int cursorFreezeX, cursorFreezeY;
 	rectDef_t cursor_pos;
+	cgOverloadCatalogEntry_t overloadCatalog[ MAX_OVERLOAD_PURCHASES ];
 	cgTeamEconomyState_t teamEconomy[ NUM_TEAMS ];
 };
 
@@ -2335,6 +2351,8 @@ void CG_Rocket_ExecDataSource( const char *dataSource, const char *table );
 void CG_Rocket_SetDataSourceIndex( const char *dataSource, const char *table, int index );
 int CG_Rocket_GetDataSourceIndex( const char *dataSource, const char *table );
 void CG_Rocket_FilterDataSource( const char *dataSource, const char *table, const char *filter );
+void CG_ParseOverloadCatalogConfig( int index, const char* config );
+void CG_ParseTeamEconomyConfig( team_t team, const char* config );
 void CG_Rocket_BuildServerInfo();
 void CG_Rocket_BuildServerList();
 void CG_Rocket_BuildPlayerList( const char *table );

@@ -124,7 +124,7 @@ int               G_BuildableDeconValue(gentity_t *ent);
 void              G_GetTotalBuildableValues(int *buildableValuesByTeam);
 void              G_InitOverloadEconomy();
 int               G_OverloadProgressValue( team_t team );
-bool              G_OverloadUnlockPurchased( team_t team, bgAttributeFamily_t family, int objectIndex );
+bool              G_OverloadUnlockPurchased( team_t team, unlockableType_t type, int itemNum );
 void              G_PublishOverloadState( team_t team );
 bool              G_OverloadPurchase( gentity_t *ent, const Cmd::Args& args, std::string* message = nullptr );
 

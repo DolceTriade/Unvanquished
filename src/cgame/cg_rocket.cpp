@@ -69,7 +69,6 @@ void CG_Rocket_Init( const WindowConfig& windowConfig )
 	CG_Rocket_RegisterElements();
 
 	Rocket_RegisterProperty( "cell-color", "white", false, false, "color" );
-	Rocket_RegisterProperty( "overload-border-width", "0.5", false, false, "number" );
 	Rocket_RegisterProperty( "unlocked-marker-color", "green", false, false, "color" );
 	Rocket_RegisterProperty( "locked-marker-color", "red", false, false, "color" );
 

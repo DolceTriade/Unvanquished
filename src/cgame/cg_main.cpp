@@ -1340,6 +1340,14 @@ void CG_Init( int serverMessageNum, int clientNum, const WindowConfig& windowCon
 			Sys::Drop( "Failed to apply attribute config: %s", error.c_str() );
 		}
 	}
+	for ( int i = 0; i < MAX_OVERLOAD_PURCHASES; ++i )
+	{
+		CG_ParseOverloadCatalogConfig( i, CG_ConfigString( CS_OVERLOAD_CATALOG + i ) );
+	}
+	for ( int team = TEAM_ALIENS; team <= TEAM_HUMANS; ++team )
+	{
+		CG_ParseTeamEconomyConfig( (team_t)team, CG_ConfigString( CS_OVERLOAD + team ) );
+	}
 
 	CG_UpdateLoadingStep( LOAD_SOUNDS );
 	CG_RegisterSounds();

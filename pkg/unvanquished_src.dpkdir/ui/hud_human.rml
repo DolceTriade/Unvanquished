@@ -176,37 +176,6 @@
 				left: 2%;
 			}
 
-			div#overload {
-				position: absolute;
-				width: 40%;
-				height: 6%;
-				bottom: 2%;
-				margin-left: auto;
-				margin-right: auto;
-
-				vertical-align: bottom;
-			}
-
-			overload_bar {
-				width: 100%;
-				height: 50%;
-				background-color: #6efbff20; /* General bar color */
-				color: #6efbff40; /* Filled-section bar color */
-			}
-
-			unlocked_items {
-				width: 100%;
-				height: 50%;
-				/* Two-colour system. HACK
-								locked colour = CSS cell-color
-								unlocked colour = CSS color
-							 */
-				cell-color: #22888860;
-				color: #88ffff90;
-
-				overload-border-width: 0;
-			}
-
 			usable_buildable {
 				width: 1.5em;
 				position: absolute;
@@ -276,10 +245,6 @@
 			<div class="health"><health_cross class="health"/>
 			<health class="health" />
 			<progress class="health" src="health" /></div>
-		</div>
-		<div id="overload">
-			<unlocked_items/>
-			<overload_bar/>
 		</div>
 		<div id="items">
 			<usable_buildable>
