@@ -43,6 +43,21 @@ Cvar::Cvar<std::string> rocket_hudFile("rocket_hudFile", "VFS path of config fil
 
 static connstate_t oldConnState;
 
+static void CG_Rocket_FlushOverloadMenuRefresh()
+{
+	if ( !rocketInfo.overloadMenuDirty || !rocketInfo.menu[ ROCKETMENU_OVERLOAD ].id )
+	{
+		return;
+	}
+
+	if ( !Rocket_DocumentRefreshData( rocketInfo.menu[ ROCKETMENU_OVERLOAD ].id ) )
+	{
+		return;
+	}
+
+	rocketInfo.overloadMenuDirty = false;
+}
+
 void CG_Rocket_Init( const WindowConfig& windowConfig )
 {
 	const char *token, *text_p;
@@ -584,6 +599,8 @@ void CG_Rocket_Frame( cgClientState_t state )
 		CG_Rocket_BuildPlayerList( nullptr );
 		cg.scoreInvalidated = false;
 	}
+
+	CG_Rocket_FlushOverloadMenuRefresh();
 
 	// Update scores as long as they are showing
 	if ( ( cg.showScores || cg.intermissionStarted ) && cg.scoresRequestTime + 2000 < cg.time )

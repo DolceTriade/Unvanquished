@@ -70,7 +70,7 @@ void BG_TeamProgressNotifyStatusChanges( const int *statusChanges, int count )
 			text += ", ";
 		}
 
-		text += UnlockableHumanName( unlockable );
+		text += BG_UnlockableHumanName( unlockable );
 	}
 
 	switch ( cg.snap->ps.persistant[ PERS_TEAM ] )

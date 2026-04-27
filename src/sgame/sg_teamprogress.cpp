@@ -111,14 +111,14 @@ void G_UpdateUnlockables()
 		}
 
 		int rawThreshold = std::max( unlockThreshold, 0 );
-		unlockThreshold = NormalizeUnlockThreshold( rawThreshold );
+		unlockThreshold = BG_NormalizeUnlockThreshold( rawThreshold );
 
 		unlockable->type            = unlockableType;
 		unlockable->num             = itemNum;
 		unlockable->team            = team;
 		unlockable->statusKnown     = true;
 		unlockable->unlockThreshold = unlockThreshold;
-		unlockable->lockThreshold   = UnlockToLockThreshold( unlockThreshold );
+		unlockable->lockThreshold   = BG_UnlockToLockThreshold( unlockThreshold );
 
 		if ( rawThreshold == 0 )
 		{

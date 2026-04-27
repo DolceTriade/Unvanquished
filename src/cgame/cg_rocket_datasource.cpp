@@ -36,6 +36,8 @@ Maryland 20850 USA.
 #include "cg_local.h"
 #include "shared/parse.h"
 
+#include <limits>
+
 static std::string OverloadCommandForEntry( const cgOverloadCatalogEntry_t& entry )
 {
 	if ( entry.kind == 0 )
@@ -51,8 +53,70 @@ static std::string OverloadCommandForEntry( const cgOverloadCatalogEntry_t& entr
 	return Str::Format( "upgrade %s %s", entry.thing, entry.stat );
 }
 
+static int OverloadNextCost( const cgOverloadCatalogEntry_t& entry, int index, const cgTeamEconomyState_t& state )
+{
+	if ( entry.kind == 2 )
+	{
+		return entry.baseCost + state.repeatCounts[ index ] * entry.costStep;
+	}
+
+	return entry.baseCost;
+}
+
+static int OverloadRemainingCost( const cgOverloadCatalogEntry_t& entry, int index, const cgTeamEconomyState_t& state )
+{
+	if ( entry.kind == 1 && state.ownedPurchases[ index ] )
+	{
+		return 0;
+	}
+
+	if ( entry.kind == 2 && entry.maxRanks > 0 && entry.maxRanks < std::numeric_limits<int>::max() &&
+	     state.repeatCounts[ index ] >= entry.maxRanks )
+	{
+		return 0;
+	}
+
+	return std::max( 0, OverloadNextCost( entry, index, state ) - state.investedCredits[ index ] );
+}
+
+static bool OverloadEntryLocked( const cgOverloadCatalogEntry_t& entry, const cgTeamEconomyState_t& state )
+{
+	return state.completedPurchases < entry.requiredCompletedCount;
+}
+
+static bool OverloadEntryMaxed( const cgOverloadCatalogEntry_t& entry, int index, const cgTeamEconomyState_t& state )
+{
+	if ( entry.kind == 1 )
+	{
+		return state.ownedPurchases[ index ];
+	}
+
+	return entry.kind == 2 && entry.maxRanks > 0 && entry.maxRanks < std::numeric_limits<int>::max() &&
+	       state.repeatCounts[ index ] >= entry.maxRanks;
+}
+
+static std::string OverloadGroupForEntry( const cgOverloadCatalogEntry_t& entry )
+{
+	if ( entry.kind == 0 )
+	{
+		return "Build Points";
+	}
+
+	if ( entry.kind == 1 )
+	{
+		return "Unlocks";
+	}
+
+	return entry.thing;
+}
+
 static std::string OverloadProgressForEntry( const cgOverloadCatalogEntry_t& entry, int index, const cgTeamEconomyState_t& state )
 {
+	if ( OverloadEntryLocked( entry, state ) && entry.kind != 1 )
+	{
+		return Str::Format( "Requires %d completed purchases", entry.requiredCompletedCount );
+	}
+
 	if ( entry.kind == 0 )
 	{
 		return Str::Format( "%d / %d", state.investedCredits[ index ], entry.baseCost );
@@ -68,20 +132,40 @@ static std::string OverloadProgressForEntry( const cgOverloadCatalogEntry_t& ent
 		return Str::Format( "%d / %d", state.investedCredits[ index ], entry.baseCost );
 	}
 
+	if ( OverloadEntryMaxed( entry, index, state ) )
+	{
+		return Str::Format( "Max rank %d", state.repeatCounts[ index ] );
+	}
+
 	int nextCost = entry.baseCost + state.repeatCounts[ index ] * entry.costStep;
 	return Str::Format( "Rank %d, %d / %d", state.repeatCounts[ index ], state.investedCredits[ index ], nextCost );
 }
 
-static const char* OverloadStatusForEntry( const cgOverloadCatalogEntry_t& entry, int index, const cgTeamEconomyState_t& state )
+static const char* OverloadStatusForEntry( const cgOverloadCatalogEntry_t& entry, int index, const cgTeamEconomyState_t& state, int credits )
 {
+	if ( OverloadEntryLocked( entry, state ) )
+	{
+		return "locked";
+	}
+
 	if ( entry.kind == 1 && state.ownedPurchases[ index ] )
 	{
 		return "owned";
 	}
 
+	if ( OverloadEntryMaxed( entry, index, state ) )
+	{
+		return "maxed";
+	}
+
 	if ( state.investedCredits[ index ] > 0 )
 	{
 		return "partial";
+	}
+
+	if ( credits < OverloadRemainingCost( entry, index, state ) )
+	{
+		return "expensive";
 	}
 
 	return "available";
@@ -1516,6 +1600,12 @@ static void CG_Rocket_BuildOverloadList( const char *table )
 	}
 
 	const cgTeamEconomyState_t& state = rocketInfo.teamEconomy[ team ];
+	if ( !state.valid )
+	{
+		return;
+	}
+
+	int credits = cg.predictedPlayerState.persistant[ PERS_CREDIT ];
 	for ( int i = 0; i < MAX_OVERLOAD_PURCHASES; ++i )
 	{
 		const cgOverloadCatalogEntry_t& entry = rocketInfo.overloadCatalog[ i ];
@@ -1530,17 +1620,24 @@ static void CG_Rocket_BuildOverloadList( const char *table )
 		}
 
 		buf[ 0 ] = '\0';
-		Info_SetValueForKey( buf, "index", va( "%d", (int)i ), false );
+		Info_SetValueForKey( buf, "index", va( "%d", i ), false );
 		Info_SetValueForKey( buf, "name", entry.displayName, false );
 		Info_SetValueForKey( buf, "kind", entry.kind == 0 ? "bp" :
 		                            entry.kind == 1 ? "unlock" : "upgrade", false );
+		Info_SetValueForKey( buf, "thing", entry.thing, false );
+		Info_SetValueForKey( buf, "group", OverloadGroupForEntry( entry ).c_str(), false );
 		Info_SetValueForKey( buf, "description", entry.description, false );
 		Info_SetValueForKey( buf, "command", OverloadCommandForEntry( entry ).c_str(), false );
-		Info_SetValueForKey( buf, "cost", va( "%d", entry.kind == 2
-			? entry.baseCost + state.repeatCounts[ i ] * entry.costStep
-			: entry.baseCost ), false );
+		Info_SetValueForKey( buf, "cost", va( "%d", OverloadNextCost( entry, i, state ) ), false );
+		Info_SetValueForKey( buf, "remaining", va( "%d", OverloadRemainingCost( entry, i, state ) ), false );
+		Info_SetValueForKey( buf, "requiredCompletedCount", va( "%d", entry.requiredCompletedCount ), false );
+		Info_SetValueForKey( buf, "completedPurchases", va( "%d", state.completedPurchases ), false );
+		Info_SetValueForKey( buf, "remainingCompletedCount",
+		                     va( "%d", std::max( 0, entry.requiredCompletedCount - state.completedPurchases ) ), false );
+		Info_SetValueForKey( buf, "rank", va( "%d", state.repeatCounts[ i ] ), false );
+		Info_SetValueForKey( buf, "maxRanks", va( "%d", entry.maxRanks ), false );
 		Info_SetValueForKey( buf, "progress", OverloadProgressForEntry( entry, i, state ).c_str(), false );
-		Info_SetValueForKey( buf, "status", OverloadStatusForEntry( entry, i, state ), false );
+		Info_SetValueForKey( buf, "status", OverloadStatusForEntry( entry, i, state, credits ), false );
 		Rocket_DSAddRow( "overloadList", "default", buf );
 	}
 }
