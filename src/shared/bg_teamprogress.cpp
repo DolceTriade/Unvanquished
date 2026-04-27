@@ -41,7 +41,7 @@ int              unlockablesTypeOffset[ UNLT_NUM_UNLOCKABLETYPES ];
 // local methods
 // -------------
 
-const char *UnlockableHumanName( unlockable_t *unlockable )
+const char *BG_UnlockableHumanName( unlockable_t *unlockable )
 {
 	switch ( unlockable->type )
 	{
@@ -51,7 +51,7 @@ const char *UnlockableHumanName( unlockable_t *unlockable )
 		case UNLT_CLASS:     return BG_ClassModelConfig( unlockable->num )->humanName;
 	}
 
-	Sys::Error( "UnlockableHumanName: Unlockable has unknown type" );
+	Sys::Error( "BG_UnlockableHumanName: Unlockable has unknown type" );
 }
 
 static bool Unlocked( unlockableType_t type, int itemNum )
@@ -69,16 +69,16 @@ static void CheckStatusKnowledge( unlockableType_t type, int itemNum )
 		dummy.num  = itemNum;
 
 		Log::Warn( "Asked for the status of unlockable item %s but the status is unknown.",
-		            UnlockableHumanName( &dummy ) );
+		            BG_UnlockableHumanName( &dummy ) );
 	}
 }
 
-float UnlockToLockThreshold( float unlockThreshold )
+float BG_UnlockToLockThreshold( float unlockThreshold )
 {
 	return unlockThreshold;
 }
 
-int NormalizeUnlockThreshold( int unlockThreshold )
+int BG_NormalizeUnlockThreshold( int unlockThreshold )
 {
 	if ( unlockThreshold <= 0 )
 	{
@@ -189,13 +189,13 @@ void BG_ImportUnlockablesFromMask( int team, int mask )
 				Sys::Error( "BG_ImportUnlockablesFromMask: Unknown unlockable type" );
 		}
 
-		unlockThreshold = NormalizeUnlockThreshold( std::max( unlockThreshold, 0 ) );
+		unlockThreshold = BG_NormalizeUnlockThreshold( std::max( unlockThreshold, 0 ) );
 
 		unlockable->type            = unlockableType;
 		unlockable->num             = itemNum;
 		unlockable->team            = currentTeam;
 		unlockable->unlockThreshold = unlockThreshold;
-		unlockable->lockThreshold   = UnlockToLockThreshold( unlockThreshold );
+		unlockable->lockThreshold   = BG_UnlockToLockThreshold( unlockThreshold );
 
 		// retrieve the item's locking state
 		if ( !unlockThreshold )

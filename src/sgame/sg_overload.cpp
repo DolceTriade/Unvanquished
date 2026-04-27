@@ -25,6 +25,7 @@ along with Unvanquished. If not, see <http://www.gnu.org/licenses/>.
 #include "common/Common.h"
 #include "sg_local.h"
 #include "shared/bg_attributes.h"
+#include "shared/bg_teamprogress.h"
 
 #include <limits>
 #include <sstream>
@@ -317,6 +318,8 @@ static void PublishOverloadCatalog()
 			Info_SetValueForKey( config, "bc", va( "%d", entry.baseCost ), false );
 			Info_SetValueForKey( config, "cs", va( "%d", entry.costStep ), false );
 			Info_SetValueForKey( config, "ba", va( "%d", entry.bundleAmount ), false );
+			Info_SetValueForKey( config, "req", va( "%d", entry.requiredCompletedCount ), false );
+			Info_SetValueForKey( config, "mr", va( "%d", entry.maxRanks ), false );
 
 			if ( strlen( config ) >= BIG_INFO_STRING )
 			{
@@ -673,9 +676,10 @@ static void AddUnlockEntriesForFamily( bgAttributeFamily_t family, unlockableTyp
 			Sys::Error( "could not resolve attribute object for %s", thing );
 		}
 
+		const int requiredCompletedCount = BG_NormalizeUnlockThreshold( unlockThreshold );
 		std::string displayName = UnlockableDisplayName( unlockableType, itemNum );
 		std::string uiDescription = UnlockableDescription( unlockableType, itemNum );
-		AddUnlock( team, 0, unlockableType, itemNum, family, objectIndex, unlockField,
+		AddUnlock( team, requiredCompletedCount, unlockableType, itemNum, family, objectIndex, unlockField,
 		           thing, displayName.c_str(), uiDescription.c_str() );
 	}
 }

@@ -67,6 +67,23 @@ void Rocket_SetDocumentScale( Rml::ElementDocument& document )
 	document.GetContext()->SetDensityIndependentPixelRatio(ratio);
 }
 
+bool Rocket_DocumentRefreshData( const char *name )
+{
+	if ( !menuContext || !name || !*name )
+	{
+		return false;
+	}
+
+	Rml::ElementDocument* document = menuContext->GetDocument( name );
+	if ( !document )
+	{
+		return false;
+	}
+
+	document->DispatchEvent( "refreshdata", {} );
+	return true;
+}
+
 void Rocket_DocumentAction( const char *name, const char *action )
 {
 	if ( !Q_stricmp( action, "show" ) || !Q_stricmp( action, "open" ) )

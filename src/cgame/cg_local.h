@@ -1469,6 +1469,8 @@ struct cgOverloadCatalogEntry_t
 	int baseCost;
 	int costStep;
 	int bundleAmount;
+	int requiredCompletedCount;
+	int maxRanks;
 	char thing[ 64 ];
 	char stat[ 64 ];
 	char displayName[ 128 ];
@@ -1495,6 +1497,7 @@ struct rocketInfo_t
 	rectDef_t cursor_pos;
 	cgOverloadCatalogEntry_t overloadCatalog[ MAX_OVERLOAD_PURCHASES ];
 	cgTeamEconomyState_t teamEconomy[ NUM_TEAMS ];
+	bool overloadMenuDirty;
 };
 
 extern rocketInfo_t rocketInfo;
@@ -2379,6 +2382,7 @@ void Rocket_Render();
 void Rocket_Update();
 void Rocket_LoadDocument( const char *path );
 void Rocket_DocumentAction( const char *name, const char *action );
+bool Rocket_DocumentRefreshData( const char *name );
 bool Rocket_GetEvent(std::string& cmdText);
 void Rocket_DeleteEvent();
 void Rocket_RegisterDataSource( const char *name );
