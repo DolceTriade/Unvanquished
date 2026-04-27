@@ -117,6 +117,11 @@ static void CG_PrintBPMessage_f()
 	cg.bpMessage = CG_Argv( 1 );
 }
 
+static void CG_MarkOverloadMenuDirty()
+{
+	rocketInfo.overloadMenuDirty = true;
+}
+
 void CG_ParseOverloadCatalogConfig( int index, const char* config )
 {
 	if ( index < 0 || index >= MAX_OVERLOAD_PURCHASES )
@@ -140,22 +145,18 @@ void CG_ParseOverloadCatalogConfig( int index, const char* config )
 
 	entry.valid = true;
 	entry.kind = !Q_stricmp( kind, "bp" ) ? 0 : !Q_stricmp( kind, "unlock" ) ? 1 : 2;
-	entry.team = (team_t) atoi( Info_ValueForKey( config, "t" ) );
+	entry.team = static_cast<team_t>( atoi( Info_ValueForKey( config, "t" ) ) );
 	entry.baseCost = atoi( Info_ValueForKey( config, "bc" ) );
 	entry.costStep = atoi( Info_ValueForKey( config, "cs" ) );
 	entry.bundleAmount = atoi( Info_ValueForKey( config, "ba" ) );
+	entry.requiredCompletedCount = atoi( Info_ValueForKey( config, "req" ) );
+	entry.maxRanks = atoi( Info_ValueForKey( config, "mr" ) );
 	Q_strncpyz( entry.thing, Info_ValueForKey( config, "thing" ), sizeof( entry.thing ) );
 	Q_strncpyz( entry.stat, Info_ValueForKey( config, "stat" ), sizeof( entry.stat ) );
 	Q_strncpyz( entry.displayName, Info_ValueForKey( config, "name" ), sizeof( entry.displayName ) );
 	Q_strncpyz( entry.description, Info_ValueForKey( config, "desc" ), sizeof( entry.description ) );
 
-	if ( menuContext && rocketInfo.menu[ ROCKETMENU_OVERLOAD ].id )
-	{
-		if ( Rml::ElementDocument* document = menuContext->GetDocument( rocketInfo.menu[ ROCKETMENU_OVERLOAD ].id ) )
-		{
-			document->DispatchEvent( "refreshdata", {} );
-		}
-	}
+	CG_MarkOverloadMenuDirty();
 }
 
 void CG_ParseTeamEconomyConfig( team_t team, const char* config )
@@ -248,13 +249,7 @@ void CG_ParseTeamEconomyConfig( team_t team, const char* config )
 		}
 	}
 
-	if ( menuContext && rocketInfo.menu[ ROCKETMENU_OVERLOAD ].id )
-	{
-		if ( Rml::ElementDocument* document = menuContext->GetDocument( rocketInfo.menu[ ROCKETMENU_OVERLOAD ].id ) )
-		{
-			document->DispatchEvent( "refreshdata", {} );
-		}
-	}
+	CG_MarkOverloadMenuDirty();
 }
 
 /*
