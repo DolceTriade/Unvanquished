@@ -23,8 +23,8 @@
 			barbox {
 				display: block;
 				position: absolute;
-				right: 0em;
-				bottom: 0em;
+				left: 0em;
+				bottom: 2em;
 				width: 6em;
 				height: 6em;
 
