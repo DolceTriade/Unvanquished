@@ -19,9 +19,9 @@ extern int          unlockablesTeamKnowledge;
 extern unlockable_t unlockables[ NUM_UNLOCKABLES ];
 extern int          unlockablesTypeOffset[ UNLT_NUM_UNLOCKABLETYPES ];
 
-const char *UnlockableHumanName( unlockable_t *unlockable );
-float      UnlockToLockThreshold( float unlockThreshold );
-int        NormalizeUnlockThreshold( int unlockThreshold );
+const char *BG_UnlockableHumanName( unlockable_t *unlockable );
+float      BG_UnlockToLockThreshold( float unlockThreshold );
+int        BG_NormalizeUnlockThreshold( int unlockThreshold );
 
 void BG_ClearUnlockablesMasks();
 void BG_ResetUnlockablesMask( team_t team );

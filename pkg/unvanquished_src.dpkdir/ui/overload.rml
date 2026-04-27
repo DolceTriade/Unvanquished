@@ -5,28 +5,11 @@
 	<script src="lua/util.lua" />
 	<style>
 		body {
-			width: 52em;
-			height: 36em;
+			width: 60em;
+			height: 38em;
 			margin: 6% auto auto auto;
 			padding: 1.2em 1.4em;
 			background: #041518f2;
-			color: #d9ffff;
-		}
-		tabset {
-			height: 100%;
-		}
-		tabset > panel {
-			height: 29.5em;
-		}
-		tab {
-			display: inline-block;
-			margin-right: 0.4em;
-			padding: 0.35em 0.7em;
-			background: #0f2629;
-			color: #8abdc2;
-		}
-		tab:selected {
-			background: #184046;
 			color: #d9ffff;
 		}
 		body::scrollbar {
@@ -41,15 +24,40 @@
 			margin: 0 0 1em 0;
 			color: #8abdc2;
 		}
-		#rows {
-			height: 28.5em;
+		#content {
+			height: 29.5em;
 			overflow-y: auto;
 			padding-right: 0.5em;
 		}
-		.rows {
-			height: 27.5em;
-			overflow-y: auto;
-			padding-right: 0.5em;
+		.filters {
+			margin: 0 0 0.9em 0;
+		}
+		.filters button {
+			margin-right: 0.45em;
+			padding: 0.3em 0.65em;
+			background: #0f2629;
+			color: #9ed2d7;
+		}
+		.filters button.active {
+			background: #1b4f58;
+			color: #ffffff;
+		}
+		.section {
+			margin-bottom: 1.1em;
+		}
+		.section h2 {
+			margin: 0 0 0.45em 0;
+			padding-bottom: 0.2em;
+			border-bottom-width: 1px;
+			border-bottom-color: #1b4448;
+			font-size: 1.15em;
+			color: #9efcff;
+		}
+		.group-title {
+			margin: 0.7em 0 0.35em 0;
+			color: #7dd0d6;
+			font-size: 0.95em;
+			text-transform: uppercase;
 		}
 		.purchase {
 			margin-bottom: 0.7em;
@@ -70,6 +78,15 @@
 		}
 		.purchase.partial {
 			background: #2c2815dd;
+		}
+		.purchase.locked {
+			background: #1b1d25dd;
+		}
+		.purchase.expensive {
+			background: #241818dd;
+		}
+		.purchase.maxed {
+			background: #10211bdd;
 		}
 		.purchase-header {
 			display: block;
@@ -124,6 +141,10 @@
 			background: #244128;
 			color: #b9efb3;
 		}
+		.actions button.locked {
+			background: #29323a;
+			color: #9aa9b1;
+		}
 		.footer {
 			margin-top: 0.9em;
 			text-align: right;
@@ -131,6 +152,29 @@
 		}
 	</style>
 	<script>
+		function printTable(t, indent)
+			indent = indent or 0
+			local spacing = string.rep("  ", indent)
+
+			if type(t) ~= "table" then
+				print(spacing .. tostring(t))
+				return
+			end
+
+			for k, v in pairs(t) do
+				local key = type(k) == "string" and '["' .. k .. '"]' or "[" .. tostring(k) .. "]"
+
+				if type(v) == "table" then
+					print(spacing .. key .. " = {")
+					printTable(v, indent + 1)
+					print(spacing .. "}")
+				else
+					local value = type(v) == "string" and '"' .. v .. '"' or tostring(v)
+					print(spacing .. key .. " = " .. value)
+				end
+			end
+		end
+
 		function EscapeHtml(text)
 			if text == nil then return "" end
 			text = string.gsub(text, "&", "&amp;")
@@ -161,56 +205,183 @@
 			return "Upgrade"
 		end
 
-		function PurchaseButtons(command, status)
-			if status == "owned" then
-				return '<button class="owned" onclick="return false;">Owned</button>'
+		OverloadFilter = "all"
+
+		function GroupLabel(group)
+			if group == nil or group == "" then return "" end
+			group = string.gsub(group, "_", " ")
+			return string.gsub(group, "(%a)([%w']*)", function(a, b)
+				return string.upper(a) .. string.lower(b)
+			end)
+		end
+
+		function StatusPriority(status)
+			if status == "partial" then return 1 end
+			if status == "available" then return 2 end
+			if status == "expensive" then return 3 end
+			if status == "locked" then return 4 end
+			if status == "owned" or status == "maxed" then return 5 end
+			return 6
+		end
+
+		function ActionLabel(kind, status)
+			if kind == "bp" then return "Buy Bundle" end
+			if kind == "unlock" then
+				if status == "partial" or status == "expensive" then return "Finish Unlock" end
+				return "Unlock"
+			end
+			if status == "partial" then return "Finish Rank" end
+			return "Buy Next"
+		end
+
+		function FilterMatches(status)
+			if OverloadFilter == "all" then return true end
+			if OverloadFilter == "available" then return status == "available" or status == "expensive" end
+			if OverloadFilter == "progress" then return status == "partial" end
+			if OverloadFilter == "future" then return status == "locked" end
+			if OverloadFilter == "done" then return status == "owned" or status == "maxed" end
+			return true
+		end
+
+		function SetFilterButtonState(document, id, active)
+			local element = document:GetElementById(id)
+			if element ~= nil then
+				element:SetClass("active", active)
+			end
+		end
+
+		function SpendButtons(row)
+			local status = row.status
+			if status == "owned" or status == "maxed" then
+				return '<button class="owned" onclick="return false;">Complete</button>'
+			end
+			if status == "locked" and row.kind ~= "unlock" then
+				return string.format(
+					'<button class="locked" onclick="return false;">%s</button>',
+					ActionLabel(row.kind, status))
 			end
 
-			return string.format(
-				'<button onclick="OverloadBuy(\'%s\', 100)">+100</button>' ..
-				'<button onclick="OverloadBuy(\'%s\', 500)">+500</button>' ..
-				'<button onclick="OverloadBuy(\'%s\', 1000)">+1000</button>',
-				command, command, command)
+			local remaining = tonumber(row.remaining) or 0
+			local buttonClass = status == "locked" and row.kind == "unlock" and ' class="locked"' or ""
+			local buttons = string.format(
+				'<button%s onclick="OverloadBuy(\'%s\', %d)">%s</button>',
+				buttonClass, row.command, remaining, ActionLabel(row.kind, status))
+
+			if row.kind ~= "bp" and remaining > 100 then
+				buttons = buttons .. string.format(
+					'<button%s onclick="OverloadBuy(\'%s\', 100)">+100</button>',
+					buttonClass, row.command)
+			end
+
+			if row.kind ~= "bp" and remaining > 500 then
+				buttons = buttons .. string.format(
+					'<button%s onclick="OverloadBuy(\'%s\', 500)">+500</button>',
+					buttonClass, row.command)
+			end
+
+			return buttons
 		end
 
 		function OverloadBuy(command, spend)
 			Cmd.exec("teambuy " .. command .. " " .. spend)
 		end
 
-		function BuildRows(document, targetId, filterKind)
+		function ReadRows()
 			CDataSource.Build("overloadList", "default")
-			local rows = CDataSource.Read("overloadList", "default", "name,description,command,cost,progress,status,kind")
+			local raw = CDataSource.Read("overloadList", "default", "name,description,command,cost,progress,status,kind,group,remaining,requiredCompletedCount,completedPurchases,remainingCompletedCount,rank,maxRanks")
+			local rows = {}
+			for i = 1, #raw do
+				rows[#rows + 1] = {
+					name = raw[i][1],
+					description = raw[i][2],
+					command = raw[i][3],
+					cost = raw[i][4],
+					progress = raw[i][5],
+					status = raw[i][6],
+					kind = raw[i][7],
+					group = raw[i][8],
+					remaining = raw[i][9],
+					requiredCompletedCount = tonumber(raw[i][10]) or 0,
+					completedPurchases = tonumber(raw[i][11]) or 0,
+					remainingCompletedCount = tonumber(raw[i][12]) or 0,
+					rank = tonumber(raw[i][13]) or 0,
+					maxRanks = tonumber(raw[i][14]) or 0,
+				}
+			end
+			table.sort(rows, function(a, b)
+				if a.kind ~= b.kind then return a.kind < b.kind end
+				if a.group ~= b.group then return a.group < b.group end
+				if a.status ~= b.status then return StatusPriority(a.status) < StatusPriority(b.status) end
+				return a.name < b.name
+			end)
+			return rows
+		end
+
+		function MetaHtml(row)
+			local meta = string.format(
+				'<div class="meta">Next cost: %s credits</div><div class="meta">Progress: %s</div>',
+				EscapeHtml(row.cost),
+				EscapeHtml(row.progress))
+
+			if row.requiredCompletedCount > 0 then
+				meta = meta .. string.format(
+					'<div class="meta">Team progression: %d / %d completed purchases</div>',
+					row.completedPurchases,
+					row.requiredCompletedCount)
+			end
+
+			return meta
+		end
+
+		function RenderRows(rows, filterKind)
 			local html = ""
+			local lastGroup = ""
 			for i = 1, #rows do
 				local row = rows[i]
-				if row[7] == filterKind then
-					local typeClass = KindClass(row[7])
+				if row.kind == filterKind and FilterMatches(row.status) then
+					local typeClass = KindClass(row.kind)
+					if filterKind == "upgrade" and row.group ~= lastGroup then
+						html = html .. string.format('<div class="group-title">%s</div>', EscapeHtml(GroupLabel(row.group)))
+						lastGroup = row.group
+					end
 					html = html .. string.format(
 						'<div class="purchase %s %s">' ..
 						'<div class="purchase-header"><span class="kind %s">%s</span><h2>%s</h2></div>' ..
 						'<p>%s</p>' ..
-						'<div class="meta">Next cost: %s credits</div>' ..
-						'<div class="meta">Progress: %s</div>' ..
+						'%s' ..
 						'<div class="actions">%s</div>' ..
 						'</div>',
 						typeClass,
-						row[6],
+						row.status,
 						typeClass,
-						KindLabel(row[7]),
-						EscapeHtml(row[1]),
-						FormatDescription(row[2]),
-						EscapeHtml(row[4]),
-						EscapeHtml(row[5]),
-						PurchaseButtons(row[3], row[6]))
+						KindLabel(row.kind),
+						EscapeHtml(row.name),
+						FormatDescription(row.description),
+						MetaHtml(row),
+						SpendButtons(row))
 				end
 			end
-			document:GetElementById(targetId).inner_rml = html
+			if html == "" then
+				html = '<p class="subtitle">No matching entries.</p>'
+			end
+			return html
 		end
 
 		function BuildOverloadMenu(document)
-			BuildRows(document, "bpRows", "bp")
-			BuildRows(document, "unlockRows", "unlock")
-			BuildRows(document, "upgradeRows", "upgrade")
+			local rows = ReadRows()
+			document:GetElementById("bpRows").inner_rml = RenderRows(rows, "bp")
+			document:GetElementById("unlockRows").inner_rml = RenderRows(rows, "unlock")
+			document:GetElementById("upgradeRows").inner_rml = RenderRows(rows, "upgrade")
+			SetFilterButtonState(document, "filterAll", OverloadFilter == "all")
+			SetFilterButtonState(document, "filterAvailable", OverloadFilter == "available")
+			SetFilterButtonState(document, "filterProgress", OverloadFilter == "progress")
+			SetFilterButtonState(document, "filterFuture", OverloadFilter == "future")
+			SetFilterButtonState(document, "filterDone", OverloadFilter == "done")
+		end
+
+		function OverloadSetFilter(filter, document)
+			OverloadFilter = filter
+			BuildOverloadMenu(document)
 		end
 
 		function OverloadHandleKey(event, document)
@@ -221,23 +392,30 @@
 		end
 	</script>
 </head>
-<body id="overload" onshow="CloseOtherCirclemenus(event) BuildOverloadMenu(document)" onrefreshdata="BuildOverloadMenu(document)" onmousedown="RightClickClose(event, document)" onkeydown="OverloadHandleKey(event, document)">
-	<h1><translate>Overload</translate></h1>
-	<p class="subtitle"><translate>Spend personal credits at the main structure to fund team BP, unlocks, and upgrades.</translate></p>
-	<tabset>
-		<tab><translate>BP</translate></tab>
-		<panel>
-			<div class="rows" id="bpRows"></div>
-		</panel>
-		<tab><translate>Unlocks</translate></tab>
-		<panel>
-			<div class="rows" id="unlockRows"></div>
-		</panel>
-		<tab><translate>Upgrades</translate></tab>
-		<panel>
-			<div class="rows" id="upgradeRows"></div>
-		</panel>
-	</tabset>
-	<div class="footer"><translate>Press ESC or right click to close.</translate></div>
-</body>
+	<body id="overload" onshow="CloseOtherCirclemenus(event) BuildOverloadMenu(document)" onrefreshdata="BuildOverloadMenu(document)" onmousedown="RightClickClose(event, document)" onkeydown="OverloadHandleKey(event, document)">
+		<h1><translate>Overload</translate></h1>
+		<p class="subtitle"><translate>Spend personal credits at the main structure to fund team BP, unlocks, and upgrades.</translate></p>
+		<div class="filters">
+			<button id="filterAll" onclick="OverloadSetFilter('all', document)"><translate>All</translate></button>
+			<button id="filterAvailable" onclick="OverloadSetFilter('available', document)"><translate>Available</translate></button>
+			<button id="filterProgress" onclick="OverloadSetFilter('progress', document)"><translate>In Progress</translate></button>
+			<button id="filterFuture" onclick="OverloadSetFilter('future', document)"><translate>Future</translate></button>
+			<button id="filterDone" onclick="OverloadSetFilter('done', document)"><translate>Completed</translate></button>
+		</div>
+		<div id="content">
+			<div class="section">
+				<h2><translate>Build Points</translate></h2>
+				<div id="bpRows"></div>
+			</div>
+			<div class="section">
+				<h2><translate>Unlocks</translate></h2>
+				<div id="unlockRows"></div>
+			</div>
+			<div class="section">
+				<h2><translate>Upgrades</translate></h2>
+				<div id="upgradeRows"></div>
+			</div>
+		</div>
+		<div class="footer"><translate>Press ESC or right click to close.</translate></div>
+	</body>
 </rml>
