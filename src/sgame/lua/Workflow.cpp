@@ -180,7 +180,7 @@ void WaitCondition::Clear()
 	this->waitFor = WaitFor::NONE;
 }
 
-static int idCounter = 0;
+static int idCounter = 1;
 
 struct workflowInstance
 {
@@ -194,6 +194,7 @@ struct workflowInstance
 };
 
 std::vector<workflowInstance> workflows;
+std::unordered_set<int> canceledWorkflows;
 
 void ParseYield( lua_State *L, workflowInstance *wf, int nres )
 {
@@ -302,6 +303,20 @@ void Workflow::Frame( lua_State *L )
 		std::unordered_set<std::string> processedSignals;
 		for ( auto &wf : workflows )
 		{
+			// If canceled, don't run it. Clean it up and mark for removal.
+			if ( canceledWorkflows.find( wf.id ) != canceledWorkflows.end() )
+			{
+				lua_rawgeti( L, LUA_REGISTRYINDEX, wf.thread_ref );
+				lua_State *co = lua_tothread( L, -1 );
+
+				cleanupThread( L, co, wf.thread_ref );
+				wf.thread_ref = LUA_REFNIL;
+				cleanup.push_back( wf.id );
+				lua_pop( L, 1 );
+				canceledWorkflows.erase( wf.id );
+				continue;
+			}
+
 			// On the first iteration, run all the coroutines. Subsequently, only run
 			// coroutines blocked on signals to ensure we burn down any accumulated backlog.
 			// Also, ensure we don't run any "completed" coroutines.
@@ -390,6 +405,8 @@ void ClearWorkflows( lua_State *L )
 	workflows.clear();
 
 	signals.Clear( L );
+
+	canceledWorkflows.clear();
 }
 
 /// Run a workflow.
@@ -415,10 +432,12 @@ int WorkflowRun( lua_State *L )
 	// Move function to co
 	lua_pushvalue( L, 1 );
 	lua_xmove( L, co, 1 );
+	auto id = idCounter++;
+	workflows.emplace_back( id, thread_ref );
 
-	workflows.emplace_back( idCounter++, thread_ref );
+	lua_pushinteger( L, id );
 
-	return 0;
+	return 1;
 }
 
 /// Send a signal to workflows waiting for an event.
@@ -502,6 +521,35 @@ int WorkflowWaitSignal( lua_State *L )
 	return lua_yield( L, 1 );
 }
 
+int WorkflowCancel( lua_State *L )
+{
+	int id = lua_tointeger( L, 1 );
+
+	if ( id <= 0 )
+	{
+		Log::Warn( "Lua tried to cancel an invalid ID: %d", id );
+		return 0;
+	}
+
+	bool found = false;
+	for ( const auto& wf : workflows )
+	{
+		if ( wf.id == id )
+		{
+			found = true;
+			break;
+		}
+	}
+	if ( !found )
+	{
+		Log::Warn( "Lua tried to cancel a non-existent workflow: %d", id );
+		return 0;
+	}
+
+	canceledWorkflows.insert( id );
+	return 0;
+}
+
 RegType<Workflow> WorkflowMethods[] = {
 	{ nullptr, nullptr },
 };
@@ -535,6 +583,8 @@ void ExtraInit<::Lua::Workflow>( lua_State *L, int metatable_index )
 	lua_setfield( L, metatable_index - 1, "wait_ms" );
 	lua_pushcfunction( L, ::Lua::WorkflowWaitSignal );
 	lua_setfield( L, metatable_index - 1, "wait_signal" );
+	lua_pushcfunction( L, ::Lua::WorkflowCancel );
+	lua_setfield( L, metatable_index - 1, "cancel" );
 }
 }  // namespace Lua
 }  // namespace Shared
