@@ -66,17 +66,14 @@ class RocketProgressElement : public Rml::Element
 
 	void OnUpdate() override
 	{
-		if ( !child_ )
-		{
-			child_ = GetChild( 0 );
-		}
-		if ( !source_.empty() && child_ && !targetAttribute_.empty() )
+		auto child = GetChild( 0 );
+		if ( !source_.empty() && child && !targetAttribute_.empty() )
 		{
 			float newValue = CG_Rocket_ProgressBarValue( source_.c_str() );
 
 			if ( newValue != value_ )
 			{
-				child_->SetAttribute( targetAttribute_, newValue );
+				child->SetAttribute( targetAttribute_, newValue );
 				value_ = newValue;
 			}
 		}
@@ -85,7 +82,6 @@ class RocketProgressElement : public Rml::Element
 
    private:
 	float value_;  // current value
-	Rml::Element *child_;
 	Rml::String source_;
 	Rml::String targetAttribute_;
 };
