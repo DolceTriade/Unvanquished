@@ -1,29 +1,54 @@
 <rml>
 <head>
 <link type="text/rcss" href="/ui/shared/basics.rcss" />
+<script>
+	function UpdateChargeRingColor(document)
+		local ring = document:GetElementById("charge-ring-ring")
+		if player.team == "aliens" then
+			ring.style.color = "#ff4040cc"
+		else
+			ring.style.color = "#83fff5cc"
+		end
+	end
+</script>
 <style>
 	body {
 		width: 100%;
 		height: 100%;
 		z-index: 1;
 	}
-	div {
+
+	div#charge-ring {
 		position: absolute;
-		width: 40%;
-		height: 3%;
-		bottom: 2%;
-		margin-left: auto;
-		margin-right: auto;
+		left: 50%;
+		top: 50%;
+		width: 6em;
+		height: 6em;
+		margin-left: -3em;
+		margin-top: -3em;
 	}
-	progress {
+
+	progresselement {
+		display: block;
 		width: 100%;
 		height: 100%;
 	}
+
+	donutprogress {
+		display: block;
+		width: 100%;
+		height: 100%;
+		innerRadius: 1.65em;
+		outerRadius: 2em;
+		color: #83fff5cc;
+	}
 </style>
 </head>
-<body id="hud_chargebar">
-<div>
-<progress direction="right" src="charge"/>
-</div>
+<body id="hud_chargebar" onload="UpdateChargeRingColor(document)" onshow="UpdateChargeRingColor(document)">
+	<div id="charge-ring">
+		<progresselement src="charge" targetAttribute="value">
+			<donutprogress id="charge-ring-ring" />
+		</progresselement>
+	</div>
 </body>
 </rml>
