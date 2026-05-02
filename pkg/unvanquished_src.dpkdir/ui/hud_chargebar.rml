@@ -4,7 +4,7 @@
 <script>
 	function UpdateChargeRingColor(document)
 		local ring = document:GetElementById("charge-ring-ring")
-		if player.team == "aliens" then
+		if player.team == "alien" then
 			ring.style.color = "#ff4040cc"
 		else
 			ring.style.color = "#83fff5cc"
