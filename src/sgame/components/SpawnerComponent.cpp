@@ -29,6 +29,12 @@ void SpawnerComponent::HandleDie(gentity_t* /*killer*/, meansOfDeath_t /*meansOf
 	if (newNumSpawns == 0 && G_ActiveMainBuildable(team)) {
 		G_BroadcastEvent(EV_NO_SPAWNS, 0, team);
 	}
+
+	G_UpdateSpawnLocationMask( static_cast<team_t>( team ) );
+}
+
+void SpawnerComponent::HandleFinishConstruction() {
+	G_UpdateSpawnLocationMask( static_cast<team_t>( GetTeamComponent().Team() ) );
 }
 
 void SpawnerComponent::Think(int timeDelta) {

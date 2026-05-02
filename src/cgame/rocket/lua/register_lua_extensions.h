@@ -40,5 +40,6 @@ Maryland 20850 USA.
 void CG_Rocket_RegisterLuaCDataSource(lua_State* L);
 void CG_Rocket_RegisterLuaEvents(lua_State* L);
 void CG_Rocket_InitializeLuaPlayer( lua_State* L );
+void CG_Rocket_RegisterLuaStringUtils( lua_State* L );
 
 #endif  // ROCKET_REGISTER_LUA_EXTENSIONS_H_

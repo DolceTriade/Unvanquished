@@ -1749,6 +1749,53 @@ static void CG_Rocket_BuildVsayList( const char *table )
 	}
 }
 
+static void CG_Rocket_BuildSpawnLocationList( const char *table )
+{
+	static char buf[ MAX_STRING_CHARS ];
+	uint64_t mask;
+
+	if ( Q_stricmp( table, "default" ) )
+	{
+		return;
+	}
+
+	Rocket_DSClearTable( "spawnLocList", "default" );
+
+	if ( rocketInfo.cstate.connState < connstate_t::CA_ACTIVE )
+	{
+		return;
+	}
+
+	team_t team = CG_MyTeam();
+	if ( team != TEAM_ALIENS && team != TEAM_HUMANS )
+	{
+		return;
+	}
+
+	mask = cg.spawnLocationMask;
+	for ( int locationIndex = 1; locationIndex < MAX_LOCATIONS; locationIndex++ )
+	{
+		const char *name = CG_ConfigString( CS_LOCATIONS + locationIndex );
+
+		if ( !( mask & ( uint64_t( 1 ) << locationIndex ) ) )
+		{
+			continue;
+		}
+
+		if ( !*name )
+		{
+			continue;
+		}
+
+		buf[ 0 ] = '\0';
+		Info_SetValueForKey( buf, "num", va( "%d", locationIndex ), false );
+		Info_SetValueForKey( buf, "name", name, false );
+		Info_SetValueForKey( buf, "selected",
+			locationIndex == cg.predictedPlayerState.persistant[ PERS_SPAWN_LOCATION ] ? "1" : "0", false );
+		Rocket_DSAddRow( "spawnLocList", "default", buf );
+	}
+}
+
 static void nullSortFunc( const char*, const char* )
 {
 }
@@ -1802,6 +1849,7 @@ static const dataSourceCmd_t dataSourceCmdList[] =
 	{ "playerList", &CG_Rocket_BuildPlayerList, &CG_Rocket_SortPlayerList, &CG_Rocket_CleanUpPlayerList, &CG_Rocket_SetPlayerListPlayer, &nullFilterFunc, &nullExecFunc, &nullGetFunc },
 	{ "resolutions", &CG_Rocket_BuildResolutionList, &nullSortFunc, &CG_Rocket_CleanUpResolutionList, &CG_Rocket_SetResolutionListResolution, &nullFilterFunc, &nullExecFunc, &CG_Rocket_GetResolutionListIndex},
 	{ "server_browser", &CG_Rocket_BuildServerList, &CG_Rocket_SortServerList, &CG_Rocket_CleanUpServerList, &CG_Rocket_SetServerListServer, &CG_Rocket_FilterServerList, &CG_Rocket_ExecServerList, &nullGetFunc },
+	{ "spawnLocList", &CG_Rocket_BuildSpawnLocationList, &nullSortFunc, &nullCleanFunc, &nullSetFunc, &nullFilterFunc, &nullExecFunc, &nullGetFunc },
 	{ "vsayList", &CG_Rocket_BuildVsayList, &nullSortFunc, &nullCleanFunc, &nullSetFunc, &nullFilterFunc, &nullExecFunc, &nullGetFunc },
 };
 

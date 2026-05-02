@@ -211,10 +211,16 @@ find the nearest buildable of the right type that is
 spawned/healthy/unblocked etc.
 ================
 */
-static gentity_t *G_SelectSpawnBuildable( vec3_t preference, buildable_t buildable )
+static gentity_t *G_SelectSpawnBuildable( vec3_t preference, buildable_t buildable, int skip )
 {
+	struct SpawnCandidate
+	{
+		gentity_t *ent;
+		float distanceSquared;
+	};
+
 	gentity_t *search = nullptr;
-	gentity_t *spot = nullptr;
+	std::vector<SpawnCandidate> candidates;
 
 	while ( ( search = G_IterateEntitiesOfClass( search, BG_Buildable( buildable )->entityName ) ) != nullptr )
 	{
@@ -248,14 +254,44 @@ static gentity_t *G_SelectSpawnBuildable( vec3_t preference, buildable_t buildab
 			continue;
 		}
 
-		if ( !spot || DistanceSquared( preference, search->s.origin ) <
-		     DistanceSquared( preference, spot->s.origin ) )
-		{
-			spot = search;
-		}
+		candidates.push_back( { search, DistanceSquared( preference, search->s.origin ) } );
 	}
 
-	return spot;
+	std::sort( candidates.begin(), candidates.end(),
+		[]( const SpawnCandidate& a, const SpawnCandidate& b )
+		{
+			return a.distanceSquared < b.distanceSquared;
+		} );
+
+	if ( skip < 0 || skip >= static_cast<int>( candidates.size() ) )
+	{
+		return nullptr;
+	}
+
+	return candidates[ skip ].ent;
+}
+
+void G_GetSpawnPreferenceOrigin( const gclient_t *client, vec3_t preference )
+{
+	gentity_t *location;
+	int locationIndex;
+
+	if ( !client )
+	{
+		VectorClear( preference );
+		return;
+	}
+
+	locationIndex = G_IsPlayableTeam( client->pers.team ) ? client->pers.spawnLocation : 0;
+
+	location = G_FindLocationEntity( locationIndex );
+	if ( location )
+	{
+		VectorCopy( location->r.currentOrigin, preference );
+		return;
+	}
+
+	VectorCopy( client->pers.lastDeathLocation, preference );
 }
 
 /*
@@ -265,9 +301,10 @@ G_SelectUnvanquishedSpawnPoint
 Chooses a player start, deathmatch start, etc
 ============
 */
-gentity_t *G_SelectUnvanquishedSpawnPoint( team_t team, vec3_t preference, vec3_t origin, vec3_t angles )
+gentity_t *G_SelectUnvanquishedSpawnPoint( team_t team, vec3_t preference, vec3_t origin, vec3_t angles, int skip )
 {
 	gentity_t *spot = nullptr;
+	buildable_t buildable;
 
 	/* team must exist, or there will be a sigsegv */
 	ASSERT( G_IsPlayableTeam( team ) );
@@ -276,15 +313,8 @@ gentity_t *G_SelectUnvanquishedSpawnPoint( team_t team, vec3_t preference, vec3_
 		return nullptr;
 	}
 
-	if ( team == TEAM_ALIENS )
-	{
-		spot = G_SelectSpawnBuildable( preference, BA_A_SPAWN );
-	}
-	else if ( team == TEAM_HUMANS )
-	{
-		spot = G_SelectSpawnBuildable( preference, BA_H_SPAWN );
-	}
-
+	buildable = team == TEAM_ALIENS ? BA_A_SPAWN : BA_H_SPAWN;
+	spot = G_SelectSpawnBuildable( preference, buildable, skip );
 	if ( !spot )
 	{
 		return nullptr;
@@ -1348,6 +1378,7 @@ void ClientBegin( int clientNum )
 
 	// locate ent at a spawn point
 	ClientSpawn( ent, nullptr, nullptr, nullptr );
+	G_SendSpawnLocations( clientNum );
 
 	ResendPossiblyWrongConfigstrings( clientNum );
 
@@ -1621,6 +1652,8 @@ void ClientSpawn( gentity_t *ent, gentity_t *spawn, const vec3_t origin, const v
 	// increment the spawncount so the client will detect the respawn
 	client->ps.persistant[ PERS_SPAWN_COUNT ]++;
 	client->ps.persistant[ PERS_SPECSTATE ] = client->sess.spectatorState;
+	client->ps.persistant[ PERS_SPAWN_LOCATION ] =
+		G_IsPlayableTeam( client->pers.team ) ? client->pers.spawnLocation : 0;
 
 	trap_GetUserinfo( index, userinfo, sizeof( userinfo ) );
 	client->ps.eFlags = flags;

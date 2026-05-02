@@ -175,24 +175,6 @@
 			end
 		end
 
-		function EscapeHtml(text)
-			if text == nil then return "" end
-			text = string.gsub(text, "&", "&amp;")
-			text = string.gsub(text, "<", "&lt;")
-			text = string.gsub(text, ">", "&gt;")
-			text = string.gsub(text, '"', "&quot;")
-			return text
-		end
-
-		function FormatDescription(text)
-			text = EscapeHtml(text)
-			text = string.gsub(text, "&lt;[bB][rR]%s*/&gt;", "<br />")
-			text = string.gsub(text, "&lt;[bB][rR]&gt;", "<br />")
-			text = string.gsub(text, "\\n", "<br />")
-			text = string.gsub(text, "\n", "<br />")
-			return text
-		end
-
 		function KindClass(kind)
 			if kind == "bp" then return "bp" end
 			if kind == "unlock" then return "unlock" end
@@ -320,8 +302,8 @@
 		function MetaHtml(row)
 			local meta = string.format(
 				'<div class="meta">Next cost: %s credits</div><div class="meta">Progress: %s</div>',
-				EscapeHtml(row.cost),
-				EscapeHtml(row.progress))
+				Rocket_QuakeToRML(row.cost),
+				Rocket_QuakeToRML(row.progress))
 
 			if row.requiredCompletedCount > 0 then
 				meta = meta .. string.format(
@@ -341,7 +323,7 @@
 				if row.kind == filterKind and FilterMatches(row.status) then
 					local typeClass = KindClass(row.kind)
 					if filterKind == "upgrade" and row.group ~= lastGroup then
-						html = html .. string.format('<div class="group-title">%s</div>', EscapeHtml(GroupLabel(row.group)))
+						html = html .. string.format('<div class="group-title">%s</div>', Rocket_QuakeToRML(GroupLabel(row.group)))
 						lastGroup = row.group
 					end
 					html = html .. string.format(
@@ -355,8 +337,8 @@
 						row.status,
 						typeClass,
 						KindLabel(row.kind),
-						EscapeHtml(row.name),
-						FormatDescription(row.description),
+						Rocket_QuakeToRML(row.name),
+						row.description,
 						MetaHtml(row),
 						SpendButtons(row))
 				end

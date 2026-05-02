@@ -1,5 +1,6 @@
 #include "common/Common.h"
 #include "BuildableComponent.h"
+#include "../sg_public.h"
 
 BuildableComponent::BuildableComponent(Entity& entity, HealthComponent& r_HealthComponent,
 	ThinkingComponent& r_ThinkingComponent, TeamComponent& r_TeamComponent)
@@ -88,6 +89,7 @@ void BuildableComponent::HandleDie(gentity_t* killer, meansOfDeath_t meansOfDeat
 	if (meansOfDeath != MOD_DECONSTRUCT && meansOfDeath != MOD_REPLACE && meansOfDeath != MOD_BUILDLOG_REVERT) {
 		G_RemoveBudget(team, BG_Buildable(entity.oldEnt->s.modelindex)->buildPoints);
 	}
+
 }
 
 void BuildableComponent::Think(int timeDelta) {
@@ -133,6 +135,10 @@ void BuildableComponent::Think(int timeDelta) {
 				if (!constructionHasFinished) {
 					entity.FinishConstruction();
 					constructionHasFinished = true;
+					if ( auto* spawnerComponent = entity.Get<SpawnerComponent>() )
+					{
+						spawnerComponent->HandleFinishConstruction();
+					}
 				}
 			} break;
 

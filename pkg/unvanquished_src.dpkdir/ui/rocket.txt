@@ -21,6 +21,7 @@
 		ui/transition_downloading.rml download                 // ROCKETMENU_DOWNLOADING
 		ui/menu_ingame.rml menu_ingame                         // ROCKETMENU_INGAME_MENU
 		ui/ingame_teamselect.rml ingame_teamselect             // ROCKETMENU_TEAMSELECT
+		ui/spawn_location.rml spawn_location                   // ROCKETMENU_SPAWNLOC
 		ui/human_spawn.rml human_spawn                         // ROCKETMENU_HUMANSPAWN
 		ui/alien_spawn.rml alien_spawn                         // ROCKETMENU_ALIENSPAWN
 		ui/alien_build.rml alien_build passthrough             // ROCKETMENU_ALIENBUILD
