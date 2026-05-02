@@ -1,0 +1,103 @@
+<rml>
+<head>
+	<link type="text/rcss" href="/ui/shared/basics.rcss" />
+	<link type="text/rcss" href="/ui/shared/tooltip.rcss" />
+	<link type="text/template" href="/ui/shared/window_unmovable.rml" />
+	<style>
+		body {
+			width: 36em;
+			height: 28em;
+			margin: auto;
+		}
+
+		body > * {
+			font-size: 1.05em;
+		}
+
+		#spawnLocationList {
+			height: 18em;
+			padding-right: 0.4em;
+		}
+
+		parent.spawn-location-entry {
+			display: block;
+			margin: 0.25em 0;
+		}
+
+		button.spawn-location {
+			width: 100%;
+			text-align: left;
+			padding: 0.65em 0.8em;
+		}
+
+		button.spawn-location .name {
+			display: inline-block;
+			width: 82%;
+			overflow: hidden;
+			white-space: nowrap;
+			text-align: left;
+			vertical-align: middle;
+		}
+
+		button.spawn-location .marker {
+			display: inline-block;
+			width: 18%;
+			text-align: right;
+			vertical-align: middle;
+			opacity: 0.85;
+		}
+
+		button.teamselect {
+			width: 100%;
+			margin-top: 0.75em;
+		}
+
+		.hint {
+			margin: 0.35em 0 0.8em 0;
+			opacity: 0.8;
+		}
+	</style>
+	<script src="lua/util.lua" />
+	<script>
+		function SpawnLocationClick( locationIndex )
+			Cmd.exec( "spawnloc " .. locationIndex )
+			Events.pushcmd( "hide spawn_location" )
+		end
+
+		function BuildSpawnLocationMenu( document )
+			CDataSource.Build( "spawnLocList", "default" )
+			local locations = CDataSource.Read( "spawnLocList", "default", "num,name,selected" )
+			local list = document:GetElementById( "spawnLocationList" )
+			local html = {}
+
+			if #locations == 0 then
+				list.inner_rml = "<p class='hint'><translate>No active spawn locations are currently available.</translate></p>"
+				return
+			end
+
+			for i = 1, #locations do
+				local row = locations[ i ]
+				local selected = tonumber( row[ 3 ] ) == 1
+				local fullName = row[ 2 ]
+				local marker = selected and "<img class='emoticon' src='/emoticons/official' />" or "&nbsp;"
+
+				html[ #html + 1 ] = string.format(
+					"<parent class='spawn-location-entry'><button class='spawn-location' onclick='SpawnLocationClick(%s)'><span class='name'>%s</span><span class='marker'>%s</span></button></parent>",
+					row[ 1 ], fullName, marker
+				)
+			end
+			list.inner_rml = table.concat( html )
+		end
+	</script>
+</head>
+
+<body id="spawn_location" template="window_unmovable" onshow="BuildSpawnLocationMenu(document)" onrefreshdata="BuildSpawnLocationMenu(document)">
+	<p><translate>Choose a spawn location:</translate></p>
+	<p class="hint">
+		<translate>Your choice is remembered for future spawns. If a location is unavailable, the game uses the nearest available spawn instead.</translate>
+		<translate> Humans can teleport to a location while alive.</translate>
+	</p>
+
+	<div id="spawnLocationList"></div>
+</body>
+</rml>

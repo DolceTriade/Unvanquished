@@ -28,6 +28,8 @@ class SpawnerComponent: public SpawnerComponentBase {
 		 */
 		void HandleDie(gentity_t* killer, meansOfDeath_t meansOfDeath);
 
+		void HandleFinishConstruction();
+
 		// ///////////////////// //
 
 		Entity *GetBlocker();

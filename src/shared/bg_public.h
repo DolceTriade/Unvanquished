@@ -513,7 +513,8 @@ enum persEnum_t
   PERS_SPENTBUDGET,
   PERS_MARKEDBUDGET,
   PERS_TOTALBUDGET,
-  PERS_QUEUEDBUDGET
+  PERS_QUEUEDBUDGET,
+  PERS_SPAWN_LOCATION  // preferred spawn location for the current team
   // netcode has space for 2 more. TODO: extend
 };
 
@@ -907,6 +908,7 @@ enum dynMenu_t
   MN_H_SPAWN,
   MN_H_BUILD,
   MN_H_ARMOURY,
+  MN_H_SPAWNLOC,
   MN_H_UNKNOWNITEM,
   MN_H_NOSLOTS,
   MN_H_NOFUNDS,
