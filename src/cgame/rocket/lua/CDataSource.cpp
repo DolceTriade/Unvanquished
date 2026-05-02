@@ -80,6 +80,15 @@ static int CDataSource_Read(lua_State* L)
 	return 1;
 }
 
+static int Lua_Rocket_QuakeToRML( lua_State* L )
+{
+	const char* text = luaL_checkstring( L, 1 );
+	int parseFlags = luaL_optinteger( L, 2, 0 );
+
+	lua_pushstring( L, Rocket_QuakeToRML( text, parseFlags ).c_str() );
+	return 1;
+}
+
 void CG_Rocket_RegisterLuaCDataSource(lua_State* L)
 {
 	lua_newtable(L);
@@ -88,4 +97,10 @@ void CG_Rocket_RegisterLuaCDataSource(lua_State* L)
 	lua_pushcfunction(L, CDataSource_Read);
 	lua_setfield(L, -2, "Read");
 	lua_setglobal(L, "CDataSource");
+}
+
+void CG_Rocket_RegisterLuaStringUtils( lua_State* L )
+{
+	lua_pushcfunction( L, Lua_Rocket_QuakeToRML );
+	lua_setglobal( L, "Rocket_QuakeToRML" );
 }

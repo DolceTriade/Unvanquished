@@ -345,6 +345,7 @@ struct clientPersistant_t
 	float             evolveHealthFraction;
 	int               devolveReturningCredits;
 	weapon_t          humanItemSelection; // humans have a starting item
+	int               spawnLocation; // preferred spawn location for the current team
 
 	int               teamChangeTime; // level.time of last team change
 	int		  lastPrivateMessageSender; // last private message sender
@@ -662,6 +663,7 @@ struct level_locals_t
 		float            totalBudget; // Read access always rounds towards zero.
 		int              spentBudget;
 		int              queuedBudget;
+		uint64_t         spawnLocationMask;
 		spawnQueue_t     spawnQueue;
 		bool             locked;
 			float            overloadProgress;

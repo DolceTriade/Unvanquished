@@ -131,7 +131,7 @@ bool              G_OverloadPurchase( gentity_t *ent, const Cmd::Args& args, std
 // sg_client.c
 void              G_AddCreditToClient( gclient_t *client, short credit, bool cap );
 void              G_SetClientViewAngle( gentity_t *ent, const vec3_t angle );
-gentity_t         *G_SelectUnvanquishedSpawnPoint( team_t team, vec3_t preference, vec3_t origin, vec3_t angles );
+gentity_t         *G_SelectUnvanquishedSpawnPoint( team_t team, vec3_t preference, vec3_t origin, vec3_t angles, int skip = 0 );
 gentity_t         *G_SelectRandomFurthestSpawnPoint( const vec3_t avoidPoint, vec3_t origin, vec3_t angles );
 gentity_t         *G_SelectLockSpawnPoint( vec3_t origin, vec3_t angles , char const* intermission );
 gentity_t         *G_SelectAlienLockSpawnPoint( vec3_t origin, vec3_t angles );
@@ -276,6 +276,8 @@ team_t            G_Team( const gentity_t *ent );
 bool              G_OnSameTeam( const gentity_t *ent1, const gentity_t *ent2 );
 void              G_LeaveTeam( gentity_t *self );
 void              G_ChangeTeam( gentity_t *ent, team_t newTeam );
+void              G_SendSpawnLocations( int clientNum );
+void              G_UpdateSpawnLocationMask( team_t team );
 gentity_t         *GetCloseLocationEntity( gentity_t *ent );
 void              TeamplayInfoMessage( gentity_t *ent );
 int               G_PlayerCountForBalance( team_t team );
@@ -292,6 +294,8 @@ int               G_SoundIndex( const char *name );
 int               G_GradingTextureIndex( const char *name );
 int               G_ReverbEffectIndex( const char *name );
 int               G_LocationIndex( const char *name );
+gentity_t         *G_FindLocationEntity( int location );
+void G_GetSpawnPreferenceOrigin( const gclient_t *client, vec3_t preference );
 void              G_KillBox( gentity_t *ent );
 void              G_KillBrushModel( gentity_t *ent, gentity_t *activator );
 void              G_TeleportPlayer( gentity_t *player, const glm::vec3 &origin, const glm::vec3 &angles, float speed );

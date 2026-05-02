@@ -294,9 +294,11 @@ void G_ChangeTeam( gentity_t *ent, team_t newTeam )
 		// We shouldn't call ClientSpawn if it hasn't entered the game.
 
 		ent->client->pers.team = newTeam;
+		ent->client->pers.spawnLocation = 0;
 
 		// userinfo configstrings
 		ClientUserinfoChanged( ent->client->ps.clientNum, false );
+		G_SendSpawnLocations( ent->num() );
 
 		// configstring restrictions
 		G_UpdateTeamConfigStrings();
@@ -312,6 +314,7 @@ void G_ChangeTeam( gentity_t *ent, team_t newTeam )
 	ent->client->pers.team = newTeam;
 	ent->client->pers.teamInfo = level.startTime - 1;
 	ent->client->pers.classSelection = PCL_NONE;
+	ent->client->pers.spawnLocation = 0;
 	ClientSpawn( ent, nullptr, nullptr, nullptr );
 
 	if ( oldTeam == TEAM_HUMANS && newTeam == TEAM_ALIENS )
@@ -346,6 +349,7 @@ void G_ChangeTeam( gentity_t *ent, team_t newTeam )
 	ent->client->ps.persistant[ PERS_UNLOCKABLES ] = BG_UnlockablesMask( newTeam );
 
 	ClientUserinfoChanged( ent->client->ps.clientNum, false );
+	G_SendSpawnLocations( ent->num() );
 
 	G_UpdateTeamConfigStrings();
 
@@ -358,6 +362,120 @@ void G_ChangeTeam( gentity_t *ent, team_t newTeam )
 	TeamplayInfoMessage( ent );
 
 	Lua::ExecTeamChangeHooks( ent, newTeam );
+}
+
+static gentity_t *G_FindClosestLocationEntityForOrigin( const vec3_t origin )
+{
+	gentity_t *eloc = nullptr;
+	gentity_t *best = nullptr;
+	float bestlen = std::numeric_limits<float>::max( );
+	float len = 0.0f;
+
+	for ( eloc = level.locationHead; eloc; eloc = eloc->nextPathSegment )
+	{
+		if ( eloc->s.generic1 <= 0 )
+		{
+			continue;
+		}
+
+		len = DistanceSquared( origin, eloc->r.currentOrigin );
+		if ( len > bestlen )
+		{
+			continue;
+		}
+
+		bestlen = len;
+		best = eloc;
+	}
+
+	return best;
+}
+
+static uint64_t G_BuildSpawnLocationMask( team_t team )
+{
+	gentity_t *spawn = nullptr;
+	buildable_t buildable;
+	uint64_t mask = 0;
+
+	if ( !G_IsPlayableTeam( team ) )
+	{
+		return 0;
+	}
+
+	buildable = team == TEAM_ALIENS ? BA_A_SPAWN : BA_H_SPAWN;
+
+	while ( ( spawn = G_IterateEntitiesOfClass( spawn, BG_Buildable( buildable )->entityName ) ) != nullptr )
+	{
+		gentity_t *location;
+
+		if ( !spawn->spawned || Entities::IsDead( spawn ) )
+		{
+			continue;
+		}
+
+		location = G_FindClosestLocationEntityForOrigin( spawn->r.currentOrigin );
+		if ( !location )
+		{
+			continue;
+		}
+
+		mask |= uint64_t( 1 ) << location->s.generic1;
+	}
+
+	return mask;
+}
+
+void G_SendSpawnLocations( int clientNum )
+{
+	gentity_t *ent;
+	team_t team;
+	uint64_t mask = 0;
+
+	if ( clientNum < 0 || clientNum >= level.maxclients )
+	{
+		return;
+	}
+
+	ent = &g_entities[ clientNum ];
+	if ( !ent->client || ent->client->pers.connected != CON_CONNECTED )
+	{
+		return;
+	}
+
+	team = static_cast<team_t>( ent->client->pers.team );
+	if ( G_IsPlayableTeam( team ) )
+	{
+		mask = level.team[ team ].spawnLocationMask;
+	}
+
+	trap_SendServerCommand( clientNum, va( "spawnlocs %016llx", static_cast<unsigned long long>( mask ) ) );
+}
+
+void G_UpdateSpawnLocationMask( team_t team )
+{
+	int i;
+
+	if ( !G_IsPlayableTeam( team ) )
+	{
+		return;
+	}
+
+	level.team[ team ].spawnLocationMask = G_BuildSpawnLocationMask( team );
+
+	for ( i = 0; i < level.maxclients; i++ )
+	{
+		if ( level.clients[ i ].pers.connected != CON_CONNECTED )
+		{
+			continue;
+		}
+
+		if ( level.clients[ i ].pers.team != team )
+		{
+			continue;
+		}
+
+		G_SendSpawnLocations( i );
+	}
 }
 
 /**
@@ -390,6 +508,26 @@ gentity_t *GetCloseLocationEntity( gentity_t *ent )
 	}
 
 	return best;
+}
+
+gentity_t *G_FindLocationEntity( int location )
+{
+	gentity_t *eloc;
+
+	if ( location <= 0 || location >= MAX_LOCATIONS )
+	{
+		return nullptr;
+	}
+
+	for ( eloc = level.locationHead; eloc; eloc = eloc->nextPathSegment )
+	{
+		if ( eloc->s.generic1 == location )
+		{
+			return eloc;
+		}
+	}
+
+	return nullptr;
 }
 
 /*---------------------------------------------------------------------------*/

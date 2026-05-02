@@ -3,12 +3,12 @@
 <link type="text/rcss" href="/ui/shared/basics.rcss" />
 <script>
 	function UpdateChargeRingColor(document)
+		local ring = document:GetElementById("charge-ring-ring")
 		if player.team == "alien" then
 			ring.style.color = "#ff4040"
 		else
 			ring.style.color = "#002efd"
 		end
-		print(ring.style.color)
 	end
 </script>
 <style>

@@ -369,6 +369,27 @@ static void HArmoury_Use( gentity_t *self, gentity_t*, gentity_t *activator )
 	G_TriggerMenu( activator->client->ps.clientNum, MN_H_ARMOURY );
 }
 
+static void HSpawn_Use( gentity_t *self, gentity_t*, gentity_t *activator )
+{
+	if ( !self->spawned )
+	{
+		return;
+	}
+
+	if ( activator->client->pers.team != TEAM_HUMANS )
+	{
+		return;
+	}
+
+	if ( !self->powered || Entities::IsDead(self) )
+	{
+		G_TriggerMenu( activator->num(), MN_H_NOTPOWERED );
+		return;
+	}
+
+	G_TriggerMenu( activator->client->ps.clientNum, MN_H_SPAWNLOC );
+}
+
 static void MainStructure_Use( gentity_t *self, gentity_t*, gentity_t *activator )
 {
 	if ( !self->spawned || Entities::IsDead( self ) || !activator || !activator->client )
@@ -1506,6 +1527,8 @@ static gentity_t *SpawnBuildable( gentity_t *builder, buildable_t buildable, con
 			break;
 
 		case BA_H_SPAWN:
+			built->use = HSpawn_Use;
+			built->s.eFlags |= EF_USABLE;
 			break;
 
 		case BA_H_MGTURRET:

@@ -1101,6 +1101,7 @@ static void G_SpawnClients( team_t team )
 	int          clientNum;
 	gentity_t    *ent, *spawn;
 	vec3_t       spawn_origin, spawn_angles;
+	vec3_t       preference;
 	spawnQueue_t *sq = nullptr;
 	int          numSpawns = 0;
 
@@ -1118,9 +1119,10 @@ static void G_SpawnClients( team_t team )
 		}
 
 		ent = &g_entities[ clientNum ];
+		G_GetSpawnPreferenceOrigin( ent->client, preference );
 
 		if ( ( spawn = G_SelectUnvanquishedSpawnPoint( team,
-		               ent->client->pers.lastDeathLocation,
+		               preference,
 		               spawn_origin, spawn_angles ) ) )
 		{
 			if ( ent->client->pers.isBot )

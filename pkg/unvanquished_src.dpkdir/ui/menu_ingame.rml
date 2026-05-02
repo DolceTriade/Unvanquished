@@ -30,6 +30,8 @@
 						<button-menu style="width:87%"  onclick='Events.pushcmd("exec team human; hide ingame_menu")'><translate>Join Humans</translate></button-menu>
 						<br/>
 						<button-menu style="width:87%"  onclick='Events.pushcmd("exec team spec; hide ingame_menu")'><translate>Spectate</translate></button-menu>
+						<br/>
+						<button-menu style="width:87%" onclick='Events.pushcmd("show spawn_location")'><translate>Spawn locations</translate></button-menu>
 						<button-menu style="width:87%" onclick='Events.pushcmd("show options_democracy")'><translate>Democracy</translate></button-menu>
 					</indent>
 
