@@ -1,6 +1,16 @@
 <rml>
 <head>
 <link type="text/rcss" href="/ui/shared/basics.rcss" />
+<script>
+	function UpdateChargeRingColor(document)
+		if player.team == "alien" then
+			ring.style.color = "#ff4040"
+		else
+			ring.style.color = "#002efd"
+		end
+		print(ring.style.color)
+	end
+</script>
 <style>
 	body {
 		width: 100%;
@@ -58,7 +68,7 @@
 	}
 </style>
 </head>
-<body id="hud_builder">
+<body id="hud_builder" onload="UpdateChargeRingColor(document)" onshow="UpdateChargeRingColor(document)">
 	<div id="mine">
 		<predictedMineEfficiency />
 	</div>
