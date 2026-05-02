@@ -387,6 +387,7 @@ void Rocket_Init()
 	Rml::Lua::Interpreter::DoString(Str::Format("math.randomseed(%u)", BG_RandomEngine()()));
 	CG_Rocket_RegisterLuaCDataSource(Rml::Lua::Interpreter::GetLuaState());
 	CG_Rocket_RegisterLuaEvents(Rml::Lua::Interpreter::GetLuaState());
+	CG_Rocket_RegisterLuaStringUtils(Rml::Lua::Interpreter::GetLuaState());
 	CG_Rocket_InitializeLuaPlayer(Rml::Lua::Interpreter::GetLuaState());
 	BG_InitializeLuaConstants(Rml::Lua::Interpreter::GetLuaState());
 

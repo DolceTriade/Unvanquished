@@ -2193,6 +2193,88 @@ static bool Cmd_Class_internal( gentity_t *ent, const char *s, bool report )
 	return true;
 }
 
+static void Cmd_SpawnLoc_f( gentity_t *ent )
+{
+	char locationString[ MAX_TOKEN_CHARS ];
+	int location;
+	gentity_t *locationEnt;
+	team_t team;
+	vec3_t preference, spawn_origin, spawn_angles, teleport_origin;
+	gentity_t *spawnPoint;
+
+	if ( ent->client->pers.team != TEAM_ALIENS && ent->client->pers.team != TEAM_HUMANS )
+	{
+		return;
+	}
+
+	if ( trap_Argc() < 2 )
+	{
+		return;
+	}
+
+	trap_Argv( 1, locationString, sizeof( locationString ) );
+	location = atoi( locationString );
+	if ( location < 0 || location >= MAX_LOCATIONS )
+	{
+		return;
+	}
+
+	locationEnt = G_FindLocationEntity( location );
+	if ( location > 0 && !locationEnt )
+	{
+		return;
+	}
+
+	team = static_cast<team_t>( ent->client->pers.team );
+	ent->client->pers.spawnLocation = location;
+	ent->client->ps.persistant[ PERS_SPAWN_LOCATION ] = location;
+
+	if ( location <= 0 )
+	{
+		return;
+	}
+
+	if ( team != TEAM_HUMANS || Entities::IsDead( ent ) || ent->client->sess.spectatorState != SPECTATOR_NOT )
+	{
+		return;
+	}
+
+	int queueSkips = G_GetSpawnQueueLength( &level.team[ TEAM_HUMANS ].spawnQueue );
+
+	if ( locationEnt )
+	{
+		VectorCopy( locationEnt->r.currentOrigin, preference );
+	}
+	else
+	{
+		VectorCopy( ent->client->pers.lastDeathLocation, preference );
+	}
+
+	spawnPoint = G_SelectUnvanquishedSpawnPoint( team, preference, spawn_origin, spawn_angles, queueSkips );
+	if ( !spawnPoint )
+	{
+		trap_SendServerCommand( ent->num(), "print_tr " QQ( N_( "Cannot teleport: all spawns are reserved for queued players." ) ) );
+		return;
+	}
+
+	if ( spawnPoint->s.eType == entityType_t::ET_BUILDABLE )
+	{
+		G_SetBuildableAnim( spawnPoint, BANIM_SPAWN1, true );
+		spawnPoint->clientSpawnTime = HUMAN_SPAWN_REPEAT_TIME;
+
+		// Respawns link directly at the validated spawn point. Live teleport runs a killbox
+		// pass first, so move slightly farther along the spawn normal to avoid telefragging
+		// the telenode itself on exact box contact.
+		VectorMA( spawn_origin, 8.0f, spawnPoint->s.origin2, teleport_origin );
+	}
+	else
+	{
+		VectorCopy( spawn_origin, teleport_origin );
+	}
+
+	G_TeleportPlayer( ent, VEC2GLM( teleport_origin ), VEC2GLM( spawn_angles ), 0.0f );
+}
+
 static void Cmd_Class_f( gentity_t *ent )
 {
 	char s[ MAX_TOKEN_CHARS ];
@@ -4323,6 +4405,7 @@ static const commands_t cmds[] =
 	{ "score",           CMD_INTERMISSION,                    ScoreboardMessage      },
 	{ "sell",            CMD_HUMAN | CMD_ALIVE,               Cmd_Sell_f             },
 	{ "setviewpos",      CMD_CHEAT_TEAM,                      Cmd_SetViewpos_f       },
+	{ "spawnloc",        CMD_TEAM,                            Cmd_SpawnLoc_f         },
 	{ "tactic",          CMD_TEAM,                            Cmd_Tactic_f           },
 	{ "team",            0,                                   Cmd_Team_f             },
 	{ "teambuy",         CMD_TEAM | CMD_ALIVE,                Cmd_TeamBuy_f          },

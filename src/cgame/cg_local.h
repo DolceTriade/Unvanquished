@@ -1183,6 +1183,7 @@ struct cg_t
 	int bpVampire[ NUM_TEAMS ];
 	int bpVampireOld[ NUM_TEAMS ];
 	int bpVampireTime;
+	uint64_t spawnLocationMask;
 
 	std::string bpMessage;
 
@@ -1326,6 +1327,7 @@ enum rocketMenuType_t {
 	ROCKETMENU_DOWNLOADING,
 	ROCKETMENU_INGAME_MENU,
 	ROCKETMENU_TEAMSELECT,
+	ROCKETMENU_SPAWNLOC,
 	ROCKETMENU_HUMANSPAWN,
 	ROCKETMENU_ALIENSPAWN,
 	ROCKETMENU_ALIENBUILD,

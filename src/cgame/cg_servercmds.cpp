@@ -27,6 +27,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 // cg_servercmds.c -- reliably sequenced text commands sent by the server
 // these are processed at snapshot transition time, so there will definitely
 // be a valid snapshot this frame
+#include <cstdlib>
 #include <sstream>
 
 #include "common/Common.h"
@@ -115,6 +116,11 @@ static void CG_PrintBPMessage_f()
 {
 	// cg.bpMessage = TranslateText_Internal( false, 1 ); // Fuck do you mean it's not found?
 	cg.bpMessage = CG_Argv( 1 );
+}
+
+static void CG_ParseSpawnLocations()
+{
+	cg.spawnLocationMask = strtoull( CG_Argv( 1 ), nullptr, 16 );
 }
 
 static void CG_MarkOverloadMenuDirty()
@@ -587,6 +593,10 @@ static void CG_Menu( int menuType, int arg )
 
 		case MN_H_ARMOURY:
 			menu = ROCKETMENU_ARMOURYBUY;
+			break;
+
+		case MN_H_SPAWNLOC:
+			menu = ROCKETMENU_SPAWNLOC;
 			break;
 
 		case MN_H_UNKNOWNITEM:
@@ -1504,6 +1514,7 @@ static const consoleCommand_t svcommands[] =
 	{ "scores",           CG_ParseScores          },
 	{ "serverclosemenus", CG_ServerCloseMenus_f   },
 	{ "servermenu",       CG_ServerMenu_f         },
+	{ "spawnlocs",        CG_ParseSpawnLocations  },
 	{ "tinfo",            CG_ParseTeamInfo        },
 	{ "vcommand",         CG_VCommand             },
 	{ "voice",            CG_ParseVoice           }
