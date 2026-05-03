@@ -32,6 +32,11 @@
 		.filters {
 			margin: 0 0 0.9em 0;
 		}
+		.filter-label {
+			display: inline-block;
+			margin-right: 0.45em;
+			vertical-align: middle;
+		}
 		.filters button {
 			margin-right: 0.45em;
 			padding: 0.3em 0.65em;
@@ -150,6 +155,12 @@
 			text-align: right;
 			color: #8abdc2;
 		}
+		#upgradeNameFilter {
+			display: inline-block;
+			border: 1px;
+			width: 20em;
+			vertical-align: middle;
+		}
 	</style>
 	<script>
 		function printTable(t, indent)
@@ -188,6 +199,7 @@
 		end
 
 		OverloadFilter = "all"
+		OverloadUpgradeNameFilter = ""
 
 		function GroupLabel(group)
 			if group == nil or group == "" then return "" end
@@ -223,6 +235,12 @@
 			if OverloadFilter == "future" then return status == "locked" end
 			if OverloadFilter == "done" then return status == "owned" or status == "maxed" end
 			return true
+		end
+
+		function UpgradeFilterMatches(row)
+			if row.kind ~= "upgrade" then return true end
+			if OverloadUpgradeNameFilter == "" then return true end
+			return string.find(string.lower(row.name or ""), string.lower(OverloadUpgradeNameFilter), 1, true) ~= nil
 		end
 
 		function SetFilterButtonState(document, id, active)
@@ -320,7 +338,7 @@
 			local lastGroup = ""
 			for i = 1, #rows do
 				local row = rows[i]
-				if row.kind == filterKind and FilterMatches(row.status) then
+				if row.kind == filterKind and FilterMatches(row.status) and UpgradeFilterMatches(row) then
 					local typeClass = KindClass(row.kind)
 					if filterKind == "upgrade" and row.group ~= lastGroup then
 						html = html .. string.format('<div class="group-title">%s</div>', Rocket_QuakeToRML(GroupLabel(row.group)))
@@ -366,6 +384,11 @@
 			BuildOverloadMenu(document)
 		end
 
+		function OverloadSetUpgradeNameFilter(element, document)
+			OverloadUpgradeNameFilter = element.attributes["value"] or ""
+			BuildOverloadMenu(document)
+		end
+
 		function OverloadHandleKey(event, document)
 			if event.parameters.key_identifier == rmlui.key_identifier.ESCAPE then
 				Events.pushcmd("hide overload")
@@ -383,6 +406,9 @@
 			<button id="filterProgress" onclick="OverloadSetFilter('progress', document)"><translate>In Progress</translate></button>
 			<button id="filterFuture" onclick="OverloadSetFilter('future', document)"><translate>Future</translate></button>
 			<button id="filterDone" onclick="OverloadSetFilter('done', document)"><translate>Completed</translate></button>
+		</div>
+		<div class="filters">
+			<span class="filter-label">Filter:</span><input id="upgradeNameFilter" type="text" class="text" value="" onkeyup="OverloadSetUpgradeNameFilter(event.target_element, document)" placeholder="Filter upgrade names"/>
 		</div>
 		<div id="content">
 			<div class="section">

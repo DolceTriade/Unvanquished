@@ -95,6 +95,32 @@ static bool OverloadEntryMaxed( const cgOverloadCatalogEntry_t& entry, int index
 	       state.repeatCounts[ index ] >= entry.maxRanks;
 }
 
+static bool OverloadUpgradeHiddenUntilUnlocked( const cgOverloadCatalogEntry_t& entry, team_t team, const cgTeamEconomyState_t& state )
+{
+	if ( entry.kind != 2 )
+	{
+		return false;
+	}
+
+	for ( int i = 0; i < MAX_OVERLOAD_PURCHASES; ++i )
+	{
+		const cgOverloadCatalogEntry_t& candidate = rocketInfo.overloadCatalog[ i ];
+		if ( !candidate.valid || candidate.kind != 1 )
+		{
+			continue;
+		}
+
+		if ( candidate.team != team || Q_stricmp( candidate.thing, entry.thing ) )
+		{
+			continue;
+		}
+
+		return !state.ownedPurchases[ i ];
+	}
+
+	return false;
+}
+
 static std::string OverloadGroupForEntry( const cgOverloadCatalogEntry_t& entry )
 {
 	if ( entry.kind == 0 )
@@ -1615,6 +1641,11 @@ static void CG_Rocket_BuildOverloadList( const char *table )
 		}
 
 		if ( entry.team != TEAM_NONE && entry.team != team )
+		{
+			continue;
+		}
+
+		if ( OverloadUpgradeHiddenUntilUnlocked( entry, team, state ) )
 		{
 			continue;
 		}

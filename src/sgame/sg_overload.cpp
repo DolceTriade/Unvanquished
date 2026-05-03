@@ -715,26 +715,53 @@ static void BuildOverloadCatalog()
 	AddUnlockEntriesForFamily( BG_ATTR_BUILDABLE, UNLT_BUILDABLE, BA_NONE + 1, BA_NUM_BUILDABLES );
 	AddUnlockEntriesForFamily( BG_ATTR_CLASS, UNLT_CLASS, PCL_NONE + 1, PCL_NUM_CLASSES );
 
+	// Human weapon upgrades.
+	// Covered weapons: blaster, rifle, psaw, shotgun, lasgun, mdriver, chaingun, flamer, prifle, lcannon.
+	// No weapon overload upgrades should live outside this block.
+
+	// Human weapons: stage 1 / always available.
 	AddUpgrade( TEAM_HUMANS, 0, DefaultUpgradeBaseCost( 0 ), 100, OVERLOAD_UNCAPPED_RANKS, "rifle", "damage", "Rifle Damage", "Increase rifle damage.",
 	            { GameplayEffect( "RIFLE_DMG", 3.0 ) } );
-	AddUpgrade( TEAM_HUMANS, 0, DefaultUpgradeBaseCost( 0 ), 100, OVERLOAD_UNCAPPED_RANKS, "rifle", "clips", "Rifle Clips", "Increase rifle magazine count.",
-	            { AttributeEffect( BG_ATTR_WEAPON, "rifle", "clips", 1.0, 0.0 ) } );
+	AddUpgrade( TEAM_HUMANS, 0, DefaultUpgradeBaseCost( 0 ), 100, OVERLOAD_UNCAPPED_RANKS, "rifle", "ammo", "Rifle Ammo", "Increase rifle ammo reserve.",
+	            { AttributeEffect( BG_ATTR_WEAPON, "rifle", "ammo", 40.0, 1.0 ) } );
+	AddUpgrade( TEAM_HUMANS, 0, DefaultUpgradeBaseCost( 0 ), 100, OVERLOAD_UNCAPPED_RANKS, "psaw", "damage", "Pain Saw Damage", "Increase pain saw damage per hit.",
+	            { GameplayEffect( "PAINSAW_DAMAGE", 2.0, 1.0 ) } );
 	AddUpgrade( TEAM_HUMANS, 0, DefaultUpgradeBaseCost( 0 ), 100, OVERLOAD_UNCAPPED_RANKS, "shotgun", "damage", "Shotgun Damage", "Increase shotgun pellet damage.",
 	            { GameplayEffect( "SHOTGUN_DMG", 1.0 ) } );
-	AddUpgrade( TEAM_HUMANS, 0, DefaultUpgradeBaseCost( 0 ), 100, OVERLOAD_UNCAPPED_RANKS, "shotgun", "clips", "Shotgun Clips", "Increase shotgun magazine count.",
-	            { AttributeEffect( BG_ATTR_WEAPON, "shotgun", "clips", 1.0, 0.0 ) } );
+	AddUpgrade( TEAM_HUMANS, 0, DefaultUpgradeBaseCost( 0 ), 100, OVERLOAD_UNCAPPED_RANKS, "shotgun", "ammo", "Shotgun Ammo", "Increase shotgun ammo reserve.",
+	            { AttributeEffect( BG_ATTR_WEAPON, "shotgun", "ammo", 8.0, 1.0 ) } );
+
+	// Human weapons: stage 2 unlocks.
 	AddUpgrade( TEAM_HUMANS, 0, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), 125, OVERLOAD_UNCAPPED_RANKS, "lasgun", "damage", "Lasgun Damage", "Increase lasgun damage.",
 	            { GameplayEffect( "LASGUN_DAMAGE", 3.0 ) } );
 	AddUpgrade( TEAM_HUMANS, 0, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), 125, OVERLOAD_UNCAPPED_RANKS, "lasgun", "ammo", "Lasgun Ammo", "Increase lasgun ammo reserve.",
 	            { AttributeEffect( BG_ATTR_WEAPON, "lgun", "ammo", 25.0, 1.0 ) } );
+	AddUpgrade( TEAM_HUMANS, 0, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), 125, OVERLOAD_UNCAPPED_RANKS, "mdriver", "damage", "Mass Driver Damage", "Increase mass driver damage.",
+	            { GameplayEffect( "MDRIVER_DMG", 10.0 ) } );
+	AddUpgrade( TEAM_HUMANS, 0, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), 125, OVERLOAD_UNCAPPED_RANKS, "mdriver", "ammo", "Mass Driver Ammo", "Increase mass driver ammo reserve.",
+	            { AttributeEffect( BG_ATTR_WEAPON, "mdriver", "ammo", 2.0, 1.0 ) } );
 	AddUpgrade( TEAM_HUMANS, 0, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), 125, OVERLOAD_UNCAPPED_RANKS, "chaingun", "damage", "Chaingun Damage", "Increase chaingun damage.",
 	            { GameplayEffect( "CHAINGUN_DMG", 2.0 ) } );
-	AddUpgrade( TEAM_HUMANS, 0, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), 125, OVERLOAD_UNCAPPED_RANKS, "chaingun", "clips", "Chaingun Clips", "Increase chaingun magazine count.",
-	            { AttributeEffect( BG_ATTR_WEAPON, "chaingun", "clips", 1.0, 0.0 ) } );
+	AddUpgrade( TEAM_HUMANS, 0, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), 125, OVERLOAD_UNCAPPED_RANKS, "chaingun", "ammo", "Chaingun Ammo", "Increase chaingun ammo reserve.",
+	            { AttributeEffect( BG_ATTR_WEAPON, "chaingun", "ammo", 80.0, 1.0 ) } );
+	AddUpgrade( TEAM_HUMANS, 0, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), 125, OVERLOAD_UNCAPPED_RANKS, "flamer", "throw", "Flamer Throw", "Increase flamer projectile speed.",
+	            { GameplayEffect( "FLAMER_SPEED", 15.0, 1.0 ) } );
+	AddUpgrade( TEAM_HUMANS, 0, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), 125, OVERLOAD_UNCAPPED_RANKS, "flamer", "ammo", "Flamer Ammo", "Increase flamer ammo reserve.",
+	            { AttributeEffect( BG_ATTR_WEAPON, "flamer", "ammo", 50.0, 1.0 ) } );
+	AddUpgrade( TEAM_HUMANS, 0, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), 125, OVERLOAD_UNCAPPED_RANKS, "prifle", "damage", "Pulse Rifle Damage", "Increase pulse rifle projectile damage.",
+	            { AttributeEffect( BG_ATTR_MISSILE, "prifle", "damage", 2.0, 1.0 ) } );
+	AddUpgrade( TEAM_HUMANS, 0, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), 125, OVERLOAD_UNCAPPED_RANKS, "prifle", "ammo", "Pulse Rifle Ammo", "Increase pulse rifle ammo reserve.",
+	            { AttributeEffect( BG_ATTR_WEAPON, "prifle", "ammo", 10.0, 1.0 ) } );
+
+	// Human weapons: stage 3 unlocks.
 	AddUpgrade( TEAM_HUMANS, 0, DefaultUpgradeBaseCost( OVERLOAD_STAGE3_COUNT ), 150, OVERLOAD_UNCAPPED_RANKS, "lcannon", "damage", "Lucifer Cannon Damage", "Increase lucifer cannon damage.",
 	            { GameplayEffect( "LCANNON_DAMAGE", 15.0 ) } );
 	AddUpgrade( TEAM_HUMANS, 0, DefaultUpgradeBaseCost( OVERLOAD_STAGE3_COUNT ), 150, OVERLOAD_UNCAPPED_RANKS, "lcannon", "ammo", "Lucifer Cannon Ammo", "Increase lucifer cannon ammo reserve.",
 	            { AttributeEffect( BG_ATTR_WEAPON, "lcannon", "ammo", 10.0, 1.0 ) } );
+
+	// Human equipment upgrades.
+	// Covered upgrades: jetpack, medkit.
+	// Intentionally missing for now: lightarmour, medarmour, bsuit, radar, grenade, firebomb.
 	AddUpgrade( TEAM_HUMANS, 0, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), 125, OVERLOAD_UNCAPPED_RANKS, "jetpack", "fuel", "Jetpack Fuel", "Increase jetpack fuel capacity.",
 	            { GameplayEffect( "JETPACK_FUEL_MAX", 2500.0, 1.0 ) } );
 	AddUpgrade( TEAM_HUMANS, 0, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), 125, OVERLOAD_UNCAPPED_RANKS, "jetpack", "recharge", "Jetpack Recharge", "Increase jetpack fuel recharge.",
@@ -743,39 +770,54 @@ static void BuildOverloadCatalog()
 	            { GameplayEffect( "MEDKIT_STARTUP_SPEED", 50.0 ) } );
 	AddUpgrade( TEAM_HUMANS, 0, DefaultUpgradeBaseCost( 0 ), 100, OVERLOAD_UNCAPPED_RANKS, "medkit", "poison", "Medkit Poison Protection", "Extend medkit poison immunity.",
 	            { GameplayEffect( "MEDKIT_POISON_IMMUNITY_TIME", 1000.0, 0.0 ) } );
-	AddUpgrade( TEAM_HUMANS, 0, DefaultUpgradeBaseCost( 0 ), 100, OVERLOAD_UNCAPPED_RANKS, "mgturret", "range", "Machinegun Turret Range", "Increase machinegun turret range.",
-	            { GameplayEffect( "MGTURRET_RANGE", 25.0 ) } );
-	AddUpgrade( TEAM_HUMANS, 0, DefaultUpgradeBaseCost( 0 ), 100, OVERLOAD_UNCAPPED_RANKS, "mgturret", "repeat", "Machinegun Turret Rate", "Increase machinegun turret fire rate.",
-	            { GameplayEffect( "MGTURRET_ATTACK_PERIOD", -10.0, 25.0 ) } );
-	AddUpgrade( TEAM_HUMANS, 0, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), 125, OVERLOAD_UNCAPPED_RANKS, "rocketpod", "range", "Rocketpod Range", "Increase rocketpod range.",
-	            { GameplayEffect( "ROCKETPOD_RANGE", 80.0 ) } );
-	AddUpgrade( TEAM_HUMANS, 0, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), 125, OVERLOAD_UNCAPPED_RANKS, "rocketpod", "repeat", "Rocketpod Rate", "Increase rocketpod fire rate.",
-	            { GameplayEffect( "ROCKETPOD_ATTACK_PERIOD", -75.0, 250.0 ) } );
 
+	// Human buildable weapon upgrades.
+	// Covered buildables: mgturret, rocketpod.
+	AddUpgrade( TEAM_HUMANS, 0, DefaultUpgradeBaseCost( 0 ), 100, OVERLOAD_UNCAPPED_RANKS, "mgturret", "damage", "Machinegun Turret Damage", "Increase machinegun turret damage.",
+	            { GameplayEffect( "MGTURRET_MIN_DAMAGE", 1.0, 0.0 ),
+	              GameplayEffect( "MGTURRET_MAX_DAMAGE", 2.0, 1.0 ) } );
+	AddUpgrade( TEAM_HUMANS, 0, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), 125, OVERLOAD_UNCAPPED_RANKS, "rocketpod", "damage", "Rocketpod Damage", "Increase rocketpod rocket damage.",
+	            { AttributeEffect( BG_ATTR_MISSILE, "rocket", "damage", 12.0, 1.0 ),
+	              AttributeEffect( BG_ATTR_MISSILE, "rocket", "splash_damage", 8.0, 0.0 ) } );
+
+	// Alien buildable upgrades.
+	// Covered buildables: acid_tube, hive, trapper.
+	AddUpgrade( TEAM_ALIENS, 0, DefaultUpgradeBaseCost( 0 ), 100, OVERLOAD_UNCAPPED_RANKS, "acid_tube", "damage", "Acid Tube Damage", "Increase acid tube damage per second.",
+	            { GameplayEffect( "ACIDTUBE_DAMAGE", 2.0, 1.0 ) } );
+	AddUpgrade( TEAM_ALIENS, 0, DefaultUpgradeBaseCost( OVERLOAD_STAGE3_COUNT ), 150, OVERLOAD_UNCAPPED_RANKS, "hive", "damage", "Hive Damage", "Increase hive missile damage.",
+	            { AttributeEffect( BG_ATTR_MISSILE, "hive", "damage", 8.0, 1.0 ) } );
+	AddUpgrade( TEAM_ALIENS, 0, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), 125, OVERLOAD_UNCAPPED_RANKS, "trapper", "health", "Trapper Health", "Increase trapper durability.",
+	            { AttributeEffect( BG_ATTR_BUILDABLE, "trapper", "health", 15.0, 1.0 ) } );
+
+	// Alien class upgrades.
+	// Covered classes: dretch, mantis, adv_mantis, marauder, dragoon, adv_dragoon, tyrant.
+	// Intentionally missing for now: basilisk, adv_basilisk, granger, adv_granger.
 	AddUpgrade( TEAM_ALIENS, 0, DefaultUpgradeBaseCost( 0 ), 100, OVERLOAD_UNCAPPED_RANKS, "dretch", "damage", "Dretch Damage", "Increase dretch bite damage.",
 	            { GameplayEffect( "LEVEL0_BITE_DMG", 3.0 ) } );
 	AddUpgrade( TEAM_ALIENS, 0, DefaultUpgradeBaseCost( 0 ), 100, OVERLOAD_UNCAPPED_RANKS, "dretch", "range", "Dretch Range", "Increase dretch bite range.",
 	            { GameplayEffect( "LEVEL0_BITE_RANGE", 5.0 ) } );
 	AddUpgrade( TEAM_ALIENS, 0, DefaultUpgradeBaseCost( 0 ), 100, OVERLOAD_UNCAPPED_RANKS, "mantis", "damage", "Mantis Damage", "Increase mantis claw damage.",
-	            { GameplayEffect( "LEVEL2_CLAW_DMG", 4.0 ) } );
+	            { GameplayEffect( "LEVEL1_CLAW_DMG", 4.0 ) } );
 	AddUpgrade( TEAM_ALIENS, 0, DefaultUpgradeBaseCost( 0 ), 100, OVERLOAD_UNCAPPED_RANKS, "mantis", "range", "Mantis Range", "Increase mantis claw range.",
-	            { GameplayEffect( "LEVEL2_CLAW_RANGE", 5.0 ) } );
+	            { GameplayEffect( "LEVEL1_CLAW_RANGE", 5.0 ) } );
 	AddUpgrade( TEAM_ALIENS, 0, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), 125, OVERLOAD_UNCAPPED_RANKS, "adv_mantis", "damage", "Advanced Mantis Zap Damage", "Increase advanced mantis zap damage.",
 	            { GameplayEffect( "LEVEL2_AREAZAP_DMG", 4.0 ) } );
 	AddUpgrade( TEAM_ALIENS, 0, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), 125, OVERLOAD_UNCAPPED_RANKS, "adv_mantis", "range", "Advanced Mantis Zap Range", "Increase advanced mantis zap range.",
 	            { GameplayEffect( "LEVEL2_AREAZAP_RANGE", 10.0 ) } );
-	AddUpgrade( TEAM_ALIENS, 0, DefaultUpgradeBaseCost( 0 ), 100, OVERLOAD_UNCAPPED_RANKS, "marauder", "damage", "Marauder Damage", "Increase marauder zap damage.",
-	            { GameplayEffect( "LEVEL2_AREAZAP_DMG", 4.0 ) } );
-	AddUpgrade( TEAM_ALIENS, 0, DefaultUpgradeBaseCost( 0 ), 100, OVERLOAD_UNCAPPED_RANKS, "marauder", "range", "Marauder Range", "Increase marauder zap range.",
-	            { GameplayEffect( "LEVEL2_AREAZAP_RANGE", 10.0 ) } );
+	AddUpgrade( TEAM_ALIENS, 0, DefaultUpgradeBaseCost( 0 ), 100, OVERLOAD_UNCAPPED_RANKS, "marauder", "damage", "Marauder Damage", "Increase marauder claw damage.",
+	            { GameplayEffect( "LEVEL2_CLAW_DMG", 4.0 ) } );
+	AddUpgrade( TEAM_ALIENS, 0, DefaultUpgradeBaseCost( 0 ), 100, OVERLOAD_UNCAPPED_RANKS, "marauder", "range", "Marauder Range", "Increase marauder claw range.",
+	            { GameplayEffect( "LEVEL2_CLAW_RANGE", 5.0 ) } );
 	AddUpgrade( TEAM_ALIENS, 0, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), 125, OVERLOAD_UNCAPPED_RANKS, "dragoon", "damage", "Dragoon Damage", "Increase dragoon claw damage.",
 	            { GameplayEffect( "LEVEL3_CLAW_DMG", 5.0 ) } );
+	AddUpgrade( TEAM_ALIENS, 0, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), 125, OVERLOAD_UNCAPPED_RANKS, "dragoon", "claw_range", "Dragoon Claw Range", "Increase dragoon claw range for both base and advanced forms.",
+	            { GameplayEffect( "LEVEL3_CLAW_RANGE", 5.0 ),
+	              GameplayEffect( "LEVEL3_CLAW_UPG_RANGE", 5.0 ) } );
 	AddUpgrade( TEAM_ALIENS, 0, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), 125, OVERLOAD_UNCAPPED_RANKS, "dragoon", "pounce_damage", "Dragoon Pounce Damage", "Increase dragoon pounce damage.",
 	            { GameplayEffect( "LEVEL3_POUNCE_DMG", 10.0 ) } );
-	AddUpgrade( TEAM_ALIENS, 0, DefaultUpgradeBaseCost( OVERLOAD_STAGE3_COUNT ), 150, OVERLOAD_UNCAPPED_RANKS, "adv_dragoon", "damage", "Advanced Dragoon Damage", "Increase advanced dragoon claw damage.",
-	            { GameplayEffect( "LEVEL3_CLAW_DMG", 5.0 ) } );
-	AddUpgrade( TEAM_ALIENS, 0, DefaultUpgradeBaseCost( OVERLOAD_STAGE3_COUNT ), 150, OVERLOAD_UNCAPPED_RANKS, "adv_dragoon", "pounce_range", "Advanced Dragoon Pounce Range", "Increase advanced dragoon pounce range.",
-	            { GameplayEffect( "LEVEL3_POUNCE_UPG_RANGE", 15.0 ) } );
+	AddUpgrade( TEAM_ALIENS, 0, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), 125, OVERLOAD_UNCAPPED_RANKS, "dragoon", "pounce_range", "Dragoon Pounce Range", "Increase dragoon pounce range for both base and advanced forms.",
+	            { GameplayEffect( "LEVEL3_POUNCE_RANGE", 12.0 ),
+	              GameplayEffect( "LEVEL3_POUNCE_UPG_RANGE", 12.0 ) } );
 	AddUpgrade( TEAM_ALIENS, 0, DefaultUpgradeBaseCost( OVERLOAD_STAGE3_COUNT ), 150, OVERLOAD_UNCAPPED_RANKS, "tyrant", "damage", "Tyrant Damage", "Increase tyrant claw damage.",
 	            { GameplayEffect( "LEVEL4_CLAW_DMG", 8.0 ) } );
 	AddUpgrade( TEAM_ALIENS, 0, DefaultUpgradeBaseCost( OVERLOAD_STAGE3_COUNT ), 150, OVERLOAD_UNCAPPED_RANKS, "tyrant", "trample_damage", "Tyrant Trample Damage", "Increase tyrant trample damage.",
