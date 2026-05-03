@@ -606,6 +606,11 @@ void G_InitGame( int levelTime, int randomSeed, bool inClient )
 	// load up a custom building layout if there is one
 	G_LayoutLoad();
 
+	// Seed cached spawn-location masks from the initial builtin/custom layout so the
+	// first client receives the correct spawn list before any later build event occurs.
+	G_UpdateSpawnLocationMask( TEAM_ALIENS );
+	G_UpdateSpawnLocationMask( TEAM_HUMANS );
+
 	// Initialize item locking state
 	BG_InitUnlockackables();
 
