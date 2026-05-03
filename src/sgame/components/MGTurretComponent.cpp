@@ -3,8 +3,6 @@
 
 #include <glm/geometric.hpp>
 
-constexpr float MAX_DAMAGE           = 4.0f;
-constexpr float MIN_DAMAGE           = 2.0f;
 constexpr int   TARGET_SEARCH_PERIOD = 500;
 
 MGTurretComponent::MGTurretComponent(Entity& entity, HumanBuildableComponent& r_HumanBuildableComponent, TurretComponent& r_TurretComponent)
@@ -127,7 +125,7 @@ void MGTurretComponent::Shoot() {
 		G_Distance(entity.oldEnt, target->oldEnt) / MGTURRET_RANGE, 0.0f, 1.0f
 	);
 
-	float damage = MIN_DAMAGE + (MAX_DAMAGE - MIN_DAMAGE) * damageMod;
+	float damage = MGTURRET_MIN_DAMAGE + (MGTURRET_MAX_DAMAGE - MGTURRET_MIN_DAMAGE) * damageMod;
 
 	entity.oldEnt->turretCurrentDamage = damage;
 	G_AddEvent(entity.oldEnt, EV_FIRE_WEAPON, 0);

@@ -6,7 +6,6 @@
 
 class AcidTubeComponent: public AcidTubeComponentBase {
 	public:
-		const static float ATTACK_DAMAGE;
 		const static float ATTACK_RANGE;
 		const static int   ATTACK_ANIM_PERIOD;
 

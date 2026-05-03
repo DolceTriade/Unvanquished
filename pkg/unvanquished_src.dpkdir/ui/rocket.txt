@@ -28,7 +28,7 @@
 		ui/human_build.rml human_build passthrough             // ROCKETMENU_HUMANBUILD
 		ui/human_buy.rml human_buy                             // ROCKETMENU_ARMOURYBUY
 		ui/alien_evo.rml alien_evo passthrough                 // ROCKETMENU_ALIENEVOLVE
-		ui/overload.rml overload passthrough                   // ROCKETMENU_OVERLOAD
+		ui/overload.rml overload                               // ROCKETMENU_OVERLOAD
 		ui/ingame_chat.rml ingame_chat                         // ROCKETMENU_CHAT
 		ui/ingame_beaconmenu.rml ingame_beaconmenu passthrough // ROCKETMENU_BEACONS
 		ui/error.rml error                                     // ROCKETMENU_ERROR

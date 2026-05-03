@@ -2,7 +2,6 @@
 #include "AcidTubeComponent.h"
 #include "../Entities.h"
 
-const float AcidTubeComponent::ATTACK_DAMAGE      = 20.0f;
 const float AcidTubeComponent::ATTACK_RANGE       = ACIDTUBE_RANGE;
 const int   AcidTubeComponent::ATTACK_ANIM_PERIOD = 2000;
 
@@ -16,7 +15,7 @@ AcidTubeComponent::AcidTubeComponent(Entity& entity, AlienBuildableComponent& r_
 void AcidTubeComponent::ConsiderAttack(int timeDelta) {
 	if (!GetAlienBuildableComponent().GetBuildableComponent().Active()) return;
 
-	bool attacking = Entities::AntiHumanRadiusDamage(entity, ATTACK_DAMAGE * timeDelta * 0.001f,
+	bool attacking = Entities::AntiHumanRadiusDamage(entity, ACIDTUBE_DAMAGE * timeDelta * 0.001f,
 	                                                 ATTACK_RANGE, MOD_ATUBE);
 
 	if (attacking && (lastAttackAnimation < 0 || level.time - lastAttackAnimation > 2000)) {
