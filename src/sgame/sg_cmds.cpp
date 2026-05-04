@@ -602,7 +602,7 @@ static void Cmd_Give_printUsage( gentity_t *ent )
 {
 	ADMP( QQ( N_( "usage: give [what]" ) ) );
 	ADMP( QQ( N_( "usage: valid choices are: all, health [amount], funds [amount], "
-	              "bp [amount], stamina, poison, fuel, ammo" ) ) );
+	              "bp [amount], unlocks, stamina, poison, fuel, ammo" ) ) );
 }
 static void Cmd_Give_f( gentity_t *ent )
 {
@@ -656,6 +656,12 @@ static void Cmd_Give_f( gentity_t *ent )
 			level.team[ent->client->pers.team].totalBudget +=
 				static_cast<int>( amount );
 		}
+	}
+
+	if ( team != TEAM_NONE && Q_stricmp( name, "unlocks" ) == 0 )
+	{
+		valid = true;
+		G_OverloadUnlockAll( team );
 	}
 
 	if ( Entities::IsDead( ent ) || ent->client->sess.spectatorState != SPECTATOR_NOT )
@@ -2972,6 +2978,7 @@ static bool Cmd_Buy_internal( gentity_t *ent, const char *s, bool sellConflictin
 			ent->client->ps.stats[ STAT_CLASS ] = PCL_HUMAN_LIGHT;
 			ent->client->pers.classSelection = PCL_HUMAN_LIGHT;
 			ent->client->ps.eFlags ^= EF_TELEPORT_BIT;
+			ent->entity->Get<HealthComponent>()->SetMaxHealth( BG_Class( PCL_HUMAN_LIGHT )->health, true );
 		}
 		else if ( upgrade == UP_MEDIUMARMOUR )
 		{
@@ -2985,6 +2992,7 @@ static bool Cmd_Buy_internal( gentity_t *ent, const char *s, bool sellConflictin
 			ent->client->ps.stats[ STAT_CLASS ] = PCL_HUMAN_MEDIUM;
 			ent->client->pers.classSelection = PCL_HUMAN_MEDIUM;
 			ent->client->ps.eFlags ^= EF_TELEPORT_BIT;
+			ent->entity->Get<HealthComponent>()->SetMaxHealth( BG_Class( PCL_HUMAN_MEDIUM )->health, true );
 		}
 		else if ( upgrade == UP_BATTLESUIT )
 		{
@@ -2998,6 +3006,7 @@ static bool Cmd_Buy_internal( gentity_t *ent, const char *s, bool sellConflictin
 			ent->client->ps.stats[ STAT_CLASS ] = PCL_HUMAN_BSUIT;
 			ent->client->pers.classSelection = PCL_HUMAN_BSUIT;
 			ent->client->ps.eFlags ^= EF_TELEPORT_BIT;
+			ent->entity->Get<HealthComponent>()->SetMaxHealth( BG_Class( PCL_HUMAN_BSUIT )->health, true );
 		}
 
 		//add to inventory

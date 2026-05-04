@@ -120,7 +120,8 @@ void G_UpdateUnlockables()
 		unlockable->unlockThreshold = unlockThreshold;
 		unlockable->lockThreshold   = BG_UnlockToLockThreshold( unlockThreshold );
 
-		if ( rawThreshold == 0 )
+		if ( rawThreshold == 0 &&
+		     !G_OverloadHasUnlockEntry( team, static_cast<unlockableType_t>( unlockableType ), itemNum ) )
 		{
 			unlockable->unlocked = true;
 		}
