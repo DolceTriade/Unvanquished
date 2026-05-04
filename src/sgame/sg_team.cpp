@@ -200,6 +200,9 @@ void G_UpdateTeamConfigStrings()
 	trap_SetConfigstringRestrictions( CS_VOTE_STRING + static_cast<int>(TEAM_HUMANS), &alienTeam );
 	trap_SetConfigstringRestrictions( CS_VOTE_YES + static_cast<int>(TEAM_HUMANS),    &alienTeam );
 	trap_SetConfigstringRestrictions( CS_VOTE_NO + static_cast<int>(TEAM_HUMANS),     &alienTeam );
+
+	trap_SetConfigstringRestrictions( CS_OVERLOAD + TEAM_ALIENS,    &humanTeam );
+	trap_SetConfigstringRestrictions( CS_OVERLOAD + TEAM_HUMANS,    &alienTeam );
 }
 
 /*
