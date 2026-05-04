@@ -87,6 +87,7 @@ std::vector<overloadPurchaseDef_t> overloadPurchases;
 bool overloadCatalogReady = false;
 
 static void BuildOverloadCatalog();
+static int FindUnlockThresholdField( bgAttributeFamily_t family );
 
 static int weaponUnlockPurchaseIndex[ NUM_TEAMS ][ WP_NUM_WEAPONS ];
 static int upgradeUnlockPurchaseIndex[ NUM_TEAMS ][ UP_NUM_UPGRADES ];
@@ -160,10 +161,6 @@ static void CheckOverloadCatalogReady()
 	}
 }
 
-constexpr int OVERLOAD_STAGE2_COUNT = 3;
-constexpr int OVERLOAD_STAGE3_COUNT = 6;
-constexpr int OVERLOAD_BP_BUNDLE_COST = 350;
-constexpr int OVERLOAD_BP_BUNDLE_AMOUNT = 25;
 constexpr int OVERLOAD_UNCAPPED_RANKS = std::numeric_limits<int>::max();
 
 static int InitialBudgetForTeam( team_t team )
@@ -205,9 +202,14 @@ static int ScaleOverloadCost( team_t team, int cost )
 	return static_cast<int>( ( scaled + 999 ) / 1000 );
 }
 
+static int CatalogCost( int cost )
+{
+	return cost * OVERLOAD_PRICE_MULTIPLIER;
+}
+
 static int OverloadNextCost( const overloadPurchaseDef_t& entry, int entryIndex, team_t team )
 {
-	if ( entry.kind == overloadPurchaseKind_t::UPGRADE )
+	if ( entry.kind == overloadPurchaseKind_t::UPGRADE || entry.kind == overloadPurchaseKind_t::BP_BUNDLE )
 	{
 		return ScaleOverloadCost( team, entry.baseCost + TeamEconomy( team ).repeatCounts[ entryIndex ] * entry.costStep );
 	}
@@ -605,9 +607,18 @@ static overloadEffect_t AttributeEffect( bgAttributeFamily_t family, const char*
 	return effect;
 }
 
+static overloadEffect_t PercentAttributeEffect( bgAttributeFamily_t family, const char* objectName, const char* fieldName, double fraction,
+                                                double minValue = -std::numeric_limits<double>::infinity(),
+                                                double maxValue = std::numeric_limits<double>::infinity() )
+{
+	overloadEffect_t effect = AttributeEffect( family, objectName, fieldName, 0.0, minValue, maxValue );
+	effect.step = effect.baseline * fraction;
+	return effect;
+}
+
 static int DefaultUpgradeBaseCost( int requiredCompletedCount )
 {
-	return 250 + requiredCompletedCount * 50;
+	return CatalogCost( 250 + requiredCompletedCount * 50 );
 }
 
 static int UnlockCost( bgAttributeFamily_t family, int objectIndex, int requiredCompletedCount )
@@ -623,7 +634,7 @@ static int UnlockCost( bgAttributeFamily_t family, int objectIndex, int required
 		default: intrinsic = 0; break;
 	}
 
-	return std::max( 200 + requiredCompletedCount * 50, intrinsic );
+	return CatalogCost( std::max( 200 + requiredCompletedCount * 50, intrinsic ) );
 }
 
 static void AddUpgrade( team_t team, int requiredCompletedCount, int baseCost, int costStep, int maxRanks,
@@ -649,9 +660,9 @@ static void AddUpgrade( team_t team, int requiredCompletedCount, int baseCost, i
 	overloadPurchases.push_back( std::move( entry ) );
 }
 
-static void AddUnlock( team_t team, int requiredCompletedCount, unlockableType_t unlockableType, int itemNum,
-                       bgAttributeFamily_t family, int objectIndex, int unlockField,
-                       const char* thing, const char* displayName, const char* uiDescription )
+static void AddUnlockWithCost( team_t team, int requiredCompletedCount, unlockableType_t unlockableType, int itemNum,
+                               bgAttributeFamily_t family, int objectIndex, int unlockField, int baseCost,
+                               const char* thing, const char* displayName, const char* uiDescription )
 {
 	overloadPurchaseDef_t entry{};
 	entry.kind = overloadPurchaseKind_t::UNLOCK;
@@ -660,7 +671,7 @@ static void AddUnlock( team_t team, int requiredCompletedCount, unlockableType_t
 	entry.displayName = displayName;
 	entry.uiDescription = uiDescription;
 	entry.requiredCompletedCount = requiredCompletedCount;
-	entry.baseCost = UnlockCost( family, objectIndex, requiredCompletedCount );
+	entry.baseCost = baseCost;
 	entry.costStep = 0;
 	entry.bundleAmount = 0;
 	entry.maxRanks = 1;
@@ -669,6 +680,169 @@ static void AddUnlock( team_t team, int requiredCompletedCount, unlockableType_t
 	entry.unlockField = unlockField;
 	overloadPurchases.push_back( std::move( entry ) );
 	SetUnlockPurchaseIndex( team, unlockableType, itemNum, static_cast<int>( overloadPurchases.size() ) - 1 );
+}
+
+static void AddUnlock( team_t team, int requiredCompletedCount, unlockableType_t unlockableType, int itemNum,
+                       bgAttributeFamily_t family, int objectIndex, int unlockField,
+                       const char* thing, const char* displayName, const char* uiDescription )
+{
+	AddUnlockWithCost( team, requiredCompletedCount, unlockableType, itemNum, family, objectIndex, unlockField,
+	                   UnlockCost( family, objectIndex, requiredCompletedCount ),
+	                   thing, displayName, uiDescription );
+}
+
+static void AddWeaponUnlock( team_t team, int requiredCompletedCount, weapon_t weapon )
+{
+	const int unlockField = FindUnlockThresholdField( BG_ATTR_WEAPON );
+	const int objectIndex = BG_FindAttributeObject( BG_ATTR_WEAPON, BG_Weapon( weapon )->name );
+	if ( objectIndex < 0 || unlockField < 0 )
+	{
+		Sys::Error( "AddWeaponUnlock: could not resolve attribute data for %s", BG_Weapon( weapon )->name );
+	}
+
+	std::string displayName = UnlockableDisplayName( UNLT_WEAPON, weapon );
+	std::string uiDescription = UnlockableDescription( UNLT_WEAPON, weapon );
+	AddUnlock( team, requiredCompletedCount, UNLT_WEAPON, weapon, BG_ATTR_WEAPON, objectIndex, unlockField,
+	           OverloadThingName( UNLT_WEAPON, weapon ), displayName.c_str(), uiDescription.c_str() );
+}
+
+static void AddUpgradeUnlock( team_t team, int requiredCompletedCount, upgrade_t upgrade )
+{
+	const int unlockField = FindUnlockThresholdField( BG_ATTR_UPGRADE );
+	const int objectIndex = BG_FindAttributeObject( BG_ATTR_UPGRADE, BG_Upgrade( upgrade )->name );
+	if ( objectIndex < 0 || unlockField < 0 )
+	{
+		Sys::Error( "AddUpgradeUnlock: could not resolve attribute data for %s", BG_Upgrade( upgrade )->name );
+	}
+
+	std::string displayName = UnlockableDisplayName( UNLT_UPGRADE, upgrade );
+	std::string uiDescription = UnlockableDescription( UNLT_UPGRADE, upgrade );
+	AddUnlock( team, requiredCompletedCount, UNLT_UPGRADE, upgrade, BG_ATTR_UPGRADE, objectIndex, unlockField,
+	           OverloadThingName( UNLT_UPGRADE, upgrade ), displayName.c_str(), uiDescription.c_str() );
+}
+
+static void AddBuildableUnlock( team_t team, int requiredCompletedCount, buildable_t buildable )
+{
+	const int unlockField = FindUnlockThresholdField( BG_ATTR_BUILDABLE );
+	const int objectIndex = BG_FindAttributeObject( BG_ATTR_BUILDABLE, BG_Buildable( buildable )->name );
+	if ( objectIndex < 0 || unlockField < 0 )
+	{
+		Sys::Error( "AddBuildableUnlock: could not resolve attribute data for %s", BG_Buildable( buildable )->name );
+	}
+
+	std::string displayName = UnlockableDisplayName( UNLT_BUILDABLE, buildable );
+	std::string uiDescription = UnlockableDescription( UNLT_BUILDABLE, buildable );
+	AddUnlock( team, requiredCompletedCount, UNLT_BUILDABLE, buildable, BG_ATTR_BUILDABLE, objectIndex, unlockField,
+	           OverloadThingName( UNLT_BUILDABLE, buildable ), displayName.c_str(), uiDescription.c_str() );
+}
+
+static void AddClassUnlock( team_t team, int requiredCompletedCount, class_t classNum )
+{
+	const int unlockField = FindUnlockThresholdField( BG_ATTR_CLASS );
+	const int objectIndex = BG_FindAttributeObject( BG_ATTR_CLASS, BG_Class( classNum )->name );
+	if ( objectIndex < 0 || unlockField < 0 )
+	{
+		Sys::Error( "AddClassUnlock: could not resolve attribute data for %s", BG_Class( classNum )->name );
+	}
+
+	std::string displayName = UnlockableDisplayName( UNLT_CLASS, classNum );
+	std::string uiDescription = UnlockableDescription( UNLT_CLASS, classNum );
+	AddUnlock( team, requiredCompletedCount, UNLT_CLASS, classNum, BG_ATTR_CLASS, objectIndex, unlockField,
+	           OverloadThingName( UNLT_CLASS, classNum ), displayName.c_str(), uiDescription.c_str() );
+}
+
+static bool UpgradePrerequisiteMetForValidation( const overloadPurchaseDef_t& entry, team_t team, const std::vector<bool>& ownedUnlocks )
+{
+	for ( size_t i = 0; i < overloadPurchases.size(); ++i )
+	{
+		const overloadPurchaseDef_t& candidate = overloadPurchases[ i ];
+		if ( candidate.kind != overloadPurchaseKind_t::UNLOCK || candidate.team != team )
+		{
+			continue;
+		}
+
+		if ( Q_stricmp( candidate.thing.c_str(), entry.thing.c_str() ) )
+		{
+			continue;
+		}
+
+		return ownedUnlocks[ i ];
+	}
+
+	return true;
+}
+
+static void ValidateOverloadGraph()
+{
+	for ( team_t team = TEAM_NONE; ( team = G_IterateTeams( team ) ); )
+	{
+		std::vector<bool> ownedUnlocks( overloadPurchases.size(), false );
+		int reachableCompletedPurchases = 0;
+		bool infiniteProgression = false;
+		bool changed = true;
+
+		while ( changed && !infiniteProgression )
+		{
+			changed = false;
+
+			for ( size_t i = 0; i < overloadPurchases.size(); ++i )
+			{
+				const overloadPurchaseDef_t& entry = overloadPurchases[ i ];
+				if ( entry.kind != overloadPurchaseKind_t::UNLOCK || entry.team != team || ownedUnlocks[ i ] )
+				{
+					continue;
+				}
+
+				if ( entry.requiredCompletedCount > reachableCompletedPurchases )
+				{
+					continue;
+				}
+
+				ownedUnlocks[ i ] = true;
+				++reachableCompletedPurchases;
+				changed = true;
+			}
+
+			for ( const overloadPurchaseDef_t& entry : overloadPurchases )
+			{
+				if ( entry.kind != overloadPurchaseKind_t::UPGRADE || entry.team != team )
+				{
+					continue;
+				}
+
+				if ( entry.requiredCompletedCount > reachableCompletedPurchases )
+				{
+					continue;
+				}
+
+				if ( UpgradePrerequisiteMetForValidation( entry, team, ownedUnlocks ) )
+				{
+					infiniteProgression = true;
+					break;
+				}
+			}
+		}
+
+		if ( infiniteProgression )
+		{
+			continue;
+		}
+
+		for ( const overloadPurchaseDef_t& entry : overloadPurchases )
+		{
+			if ( entry.team != team || entry.kind == overloadPurchaseKind_t::BP_BUNDLE )
+			{
+				continue;
+			}
+
+			if ( entry.requiredCompletedCount > reachableCompletedPurchases )
+			{
+				Sys::Error( "Overload graph broken for team %d: %s '%s' requires %d completed purchases, but only %d are reachable before progression stalls",
+				            team, PurchaseKindToken( entry.kind ), entry.thing.c_str(),
+				            entry.requiredCompletedCount, reachableCompletedPurchases );
+			}
+		}
+	}
 }
 
 static int FindUnlockThresholdField( bgAttributeFamily_t family )
@@ -681,70 +855,6 @@ static int FindUnlockThresholdField( bgAttributeFamily_t family )
 
 	// Tolerate legacy camelCase naming if a family ever exposes it that way.
 	return BG_FindAttributeField( family, "unlockThreshold" );
-}
-
-static void AddUnlockEntriesForFamily( bgAttributeFamily_t family, unlockableType_t unlockableType, int start, int end )
-{
-	const int unlockField = FindUnlockThresholdField( family );
-	if ( unlockField < 0 )
-	{
-		Sys::Error( "unlockThreshold field missing for family %d", family );
-	}
-
-	for ( int itemNum = start; itemNum < end; ++itemNum )
-	{
-		team_t team = TEAM_NONE;
-		int unlockThreshold = 0;
-		const char* thing = nullptr;
-
-		switch ( unlockableType )
-		{
-			case UNLT_WEAPON:
-				team = BG_Weapon( itemNum )->team;
-				unlockThreshold = BG_Weapon( itemNum )->unlockThreshold;
-				thing = BG_Weapon( itemNum )->name;
-				break;
-
-			case UNLT_UPGRADE:
-				team = BG_Upgrade( itemNum )->team;
-				unlockThreshold = BG_Upgrade( itemNum )->unlockThreshold;
-				thing = BG_Upgrade( itemNum )->name;
-				break;
-
-			case UNLT_BUILDABLE:
-				team = BG_Buildable( itemNum )->team;
-				unlockThreshold = BG_Buildable( itemNum )->unlockThreshold;
-				thing = BG_Buildable( itemNum )->name;
-				break;
-
-			case UNLT_CLASS:
-				team = BG_Class( itemNum )->team;
-				unlockThreshold = BG_Class( itemNum )->unlockThreshold;
-				thing = BG_Class( itemNum )->name;
-				break;
-
-			case UNLT_NUM_UNLOCKABLETYPES:
-				Sys::Error( "AddUnlockEntriesForFamily: invalid unlockable type" );
-		}
-
-		if ( !G_IsPlayableTeam( team ) || unlockThreshold <= 0 )
-		{
-			continue;
-		}
-
-		const int objectIndex = BG_FindAttributeObject( family, thing );
-		if ( objectIndex < 0 )
-		{
-			Sys::Error( "could not resolve attribute object for %s", thing );
-		}
-
-		const int requiredCompletedCount = BG_NormalizeUnlockThreshold( unlockThreshold );
-		const char* purchaseThing = OverloadThingName( unlockableType, itemNum );
-		std::string displayName = UnlockableDisplayName( unlockableType, itemNum );
-		std::string uiDescription = UnlockableDescription( unlockableType, itemNum );
-		AddUnlock( team, requiredCompletedCount, unlockableType, itemNum, family, objectIndex, unlockField,
-		           purchaseThing, displayName.c_str(), uiDescription.c_str() );
-	}
 }
 
 static void BuildOverloadCatalog()
@@ -760,12 +870,12 @@ static void BuildOverloadCatalog()
 	overloadPurchaseDef_t bpBundle{};
 	bpBundle.kind = overloadPurchaseKind_t::BP_BUNDLE;
 	bpBundle.team = TEAM_NONE;
-	bpBundle.thing = "bp_25";
-	bpBundle.displayName = "BP +25";
-	bpBundle.uiDescription = "Add 25 team BP.";
+	bpBundle.thing = "bp";
+	bpBundle.displayName = "BP +50";
+	bpBundle.uiDescription = "Add 50 team BP. Each bundle costs more than the last.";
 	bpBundle.requiredCompletedCount = 0;
 	bpBundle.baseCost = OVERLOAD_BP_BUNDLE_COST;
-	bpBundle.costStep = 0;
+	bpBundle.costStep = OVERLOAD_BP_BUNDLE_COST_STEP;
 	bpBundle.bundleAmount = OVERLOAD_BP_BUNDLE_AMOUNT;
 	bpBundle.maxRanks = std::numeric_limits<int>::max();
 	bpBundle.unlockFamily = BG_NUM_ATTRIBUTE_FAMILIES;
@@ -773,117 +883,133 @@ static void BuildOverloadCatalog()
 	bpBundle.unlockField = -1;
 	overloadPurchases.push_back( bpBundle );
 
-	AddUnlockEntriesForFamily( BG_ATTR_WEAPON, UNLT_WEAPON, WP_NONE + 1, WP_NUM_WEAPONS );
-	AddUnlockEntriesForFamily( BG_ATTR_UPGRADE, UNLT_UPGRADE, UP_NONE + 1, UP_NUM_UPGRADES );
-	AddUnlockEntriesForFamily( BG_ATTR_BUILDABLE, UNLT_BUILDABLE, BA_NONE + 1, BA_NUM_BUILDABLES );
-	AddUnlockEntriesForFamily( BG_ATTR_CLASS, UNLT_CLASS, PCL_NONE + 1, PCL_NUM_CLASSES );
+	AddWeaponUnlock( TEAM_HUMANS, 0, WP_PAIN_SAW );
+	AddWeaponUnlock( TEAM_HUMANS, 0, WP_SHOTGUN );
+	AddWeaponUnlock( TEAM_HUMANS, 0, WP_MASS_DRIVER );
+	AddWeaponUnlock( TEAM_HUMANS, 0, WP_CHAINGUN );
+	AddWeaponUnlock( TEAM_HUMANS, OVERLOAD_STAGE2_COUNT, WP_FLAMER );
+	AddWeaponUnlock( TEAM_HUMANS, OVERLOAD_STAGE2_COUNT, WP_PULSE_RIFLE );
+	AddWeaponUnlock( TEAM_HUMANS, OVERLOAD_STAGE3_COUNT, WP_LUCIFER_CANNON );
+	AddUpgradeUnlock( TEAM_HUMANS, OVERLOAD_STAGE2_COUNT, UP_MEDIUMARMOUR );
+	AddUpgradeUnlock( TEAM_HUMANS, OVERLOAD_STAGE2_COUNT, UP_RADAR );
+	AddUpgradeUnlock( TEAM_HUMANS, OVERLOAD_STAGE2_COUNT, UP_JETPACK );
+	AddUpgradeUnlock( TEAM_HUMANS, OVERLOAD_STAGE2_COUNT, UP_BIOKIT );
+	AddUpgradeUnlock( TEAM_HUMANS, OVERLOAD_STAGE3_COUNT, UP_BATTLESUIT );
+	AddUpgradeUnlock( TEAM_HUMANS, OVERLOAD_STAGE3_COUNT, UP_GRENADE );
+	AddUpgradeUnlock( TEAM_HUMANS, OVERLOAD_STAGE3_COUNT, UP_FIREBOMB );
+	AddBuildableUnlock( TEAM_HUMANS, OVERLOAD_STAGE2_COUNT, BA_H_ROCKETPOD );
+
+	AddBuildableUnlock( TEAM_ALIENS, 0, BA_A_BOOSTER );
+	AddBuildableUnlock( TEAM_ALIENS, 0, BA_A_SPIKER );
+	AddBuildableUnlock( TEAM_ALIENS, OVERLOAD_STAGE2_COUNT, BA_A_TRAPPER );
+	AddBuildableUnlock( TEAM_ALIENS, OVERLOAD_STAGE2_COUNT, BA_A_HIVE );
+	AddClassUnlock( TEAM_ALIENS, 0, PCL_ALIEN_LEVEL2 );
+	AddClassUnlock( TEAM_ALIENS, OVERLOAD_STAGE2_COUNT, PCL_ALIEN_BUILDER0_UPG );
+	AddClassUnlock( TEAM_ALIENS, OVERLOAD_STAGE2_COUNT, PCL_ALIEN_LEVEL2_UPG );
+	AddClassUnlock( TEAM_ALIENS, OVERLOAD_STAGE2_COUNT, PCL_ALIEN_LEVEL3 );
+	AddClassUnlock( TEAM_ALIENS, OVERLOAD_STAGE3_COUNT, PCL_ALIEN_LEVEL3_UPG );
+	AddClassUnlock( TEAM_ALIENS, OVERLOAD_STAGE3_COUNT, PCL_ALIEN_LEVEL4 );
 
 	// Human weapon upgrades.
 	// Covered weapons: blaster, rifle, psaw, shotgun, lasgun, mdriver, chaingun, flamer, prifle, lcannon.
 	// No weapon overload upgrades should live outside this block.
 
 	// Human weapons: stage 1 / always available.
-	AddUpgrade( TEAM_HUMANS, 0, DefaultUpgradeBaseCost( 0 ), 100, OVERLOAD_UNCAPPED_RANKS, "rifle", "damage", "Rifle Damage", "Increase rifle damage.",
+	AddUpgrade( TEAM_HUMANS, OVERLOAD_STAGE2_COUNT, DefaultUpgradeBaseCost( 0 ), CatalogCost( 100 ), OVERLOAD_UNCAPPED_RANKS, "rifle", "damage", "Rifle Damage", "Increase rifle damage.",
 	            { GameplayEffect( "RIFLE_DMG", 3.0 ) } );
-	AddUpgrade( TEAM_HUMANS, 0, DefaultUpgradeBaseCost( 0 ), 100, OVERLOAD_UNCAPPED_RANKS, "rifle", "ammo", "Rifle Ammo", "Increase rifle ammo reserve.",
+	AddUpgrade( TEAM_HUMANS, OVERLOAD_STAGE2_COUNT, DefaultUpgradeBaseCost( 0 ), CatalogCost( 100 ), OVERLOAD_UNCAPPED_RANKS, "rifle", "ammo", "Rifle Ammo", "Increase rifle ammo reserve.",
 	            { AttributeEffect( BG_ATTR_WEAPON, "rifle", "ammo", 40.0, 1.0 ) } );
-	AddUpgrade( TEAM_HUMANS, 0, DefaultUpgradeBaseCost( 0 ), 100, OVERLOAD_UNCAPPED_RANKS, "psaw", "damage", "Pain Saw Damage", "Increase pain saw damage per hit.",
+	AddUpgrade( TEAM_HUMANS, OVERLOAD_STAGE2_COUNT, DefaultUpgradeBaseCost( 0 ), CatalogCost( 100 ), OVERLOAD_UNCAPPED_RANKS, "psaw", "damage", "Pain Saw Damage", "Increase pain saw damage per hit.",
 	            { GameplayEffect( "PAINSAW_DAMAGE", 2.0, 1.0 ) } );
-	AddUpgrade( TEAM_HUMANS, 0, DefaultUpgradeBaseCost( 0 ), 100, OVERLOAD_UNCAPPED_RANKS, "shotgun", "damage", "Shotgun Damage", "Increase shotgun pellet damage.",
+	AddUpgrade( TEAM_HUMANS, OVERLOAD_STAGE2_COUNT, DefaultUpgradeBaseCost( 0 ), CatalogCost( 100 ), OVERLOAD_UNCAPPED_RANKS, "shotgun", "damage", "Shotgun Damage", "Increase shotgun pellet damage.",
 	            { GameplayEffect( "SHOTGUN_DMG", 1.0 ) } );
-	AddUpgrade( TEAM_HUMANS, 0, DefaultUpgradeBaseCost( 0 ), 100, OVERLOAD_UNCAPPED_RANKS, "shotgun", "ammo", "Shotgun Ammo", "Increase shotgun ammo reserve.",
+	AddUpgrade( TEAM_HUMANS, OVERLOAD_STAGE2_COUNT, DefaultUpgradeBaseCost( 0 ), CatalogCost( 100 ), OVERLOAD_UNCAPPED_RANKS, "shotgun", "ammo", "Shotgun Ammo", "Increase shotgun ammo reserve.",
 	            { AttributeEffect( BG_ATTR_WEAPON, "shotgun", "ammo", 8.0, 1.0 ) } );
 
 	// Human weapons: stage 2 unlocks.
-	AddUpgrade( TEAM_HUMANS, 0, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), 125, OVERLOAD_UNCAPPED_RANKS, "lgun", "damage", "Lasgun Damage", "Increase lasgun damage.",
+	AddUpgrade( TEAM_HUMANS, OVERLOAD_STAGE2_COUNT, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), CatalogCost( 125 ), OVERLOAD_UNCAPPED_RANKS, "lgun", "damage", "Lasgun Damage", "Increase lasgun damage.",
 	            { GameplayEffect( "LASGUN_DAMAGE", 3.0 ) } );
-	AddUpgrade( TEAM_HUMANS, 0, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), 125, OVERLOAD_UNCAPPED_RANKS, "lgun", "ammo", "Lasgun Ammo", "Increase lasgun ammo reserve.",
+	AddUpgrade( TEAM_HUMANS, OVERLOAD_STAGE2_COUNT, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), CatalogCost( 125 ), OVERLOAD_UNCAPPED_RANKS, "lgun", "ammo", "Lasgun Ammo", "Increase lasgun ammo reserve.",
 	            { AttributeEffect( BG_ATTR_WEAPON, "lgun", "ammo", 25.0, 1.0 ) } );
-	AddUpgrade( TEAM_HUMANS, 0, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), 125, OVERLOAD_UNCAPPED_RANKS, "mdriver", "damage", "Mass Driver Damage", "Increase mass driver damage.",
+	AddUpgrade( TEAM_HUMANS, OVERLOAD_STAGE2_COUNT, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), CatalogCost( 125 ), OVERLOAD_UNCAPPED_RANKS, "mdriver", "damage", "Mass Driver Damage", "Increase mass driver damage.",
 	            { GameplayEffect( "MDRIVER_DMG", 10.0 ) } );
-	AddUpgrade( TEAM_HUMANS, 0, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), 125, OVERLOAD_UNCAPPED_RANKS, "mdriver", "ammo", "Mass Driver Ammo", "Increase mass driver ammo reserve.",
+	AddUpgrade( TEAM_HUMANS, OVERLOAD_STAGE2_COUNT, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), CatalogCost( 125 ), OVERLOAD_UNCAPPED_RANKS, "mdriver", "ammo", "Mass Driver Ammo", "Increase mass driver ammo reserve.",
 	            { AttributeEffect( BG_ATTR_WEAPON, "mdriver", "ammo", 2.0, 1.0 ) } );
-	AddUpgrade( TEAM_HUMANS, 0, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), 125, OVERLOAD_UNCAPPED_RANKS, "chaingun", "damage", "Chaingun Damage", "Increase chaingun damage.",
+	AddUpgrade( TEAM_HUMANS, OVERLOAD_STAGE2_COUNT, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), CatalogCost( 125 ), OVERLOAD_UNCAPPED_RANKS, "chaingun", "damage", "Chaingun Damage", "Increase chaingun damage.",
 	            { GameplayEffect( "CHAINGUN_DMG", 2.0 ) } );
-	AddUpgrade( TEAM_HUMANS, 0, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), 125, OVERLOAD_UNCAPPED_RANKS, "chaingun", "ammo", "Chaingun Ammo", "Increase chaingun ammo reserve.",
+	AddUpgrade( TEAM_HUMANS, OVERLOAD_STAGE2_COUNT, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), CatalogCost( 125 ), OVERLOAD_UNCAPPED_RANKS, "chaingun", "ammo", "Chaingun Ammo", "Increase chaingun ammo reserve.",
 	            { AttributeEffect( BG_ATTR_WEAPON, "chaingun", "ammo", 80.0, 1.0 ) } );
-	AddUpgrade( TEAM_HUMANS, 0, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), 125, OVERLOAD_UNCAPPED_RANKS, "flamer", "throw", "Flamer Throw", "Increase flamer projectile speed.",
-	            { GameplayEffect( "FLAMER_SPEED", 15.0, 1.0 ) } );
-	AddUpgrade( TEAM_HUMANS, 0, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), 125, OVERLOAD_UNCAPPED_RANKS, "flamer", "ammo", "Flamer Ammo", "Increase flamer ammo reserve.",
+	AddUpgrade( TEAM_HUMANS, OVERLOAD_STAGE2_COUNT, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), CatalogCost( 125 ), OVERLOAD_UNCAPPED_RANKS, "flamer", "ammo", "Flamer Ammo", "Increase flamer ammo reserve.",
 	            { AttributeEffect( BG_ATTR_WEAPON, "flamer", "ammo", 50.0, 1.0 ) } );
-	AddUpgrade( TEAM_HUMANS, 0, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), 125, OVERLOAD_UNCAPPED_RANKS, "prifle", "damage", "Pulse Rifle Damage", "Increase pulse rifle projectile damage.",
+	AddUpgrade( TEAM_HUMANS, OVERLOAD_STAGE2_COUNT, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), CatalogCost( 125 ), OVERLOAD_UNCAPPED_RANKS, "prifle", "damage", "Pulse Rifle Damage", "Increase pulse rifle projectile damage.",
 	            { AttributeEffect( BG_ATTR_MISSILE, "prifle", "damage", 2.0, 1.0 ) } );
-	AddUpgrade( TEAM_HUMANS, 0, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), 125, OVERLOAD_UNCAPPED_RANKS, "prifle", "ammo", "Pulse Rifle Ammo", "Increase pulse rifle ammo reserve.",
+	AddUpgrade( TEAM_HUMANS, OVERLOAD_STAGE2_COUNT, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), CatalogCost( 125 ), OVERLOAD_UNCAPPED_RANKS, "prifle", "ammo", "Pulse Rifle Ammo", "Increase pulse rifle ammo reserve.",
 	            { AttributeEffect( BG_ATTR_WEAPON, "prifle", "ammo", 10.0, 1.0 ) } );
 
 	// Human weapons: stage 3 unlocks.
-	AddUpgrade( TEAM_HUMANS, 0, DefaultUpgradeBaseCost( OVERLOAD_STAGE3_COUNT ), 150, OVERLOAD_UNCAPPED_RANKS, "lcannon", "damage", "Lucifer Cannon Damage", "Increase lucifer cannon damage.",
+	AddUpgrade( TEAM_HUMANS, OVERLOAD_STAGE2_COUNT, DefaultUpgradeBaseCost( OVERLOAD_STAGE3_COUNT ), CatalogCost( 150 ), OVERLOAD_UNCAPPED_RANKS, "lcannon", "damage", "Lucifer Cannon Damage", "Increase lucifer cannon damage.",
 	            { GameplayEffect( "LCANNON_DAMAGE", 15.0 ) } );
-	AddUpgrade( TEAM_HUMANS, 0, DefaultUpgradeBaseCost( OVERLOAD_STAGE3_COUNT ), 150, OVERLOAD_UNCAPPED_RANKS, "lcannon", "ammo", "Lucifer Cannon Ammo", "Increase lucifer cannon ammo reserve.",
+	AddUpgrade( TEAM_HUMANS, OVERLOAD_STAGE2_COUNT, DefaultUpgradeBaseCost( OVERLOAD_STAGE3_COUNT ), CatalogCost( 150 ), OVERLOAD_UNCAPPED_RANKS, "lcannon", "ammo", "Lucifer Cannon Ammo", "Increase lucifer cannon ammo reserve.",
 	            { AttributeEffect( BG_ATTR_WEAPON, "lcannon", "ammo", 10.0, 1.0 ) } );
 
 	// Human equipment upgrades.
 	// Covered upgrades: jetpack, medkit.
 	// Intentionally missing for now: lightarmour, medarmour, bsuit, radar, grenade, firebomb.
-	AddUpgrade( TEAM_HUMANS, 0, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), 125, OVERLOAD_UNCAPPED_RANKS, "jetpack", "fuel", "Jetpack Fuel", "Increase jetpack fuel capacity.",
+	AddUpgrade( TEAM_HUMANS, OVERLOAD_STAGE2_COUNT, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), CatalogCost( 150 ), OVERLOAD_UNCAPPED_RANKS, "armor", "integrity", "Armor Integrity", "Increase max health for all human armour classes.",
+	            { PercentAttributeEffect( BG_ATTR_CLASS, "human_light", "health", 0.05, 1.0 ),
+	              PercentAttributeEffect( BG_ATTR_CLASS, "human_medium", "health", 0.05, 1.0 ),
+	              PercentAttributeEffect( BG_ATTR_CLASS, "human_bsuit", "health", 0.05, 1.0 ) } );
+	AddUpgrade( TEAM_HUMANS, OVERLOAD_STAGE2_COUNT, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), CatalogCost( 125 ), OVERLOAD_UNCAPPED_RANKS, "jetpack", "fuel", "Jetpack Fuel", "Increase jetpack fuel capacity.",
 	            { GameplayEffect( "JETPACK_FUEL_MAX", 2500.0, 1.0 ) } );
-	AddUpgrade( TEAM_HUMANS, 0, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), 125, OVERLOAD_UNCAPPED_RANKS, "jetpack", "recharge", "Jetpack Recharge", "Increase jetpack fuel recharge.",
-	            { GameplayEffect( "JETPACK_FUEL_RESTORE", 1.0, 1.0 ) } );
-	AddUpgrade( TEAM_HUMANS, 0, DefaultUpgradeBaseCost( 0 ), 100, OVERLOAD_UNCAPPED_RANKS, "medkit", "startup", "Medkit Startup", "Speed up medkit activation.",
-	            { GameplayEffect( "MEDKIT_STARTUP_SPEED", 50.0 ) } );
-	AddUpgrade( TEAM_HUMANS, 0, DefaultUpgradeBaseCost( 0 ), 100, OVERLOAD_UNCAPPED_RANKS, "medkit", "poison", "Medkit Poison Protection", "Extend medkit poison immunity.",
+	AddUpgrade( TEAM_HUMANS, OVERLOAD_STAGE2_COUNT, DefaultUpgradeBaseCost( 0 ), CatalogCost( 100 ), OVERLOAD_UNCAPPED_RANKS, "medkit", "poison", "Medkit Poison Protection", "Extend medkit poison immunity.",
 	            { GameplayEffect( "MEDKIT_POISON_IMMUNITY_TIME", 1000.0, 0.0 ) } );
 
 	// Human buildable weapon upgrades.
 	// Covered buildables: mgturret, rocketpod.
-	AddUpgrade( TEAM_HUMANS, 0, DefaultUpgradeBaseCost( 0 ), 100, OVERLOAD_UNCAPPED_RANKS, "mgturret", "damage", "Machinegun Turret Damage", "Increase machinegun turret damage.",
+	AddUpgrade( TEAM_HUMANS, OVERLOAD_STAGE2_COUNT, DefaultUpgradeBaseCost( 0 ), CatalogCost( 100 ), OVERLOAD_UNCAPPED_RANKS, "mgturret", "damage", "Machinegun Turret Damage", "Increase machinegun turret damage.",
 	            { GameplayEffect( "MGTURRET_MIN_DAMAGE", 1.0, 0.0 ),
 	              GameplayEffect( "MGTURRET_MAX_DAMAGE", 2.0, 1.0 ) } );
-	AddUpgrade( TEAM_HUMANS, 0, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), 125, OVERLOAD_UNCAPPED_RANKS, "rocketpod", "damage", "Rocketpod Damage", "Increase rocketpod rocket damage.",
+	AddUpgrade( TEAM_HUMANS, OVERLOAD_STAGE2_COUNT, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), CatalogCost( 125 ), OVERLOAD_UNCAPPED_RANKS, "rocketpod", "damage", "Rocketpod Damage", "Increase rocketpod rocket damage.",
 	            { AttributeEffect( BG_ATTR_MISSILE, "rocket", "damage", 12.0, 1.0 ),
 	              AttributeEffect( BG_ATTR_MISSILE, "rocket", "splash_damage", 8.0, 0.0 ) } );
 
 	// Alien buildable upgrades.
 	// Covered buildables: acid_tube, hive, trapper.
-	AddUpgrade( TEAM_ALIENS, 0, DefaultUpgradeBaseCost( 0 ), 100, OVERLOAD_UNCAPPED_RANKS, "acid_tube", "damage", "Acid Tube Damage", "Increase acid tube damage per second.",
+	AddUpgrade( TEAM_ALIENS, OVERLOAD_STAGE2_COUNT, DefaultUpgradeBaseCost( 0 ), CatalogCost( 100 ), OVERLOAD_UNCAPPED_RANKS, "acid_tube", "damage", "Acid Tube Damage", "Increase acid tube damage per second.",
 	            { GameplayEffect( "ACIDTUBE_DAMAGE", 2.0, 1.0 ) } );
-	AddUpgrade( TEAM_ALIENS, 0, DefaultUpgradeBaseCost( OVERLOAD_STAGE3_COUNT ), 150, OVERLOAD_UNCAPPED_RANKS, "hive", "damage", "Hive Damage", "Increase hive missile damage.",
+	AddUpgrade( TEAM_ALIENS, OVERLOAD_STAGE2_COUNT, DefaultUpgradeBaseCost( OVERLOAD_STAGE3_COUNT ), CatalogCost( 150 ), OVERLOAD_UNCAPPED_RANKS, "hive", "damage", "Hive Damage", "Increase hive missile damage.",
 	            { AttributeEffect( BG_ATTR_MISSILE, "hive", "damage", 8.0, 1.0 ) } );
-	AddUpgrade( TEAM_ALIENS, 0, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), 125, OVERLOAD_UNCAPPED_RANKS, "trapper", "health", "Trapper Health", "Increase trapper durability.",
+	AddUpgrade( TEAM_ALIENS, OVERLOAD_STAGE2_COUNT, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), CatalogCost( 125 ), OVERLOAD_UNCAPPED_RANKS, "trapper", "health", "Trapper Health", "Increase trapper durability.",
 	            { AttributeEffect( BG_ATTR_BUILDABLE, "trapper", "health", 15.0, 1.0 ) } );
 
 	// Alien class upgrades.
-	// Covered classes: dretch, mantis, adv_mantis, marauder, dragoon, adv_dragoon, tyrant.
-	// Intentionally missing for now: basilisk, adv_basilisk, granger, adv_granger.
-	AddUpgrade( TEAM_ALIENS, 0, DefaultUpgradeBaseCost( 0 ), 100, OVERLOAD_UNCAPPED_RANKS, "level0", "damage", "Dretch Damage", "Increase dretch bite damage.",
+	// Covered classes: dretch, level1 scout, marauder, advanced marauder, dragoon, advanced dragoon, tyrant.
+	// Intentionally missing for now: granger, advanced granger.
+	AddUpgrade( TEAM_ALIENS, OVERLOAD_STAGE2_COUNT, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), CatalogCost( 150 ), OVERLOAD_UNCAPPED_RANKS, "aliens", "vitality", "Alien Vitality", "Increase max health for all alien classes.",
+	            { PercentAttributeEffect( BG_ATTR_CLASS, "builder", "health", 0.05, 1.0 ),
+	              PercentAttributeEffect( BG_ATTR_CLASS, "builderupg", "health", 0.05, 1.0 ),
+	              PercentAttributeEffect( BG_ATTR_CLASS, "level0", "health", 0.05, 1.0 ),
+	              PercentAttributeEffect( BG_ATTR_CLASS, "level1", "health", 0.05, 1.0 ),
+	              PercentAttributeEffect( BG_ATTR_CLASS, "level2", "health", 0.05, 1.0 ),
+	              PercentAttributeEffect( BG_ATTR_CLASS, "level2upg", "health", 0.05, 1.0 ),
+	              PercentAttributeEffect( BG_ATTR_CLASS, "level3", "health", 0.05, 1.0 ),
+	              PercentAttributeEffect( BG_ATTR_CLASS, "level3upg", "health", 0.05, 1.0 ),
+	              PercentAttributeEffect( BG_ATTR_CLASS, "level4", "health", 0.05, 1.0 ) } );
+	AddUpgrade( TEAM_ALIENS, OVERLOAD_STAGE2_COUNT, DefaultUpgradeBaseCost( 0 ), CatalogCost( 100 ), OVERLOAD_UNCAPPED_RANKS, "level0", "damage", "Dretch Damage", "Increase dretch bite damage.",
 	            { GameplayEffect( "LEVEL0_BITE_DMG", 3.0 ) } );
-	AddUpgrade( TEAM_ALIENS, 0, DefaultUpgradeBaseCost( 0 ), 100, OVERLOAD_UNCAPPED_RANKS, "level0", "range", "Dretch Range", "Increase dretch bite range.",
-	            { GameplayEffect( "LEVEL0_BITE_RANGE", 5.0 ) } );
-	AddUpgrade( TEAM_ALIENS, 0, DefaultUpgradeBaseCost( 0 ), 100, OVERLOAD_UNCAPPED_RANKS, "level1", "damage", "Mantis Damage", "Increase mantis claw damage.",
+	AddUpgrade( TEAM_ALIENS, OVERLOAD_STAGE2_COUNT, DefaultUpgradeBaseCost( 0 ), CatalogCost( 100 ), OVERLOAD_UNCAPPED_RANKS, "level1", "damage", "Mantis Damage", "Increase mantis claw damage.",
 	            { GameplayEffect( "LEVEL1_CLAW_DMG", 4.0 ) } );
-	AddUpgrade( TEAM_ALIENS, 0, DefaultUpgradeBaseCost( 0 ), 100, OVERLOAD_UNCAPPED_RANKS, "level1", "range", "Mantis Range", "Increase mantis claw range.",
-	            { GameplayEffect( "LEVEL1_CLAW_RANGE", 5.0 ) } );
-	AddUpgrade( TEAM_ALIENS, 0, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), 125, OVERLOAD_UNCAPPED_RANKS, "level2upg", "damage", "Advanced Mantis Zap Damage", "Increase advanced mantis zap damage.",
+	AddUpgrade( TEAM_ALIENS, OVERLOAD_STAGE2_COUNT, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), CatalogCost( 125 ), OVERLOAD_UNCAPPED_RANKS, "level2upg", "damage", "Advanced Marauder Zap Damage", "Increase advanced marauder zap damage.",
 	            { GameplayEffect( "LEVEL2_AREAZAP_DMG", 4.0 ) } );
-	AddUpgrade( TEAM_ALIENS, 0, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), 125, OVERLOAD_UNCAPPED_RANKS, "level2upg", "range", "Advanced Mantis Zap Range", "Increase advanced mantis zap range.",
-	            { GameplayEffect( "LEVEL2_AREAZAP_RANGE", 10.0 ) } );
-	AddUpgrade( TEAM_ALIENS, 0, DefaultUpgradeBaseCost( 0 ), 100, OVERLOAD_UNCAPPED_RANKS, "level2", "damage", "Marauder Damage", "Increase marauder claw damage.",
+	AddUpgrade( TEAM_ALIENS, OVERLOAD_STAGE2_COUNT, DefaultUpgradeBaseCost( 0 ), CatalogCost( 100 ), OVERLOAD_UNCAPPED_RANKS, "level2", "damage", "Marauder Damage", "Increase marauder claw damage.",
 	            { GameplayEffect( "LEVEL2_CLAW_DMG", 4.0 ) } );
-	AddUpgrade( TEAM_ALIENS, 0, DefaultUpgradeBaseCost( 0 ), 100, OVERLOAD_UNCAPPED_RANKS, "level2", "range", "Marauder Range", "Increase marauder claw range.",
-	            { GameplayEffect( "LEVEL2_CLAW_RANGE", 5.0 ) } );
-	AddUpgrade( TEAM_ALIENS, 0, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), 125, OVERLOAD_UNCAPPED_RANKS, "level3", "damage", "Dragoon Damage", "Increase dragoon claw damage.",
+	AddUpgrade( TEAM_ALIENS, OVERLOAD_STAGE2_COUNT, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), CatalogCost( 125 ), OVERLOAD_UNCAPPED_RANKS, "level3", "damage", "Dragoon Damage", "Increase dragoon claw damage.",
 	            { GameplayEffect( "LEVEL3_CLAW_DMG", 5.0 ) } );
-	AddUpgrade( TEAM_ALIENS, 0, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), 125, OVERLOAD_UNCAPPED_RANKS, "level3", "claw_range", "Dragoon Claw Range", "Increase dragoon claw range for both base and advanced forms.",
-	            { GameplayEffect( "LEVEL3_CLAW_RANGE", 5.0 ),
-	              GameplayEffect( "LEVEL3_CLAW_UPG_RANGE", 5.0 ) } );
-	AddUpgrade( TEAM_ALIENS, 0, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), 125, OVERLOAD_UNCAPPED_RANKS, "level3", "pounce_damage", "Dragoon Pounce Damage", "Increase dragoon pounce damage.",
+	AddUpgrade( TEAM_ALIENS, OVERLOAD_STAGE2_COUNT, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), CatalogCost( 125 ), OVERLOAD_UNCAPPED_RANKS, "level3", "pounce_damage", "Dragoon Pounce Damage", "Increase dragoon pounce damage.",
 	            { GameplayEffect( "LEVEL3_POUNCE_DMG", 10.0 ) } );
-	AddUpgrade( TEAM_ALIENS, 0, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), 125, OVERLOAD_UNCAPPED_RANKS, "level3", "pounce_range", "Dragoon Pounce Range", "Increase dragoon pounce range for both base and advanced forms.",
-	            { GameplayEffect( "LEVEL3_POUNCE_RANGE", 12.0 ),
-	              GameplayEffect( "LEVEL3_POUNCE_UPG_RANGE", 12.0 ) } );
-	AddUpgrade( TEAM_ALIENS, 0, DefaultUpgradeBaseCost( OVERLOAD_STAGE3_COUNT ), 150, OVERLOAD_UNCAPPED_RANKS, "level4", "damage", "Tyrant Damage", "Increase tyrant claw damage.",
+	AddUpgrade( TEAM_ALIENS, OVERLOAD_STAGE2_COUNT, DefaultUpgradeBaseCost( OVERLOAD_STAGE3_COUNT ), CatalogCost( 150 ), OVERLOAD_UNCAPPED_RANKS, "level4", "damage", "Tyrant Damage", "Increase tyrant claw damage.",
 	            { GameplayEffect( "LEVEL4_CLAW_DMG", 8.0 ) } );
-	AddUpgrade( TEAM_ALIENS, 0, DefaultUpgradeBaseCost( OVERLOAD_STAGE3_COUNT ), 150, OVERLOAD_UNCAPPED_RANKS, "level4", "trample_damage", "Tyrant Trample Damage", "Increase tyrant trample damage.",
+	AddUpgrade( TEAM_ALIENS, OVERLOAD_STAGE2_COUNT, DefaultUpgradeBaseCost( OVERLOAD_STAGE3_COUNT ), CatalogCost( 150 ), OVERLOAD_UNCAPPED_RANKS, "level4", "trample_damage", "Tyrant Trample Damage", "Increase tyrant trample damage.",
 	            { GameplayEffect( "LEVEL4_TRAMPLE_DMG", 10.0 ) } );
 
 	if ( overloadPurchases.size() > MAX_OVERLOAD_PURCHASES )
@@ -891,6 +1017,8 @@ static void BuildOverloadCatalog()
 		Sys::Error( "Overload purchase catalog exceeds MAX_OVERLOAD_PURCHASES (%zu > %d)",
 		            overloadPurchases.size(), MAX_OVERLOAD_PURCHASES );
 	}
+
+	ValidateOverloadGraph();
 
 	overloadCatalogReady = true;
 }
@@ -1026,9 +1154,12 @@ static int RanksCompletedFromSpend( const overloadPurchaseDef_t& entry, int curr
 
 	if ( entry.kind == overloadPurchaseKind_t::BP_BUNDLE )
 	{
-		const int threshold = ScaleOverloadCost( team, entry.baseCost );
-		const int completed = investedCredits / threshold;
-		investedCredits %= threshold;
+		int completed = 0;
+		while ( investedCredits >= ScaleOverloadCost( team, entry.baseCost + ( currentRank + completed ) * entry.costStep ) )
+		{
+			investedCredits -= ScaleOverloadCost( team, entry.baseCost + ( currentRank + completed ) * entry.costStep );
+			++completed;
+		}
 		return completed;
 	}
 
@@ -1361,6 +1492,52 @@ bool G_OverloadUnlockPurchased( team_t team, unlockableType_t type, int itemNum 
 
 	int purchaseIndex = GetUnlockPurchaseIndex( team, type, itemNum );
 	return purchaseIndex >= 0 && TeamEconomy( team ).ownedPurchases[ purchaseIndex ];
+}
+
+bool G_OverloadHasUnlockEntry( team_t team, unlockableType_t type, int itemNum )
+{
+	if ( !G_IsPlayableTeam( team ) )
+	{
+		return false;
+	}
+
+	CheckOverloadCatalogReady();
+	return GetUnlockPurchaseIndex( team, type, itemNum ) >= 0;
+}
+
+void G_OverloadUnlockAll( team_t team )
+{
+	if ( !G_IsPlayableTeam( team ) )
+	{
+		return;
+	}
+
+	CheckOverloadCatalogReady();
+
+	TeamEconomyState& economy = TeamEconomy( team );
+
+	for ( size_t i = 0; i < overloadPurchases.size(); ++i )
+	{
+		const overloadPurchaseDef_t& entry = overloadPurchases[ i ];
+		if ( entry.kind != overloadPurchaseKind_t::UNLOCK || entry.team != team )
+		{
+			continue;
+		}
+
+		if ( economy.ownedPurchases[ i ] )
+		{
+			continue;
+		}
+
+		economy.ownedPurchases[ i ] = true;
+		economy.repeatCounts[ i ] = 1;
+		economy.investedCredits[ i ] = 0;
+		economy.completedPurchases += 1;
+	}
+
+	ApplyAllOverloadState();
+	SyncOverloadProgress( team );
+	G_PublishOverloadState( team );
 }
 
 bool G_OverloadPurchase( gentity_t *ent, const Cmd::Args& args, std::string* message )
