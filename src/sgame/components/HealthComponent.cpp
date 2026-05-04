@@ -251,8 +251,9 @@ void HealthComponent::SetMaxHealth(float maxHealth, bool scaleHealth) {
 
 	healthLogger.Debug("Changing maximum health: %3.1f → %3.1f.", this->maxHealth, maxHealth);
 
+	float oldMaxHealth = HealthComponent::maxHealth;
 	HealthComponent::maxHealth = maxHealth;
-	if (scaleHealth) SetHealth(health * (this->maxHealth / maxHealth));
+	if (scaleHealth) SetHealth(health * (maxHealth / oldMaxHealth));
 }
 
 // TODO: Move credits array to HealthComponent.

@@ -280,7 +280,7 @@ static void CG_CompleteGive()
 	unsigned               i = 0;
 	static const char give[][ 12 ] =
 	{
-		"all", "health", "funds", "stamina", "poison", "fuel", "ammo", "bp"
+		"all", "health", "funds", "stamina", "poison", "fuel", "ammo", "bp", "unlocks"
 	};
 
 	for( i = 0; i < ARRAY_LEN( give ); i++ )

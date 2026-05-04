@@ -123,7 +123,7 @@ constexpr float HUGE_DISTANCE = 1e15f;
 #define DEFAULT_GRAVITY    800
 
 #define VOTE_TIME          30000 // 30 seconds before vote times out
-#define MAX_OVERLOAD_PURCHASES 64
+#define MAX_OVERLOAD_PURCHASES 75
 
 #define DEAD_VIEWHEIGHT    4 // height from ground
 
