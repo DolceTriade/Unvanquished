@@ -31,8 +31,6 @@ along with Unvanquished. If not, see <http://www.gnu.org/licenses/>.
 #include <sstream>
 #include <vector>
 
-namespace {
-
 enum class overloadPurchaseKind_t
 {
 	BP_BUNDLE,
@@ -188,6 +186,46 @@ static TeamEconomyState& TeamEconomy( team_t team )
 	return level.team[ team ].economy;
 }
 
+static int OverloadCostMultiplierPermille( team_t team )
+{
+	const TeamEconomyState& economy = TeamEconomy( team );
+	const int extraPlayers = std::max( 0, economy.maxPlayersSeen - 1 );
+	const float scale = std::max( 1.0f, 1.0f + g_overloadCostPerPlayer.Get() * extraPlayers );
+	return std::max( 1000, static_cast<int>( std::lround( scale * 1000.0f ) ) );
+}
+
+static int ScaleOverloadCost( team_t team, int cost )
+{
+	if ( cost <= 0 )
+	{
+		return cost;
+	}
+
+	const int64_t scaled = static_cast<int64_t>( cost ) * OverloadCostMultiplierPermille( team );
+	return static_cast<int>( ( scaled + 999 ) / 1000 );
+}
+
+static int OverloadNextCost( const overloadPurchaseDef_t& entry, int entryIndex, team_t team )
+{
+	if ( entry.kind == overloadPurchaseKind_t::UPGRADE )
+	{
+		return ScaleOverloadCost( team, entry.baseCost + TeamEconomy( team ).repeatCounts[ entryIndex ] * entry.costStep );
+	}
+
+	return ScaleOverloadCost( team, entry.baseCost );
+}
+
+static std::string FormatOverloadCurrency( int value, team_t team )
+{
+	if ( team == TEAM_ALIENS )
+	{
+		int tenths = value * 10 / CREDITS_PER_EVO;
+		return Str::Format( "%d.%d morph points", tenths / 10, std::abs( tenths % 10 ) );
+	}
+
+	return Str::Format( "%d credits", value );
+}
+
 static std::string EncodeIndexValuePairs( const int* values )
 {
 	std::ostringstream stream;
@@ -249,6 +287,7 @@ static void PublishOverloadStateInternal( team_t team )
 	       << ";bp=" << economy.bpPurchased
 	       << ";tb=" << level.team[ team ].totalBudget
 	       << ";sb=" << level.team[ team ].spentBudget
+	       << ";cm=" << OverloadCostMultiplierPermille( team )
 	       << ";ic=" << EncodeIndexValuePairs( economy.investedCredits )
 	       << ";rc=" << EncodeIndexValuePairs( economy.repeatCounts )
 	       << ";op=" << EncodeOwnedPurchases( economy.ownedPurchases );
@@ -268,6 +307,21 @@ static void PublishAllTeamEconomyStates()
 	for ( team_t team = TEAM_NONE; ( team = G_IterateTeams( team ) ); )
 	{
 		::G_PublishOverloadState( team );
+	}
+}
+
+static void UpdateOverloadCostScalingInternal()
+{
+	for ( team_t team = TEAM_NONE; ( team = G_IterateTeams( team ) ); )
+	{
+		TeamEconomyState& economy = TeamEconomy( team );
+		if ( level.team[ team ].numPlayers <= economy.maxPlayersSeen )
+		{
+			continue;
+		}
+
+		economy.maxPlayersSeen = level.team[ team ].numPlayers;
+		PublishOverloadStateInternal( team );
 	}
 }
 
@@ -416,19 +470,27 @@ static std::string UnlockableDisplayName( unlockableType_t type, int itemNum )
 	Sys::Error( "UnlockableDisplayName: unknown unlockable type" );
 }
 
-static const char* CanonicalThingName( const char* thing )
+static const char* OverloadThingName( unlockableType_t type, int itemNum )
 {
-	if ( !Q_stricmp( thing, "basilisk" ) )
+	switch ( type )
 	{
-		return "mantis";
+		case UNLT_WEAPON:
+			return BG_Weapon( itemNum )->name;
+
+		case UNLT_UPGRADE:
+			return BG_Upgrade( itemNum )->name;
+
+		case UNLT_BUILDABLE:
+			return BG_Buildable( itemNum )->name;
+
+		case UNLT_CLASS:
+			return BG_Class( itemNum )->name;
+
+		case UNLT_NUM_UNLOCKABLETYPES:
+			break;
 	}
 
-	if ( !Q_stricmp( thing, "adv_basilisk" ) )
-	{
-		return "adv_mantis";
-	}
-
-	return thing;
+	Sys::Error( "OverloadThingName: invalid unlockable type" );
 }
 
 static void CaptureGameplayEffectBaseline( overloadEffect_t& effect )
@@ -677,10 +739,11 @@ static void AddUnlockEntriesForFamily( bgAttributeFamily_t family, unlockableTyp
 		}
 
 		const int requiredCompletedCount = BG_NormalizeUnlockThreshold( unlockThreshold );
+		const char* purchaseThing = OverloadThingName( unlockableType, itemNum );
 		std::string displayName = UnlockableDisplayName( unlockableType, itemNum );
 		std::string uiDescription = UnlockableDescription( unlockableType, itemNum );
 		AddUnlock( team, requiredCompletedCount, unlockableType, itemNum, family, objectIndex, unlockField,
-		           thing, displayName.c_str(), uiDescription.c_str() );
+		           purchaseThing, displayName.c_str(), uiDescription.c_str() );
 	}
 }
 
@@ -732,9 +795,9 @@ static void BuildOverloadCatalog()
 	            { AttributeEffect( BG_ATTR_WEAPON, "shotgun", "ammo", 8.0, 1.0 ) } );
 
 	// Human weapons: stage 2 unlocks.
-	AddUpgrade( TEAM_HUMANS, 0, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), 125, OVERLOAD_UNCAPPED_RANKS, "lasgun", "damage", "Lasgun Damage", "Increase lasgun damage.",
+	AddUpgrade( TEAM_HUMANS, 0, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), 125, OVERLOAD_UNCAPPED_RANKS, "lgun", "damage", "Lasgun Damage", "Increase lasgun damage.",
 	            { GameplayEffect( "LASGUN_DAMAGE", 3.0 ) } );
-	AddUpgrade( TEAM_HUMANS, 0, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), 125, OVERLOAD_UNCAPPED_RANKS, "lasgun", "ammo", "Lasgun Ammo", "Increase lasgun ammo reserve.",
+	AddUpgrade( TEAM_HUMANS, 0, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), 125, OVERLOAD_UNCAPPED_RANKS, "lgun", "ammo", "Lasgun Ammo", "Increase lasgun ammo reserve.",
 	            { AttributeEffect( BG_ATTR_WEAPON, "lgun", "ammo", 25.0, 1.0 ) } );
 	AddUpgrade( TEAM_HUMANS, 0, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), 125, OVERLOAD_UNCAPPED_RANKS, "mdriver", "damage", "Mass Driver Damage", "Increase mass driver damage.",
 	            { GameplayEffect( "MDRIVER_DMG", 10.0 ) } );
@@ -792,35 +855,35 @@ static void BuildOverloadCatalog()
 	// Alien class upgrades.
 	// Covered classes: dretch, mantis, adv_mantis, marauder, dragoon, adv_dragoon, tyrant.
 	// Intentionally missing for now: basilisk, adv_basilisk, granger, adv_granger.
-	AddUpgrade( TEAM_ALIENS, 0, DefaultUpgradeBaseCost( 0 ), 100, OVERLOAD_UNCAPPED_RANKS, "dretch", "damage", "Dretch Damage", "Increase dretch bite damage.",
+	AddUpgrade( TEAM_ALIENS, 0, DefaultUpgradeBaseCost( 0 ), 100, OVERLOAD_UNCAPPED_RANKS, "level0", "damage", "Dretch Damage", "Increase dretch bite damage.",
 	            { GameplayEffect( "LEVEL0_BITE_DMG", 3.0 ) } );
-	AddUpgrade( TEAM_ALIENS, 0, DefaultUpgradeBaseCost( 0 ), 100, OVERLOAD_UNCAPPED_RANKS, "dretch", "range", "Dretch Range", "Increase dretch bite range.",
+	AddUpgrade( TEAM_ALIENS, 0, DefaultUpgradeBaseCost( 0 ), 100, OVERLOAD_UNCAPPED_RANKS, "level0", "range", "Dretch Range", "Increase dretch bite range.",
 	            { GameplayEffect( "LEVEL0_BITE_RANGE", 5.0 ) } );
-	AddUpgrade( TEAM_ALIENS, 0, DefaultUpgradeBaseCost( 0 ), 100, OVERLOAD_UNCAPPED_RANKS, "mantis", "damage", "Mantis Damage", "Increase mantis claw damage.",
+	AddUpgrade( TEAM_ALIENS, 0, DefaultUpgradeBaseCost( 0 ), 100, OVERLOAD_UNCAPPED_RANKS, "level1", "damage", "Mantis Damage", "Increase mantis claw damage.",
 	            { GameplayEffect( "LEVEL1_CLAW_DMG", 4.0 ) } );
-	AddUpgrade( TEAM_ALIENS, 0, DefaultUpgradeBaseCost( 0 ), 100, OVERLOAD_UNCAPPED_RANKS, "mantis", "range", "Mantis Range", "Increase mantis claw range.",
+	AddUpgrade( TEAM_ALIENS, 0, DefaultUpgradeBaseCost( 0 ), 100, OVERLOAD_UNCAPPED_RANKS, "level1", "range", "Mantis Range", "Increase mantis claw range.",
 	            { GameplayEffect( "LEVEL1_CLAW_RANGE", 5.0 ) } );
-	AddUpgrade( TEAM_ALIENS, 0, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), 125, OVERLOAD_UNCAPPED_RANKS, "adv_mantis", "damage", "Advanced Mantis Zap Damage", "Increase advanced mantis zap damage.",
+	AddUpgrade( TEAM_ALIENS, 0, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), 125, OVERLOAD_UNCAPPED_RANKS, "level2upg", "damage", "Advanced Mantis Zap Damage", "Increase advanced mantis zap damage.",
 	            { GameplayEffect( "LEVEL2_AREAZAP_DMG", 4.0 ) } );
-	AddUpgrade( TEAM_ALIENS, 0, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), 125, OVERLOAD_UNCAPPED_RANKS, "adv_mantis", "range", "Advanced Mantis Zap Range", "Increase advanced mantis zap range.",
+	AddUpgrade( TEAM_ALIENS, 0, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), 125, OVERLOAD_UNCAPPED_RANKS, "level2upg", "range", "Advanced Mantis Zap Range", "Increase advanced mantis zap range.",
 	            { GameplayEffect( "LEVEL2_AREAZAP_RANGE", 10.0 ) } );
-	AddUpgrade( TEAM_ALIENS, 0, DefaultUpgradeBaseCost( 0 ), 100, OVERLOAD_UNCAPPED_RANKS, "marauder", "damage", "Marauder Damage", "Increase marauder claw damage.",
+	AddUpgrade( TEAM_ALIENS, 0, DefaultUpgradeBaseCost( 0 ), 100, OVERLOAD_UNCAPPED_RANKS, "level2", "damage", "Marauder Damage", "Increase marauder claw damage.",
 	            { GameplayEffect( "LEVEL2_CLAW_DMG", 4.0 ) } );
-	AddUpgrade( TEAM_ALIENS, 0, DefaultUpgradeBaseCost( 0 ), 100, OVERLOAD_UNCAPPED_RANKS, "marauder", "range", "Marauder Range", "Increase marauder claw range.",
+	AddUpgrade( TEAM_ALIENS, 0, DefaultUpgradeBaseCost( 0 ), 100, OVERLOAD_UNCAPPED_RANKS, "level2", "range", "Marauder Range", "Increase marauder claw range.",
 	            { GameplayEffect( "LEVEL2_CLAW_RANGE", 5.0 ) } );
-	AddUpgrade( TEAM_ALIENS, 0, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), 125, OVERLOAD_UNCAPPED_RANKS, "dragoon", "damage", "Dragoon Damage", "Increase dragoon claw damage.",
+	AddUpgrade( TEAM_ALIENS, 0, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), 125, OVERLOAD_UNCAPPED_RANKS, "level3", "damage", "Dragoon Damage", "Increase dragoon claw damage.",
 	            { GameplayEffect( "LEVEL3_CLAW_DMG", 5.0 ) } );
-	AddUpgrade( TEAM_ALIENS, 0, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), 125, OVERLOAD_UNCAPPED_RANKS, "dragoon", "claw_range", "Dragoon Claw Range", "Increase dragoon claw range for both base and advanced forms.",
+	AddUpgrade( TEAM_ALIENS, 0, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), 125, OVERLOAD_UNCAPPED_RANKS, "level3", "claw_range", "Dragoon Claw Range", "Increase dragoon claw range for both base and advanced forms.",
 	            { GameplayEffect( "LEVEL3_CLAW_RANGE", 5.0 ),
 	              GameplayEffect( "LEVEL3_CLAW_UPG_RANGE", 5.0 ) } );
-	AddUpgrade( TEAM_ALIENS, 0, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), 125, OVERLOAD_UNCAPPED_RANKS, "dragoon", "pounce_damage", "Dragoon Pounce Damage", "Increase dragoon pounce damage.",
+	AddUpgrade( TEAM_ALIENS, 0, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), 125, OVERLOAD_UNCAPPED_RANKS, "level3", "pounce_damage", "Dragoon Pounce Damage", "Increase dragoon pounce damage.",
 	            { GameplayEffect( "LEVEL3_POUNCE_DMG", 10.0 ) } );
-	AddUpgrade( TEAM_ALIENS, 0, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), 125, OVERLOAD_UNCAPPED_RANKS, "dragoon", "pounce_range", "Dragoon Pounce Range", "Increase dragoon pounce range for both base and advanced forms.",
+	AddUpgrade( TEAM_ALIENS, 0, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), 125, OVERLOAD_UNCAPPED_RANKS, "level3", "pounce_range", "Dragoon Pounce Range", "Increase dragoon pounce range for both base and advanced forms.",
 	            { GameplayEffect( "LEVEL3_POUNCE_RANGE", 12.0 ),
 	              GameplayEffect( "LEVEL3_POUNCE_UPG_RANGE", 12.0 ) } );
-	AddUpgrade( TEAM_ALIENS, 0, DefaultUpgradeBaseCost( OVERLOAD_STAGE3_COUNT ), 150, OVERLOAD_UNCAPPED_RANKS, "tyrant", "damage", "Tyrant Damage", "Increase tyrant claw damage.",
+	AddUpgrade( TEAM_ALIENS, 0, DefaultUpgradeBaseCost( OVERLOAD_STAGE3_COUNT ), 150, OVERLOAD_UNCAPPED_RANKS, "level4", "damage", "Tyrant Damage", "Increase tyrant claw damage.",
 	            { GameplayEffect( "LEVEL4_CLAW_DMG", 8.0 ) } );
-	AddUpgrade( TEAM_ALIENS, 0, DefaultUpgradeBaseCost( OVERLOAD_STAGE3_COUNT ), 150, OVERLOAD_UNCAPPED_RANKS, "tyrant", "trample_damage", "Tyrant Trample Damage", "Increase tyrant trample damage.",
+	AddUpgrade( TEAM_ALIENS, 0, DefaultUpgradeBaseCost( OVERLOAD_STAGE3_COUNT ), 150, OVERLOAD_UNCAPPED_RANKS, "level4", "trample_damage", "Tyrant Trample Damage", "Increase tyrant trample damage.",
 	            { GameplayEffect( "LEVEL4_TRAMPLE_DMG", 10.0 ) } );
 
 	if ( overloadPurchases.size() > MAX_OVERLOAD_PURCHASES )
@@ -841,16 +904,14 @@ static bool EntryMatches( const overloadPurchaseDef_t& entry, const Cmd::Args& a
 
 	if ( entry.kind == overloadPurchaseKind_t::UNLOCK )
 	{
-		const char* requestedThing = CanonicalThingName( args.Argv( 2 ).c_str() );
 		return args.Argc() >= 3 &&
 		       !Q_stricmp( args.Argv( 1 ).c_str(), "unlock" ) &&
-		       !Q_stricmp( requestedThing, entry.thing.c_str() );
+		       !Q_stricmp( args.Argv( 2 ).c_str(), entry.thing.c_str() );
 	}
 
-	const char* requestedThing = CanonicalThingName( args.Argv( 2 ).c_str() );
 	return args.Argc() >= 4 &&
 	       !Q_stricmp( args.Argv( 1 ).c_str(), "upgrade" ) &&
-	       !Q_stricmp( requestedThing, entry.thing.c_str() ) &&
+	       !Q_stricmp( args.Argv( 2 ).c_str(), entry.thing.c_str() ) &&
 	       !Q_stricmp( args.Argv( 3 ).c_str(), entry.stat.c_str() );
 }
 
@@ -894,6 +955,25 @@ static bool EntryIsAvailable( team_t team, const overloadPurchaseDef_t& entry )
 		return false;
 	}
 
+	if ( entry.kind == overloadPurchaseKind_t::UPGRADE )
+	{
+		for ( size_t i = 0; i < overloadPurchases.size(); ++i )
+		{
+			const overloadPurchaseDef_t& candidate = overloadPurchases[ i ];
+			if ( candidate.kind != overloadPurchaseKind_t::UNLOCK || candidate.team != team )
+			{
+				continue;
+			}
+
+			if ( Q_stricmp( candidate.thing.c_str(), entry.thing.c_str() ) )
+			{
+				continue;
+			}
+
+			return economy.ownedPurchases[ i ];
+		}
+	}
+
 	if ( entry.kind == overloadPurchaseKind_t::UNLOCK )
 	{
 		return !economy.ownedPurchases[ index ];
@@ -915,7 +995,7 @@ static int RemainingSpendCapacity( const overloadPurchaseDef_t& entry, int entry
 
 	if ( entry.kind == overloadPurchaseKind_t::UNLOCK )
 	{
-		return std::max( 0, entry.baseCost - invested );
+		return std::max( 0, OverloadNextCost( entry, entryIndex, team ) - invested );
 	}
 
 	if ( entry.maxRanks == OVERLOAD_UNCAPPED_RANKS )
@@ -926,17 +1006,17 @@ static int RemainingSpendCapacity( const overloadPurchaseDef_t& entry, int entry
 	int remaining = -invested;
 	for ( int rank = currentRank; rank < entry.maxRanks; ++rank )
 	{
-		remaining += entry.baseCost + rank * entry.costStep;
+		remaining += ScaleOverloadCost( team, entry.baseCost + rank * entry.costStep );
 	}
 
 	return std::max( 0, remaining );
 }
 
-static int RanksCompletedFromSpend( const overloadPurchaseDef_t& entry, int currentRank, int& investedCredits )
+static int RanksCompletedFromSpend( const overloadPurchaseDef_t& entry, int currentRank, int& investedCredits, team_t team )
 {
 	if ( entry.kind == overloadPurchaseKind_t::UNLOCK )
 	{
-		if ( investedCredits >= entry.baseCost )
+		if ( investedCredits >= ScaleOverloadCost( team, entry.baseCost ) )
 		{
 			investedCredits = 0;
 			return 1;
@@ -946,15 +1026,16 @@ static int RanksCompletedFromSpend( const overloadPurchaseDef_t& entry, int curr
 
 	if ( entry.kind == overloadPurchaseKind_t::BP_BUNDLE )
 	{
-		const int completed = investedCredits / entry.baseCost;
-		investedCredits %= entry.baseCost;
+		const int threshold = ScaleOverloadCost( team, entry.baseCost );
+		const int completed = investedCredits / threshold;
+		investedCredits %= threshold;
 		return completed;
 	}
 
 	int completed = 0;
 	while ( currentRank + completed < entry.maxRanks )
 	{
-		int threshold = entry.baseCost + ( currentRank + completed ) * entry.costStep;
+		int threshold = ScaleOverloadCost( team, entry.baseCost + ( currentRank + completed ) * entry.costStep );
 		if ( investedCredits < threshold )
 		{
 			break;
@@ -1181,10 +1262,12 @@ static std::string PurchaseProgressMessage( const overloadPurchaseDef_t& entry, 
 	{
 		if ( totalGranted > 0 )
 		{
-			return Str::Format( "%s: spent %d credits, gained %d BP", entry.thing, actualSpend, totalGranted );
+			return Str::Format( "%s: spent %s, gained %d BP", entry.thing, FormatOverloadCurrency( actualSpend, team ), totalGranted );
 		}
 
-		return Str::Format( "%s: invested %d/%d", entry.thing, economy.investedCredits[ entryIndex ], entry.baseCost );
+		return Str::Format( "%s: invested %s / %s", entry.thing,
+		                    FormatOverloadCurrency( economy.investedCredits[ entryIndex ], team ),
+		                    FormatOverloadCurrency( OverloadNextCost( entry, entryIndex, team ), team ) );
 	}
 
 	if ( entry.kind == overloadPurchaseKind_t::UNLOCK )
@@ -1194,7 +1277,9 @@ static std::string PurchaseProgressMessage( const overloadPurchaseDef_t& entry, 
 			return Str::Format( "unlocked %s", entry.displayName );
 		}
 
-		return Str::Format( "%s unlock: invested %d/%d", entry.thing, economy.investedCredits[ entryIndex ], entry.baseCost );
+		return Str::Format( "%s unlock: invested %s / %s", entry.thing,
+		                    FormatOverloadCurrency( economy.investedCredits[ entryIndex ], team ),
+		                    FormatOverloadCurrency( OverloadNextCost( entry, entryIndex, team ), team ) );
 	}
 
 	if ( completionsApplied > 0 )
@@ -1202,11 +1287,11 @@ static std::string PurchaseProgressMessage( const overloadPurchaseDef_t& entry, 
 		return Str::Format( "%s %s rank %d", entry.thing, entry.stat, economy.repeatCounts[ entryIndex ] );
 	}
 
-	int nextCost = entry.baseCost + economy.repeatCounts[ entryIndex ] * entry.costStep;
-	return Str::Format( "%s %s: invested %d/%d", entry.thing, entry.stat, economy.investedCredits[ entryIndex ], nextCost );
+	int nextCost = OverloadNextCost( entry, entryIndex, team );
+	return Str::Format( "%s %s: invested %s / %s", entry.thing, entry.stat,
+	                    FormatOverloadCurrency( economy.investedCredits[ entryIndex ], team ),
+	                    FormatOverloadCurrency( nextCost, team ) );
 }
-
-} // namespace
 
 void G_PublishOverloadState( team_t team )
 {
@@ -1243,6 +1328,7 @@ void G_InitOverloadEconomy()
 		TeamEconomyState& economy = TeamEconomy( team );
 		economy.completedPurchases = 0;
 		economy.bpPurchased = 0;
+		economy.maxPlayersSeen = 0;
 		memset( economy.investedCredits, 0, sizeof( economy.investedCredits ) );
 		memset( economy.repeatCounts, 0, sizeof( economy.repeatCounts ) );
 		memset( economy.ownedPurchases, 0, sizeof( economy.ownedPurchases ) );
@@ -1317,7 +1403,7 @@ bool G_OverloadPurchase( gentity_t *ent, const Cmd::Args& args, std::string* mes
 
 	if ( ent->client->pers.credit < spend )
 	{
-		if ( message ) *message = "not enough credits";
+		if ( message ) *message = "not enough resources";
 		return false;
 	}
 
@@ -1333,7 +1419,7 @@ bool G_OverloadPurchase( gentity_t *ent, const Cmd::Args& args, std::string* mes
 	economy.investedCredits[ purchaseIndex ] += actualSpend;
 
 	int invested = economy.investedCredits[ purchaseIndex ];
-	int completionsApplied = RanksCompletedFromSpend( *entry, economy.repeatCounts[ purchaseIndex ], invested );
+	int completionsApplied = RanksCompletedFromSpend( *entry, economy.repeatCounts[ purchaseIndex ], invested, team );
 	economy.investedCredits[ purchaseIndex ] = invested;
 
 	bool gameplayDirty = false;
@@ -1362,4 +1448,8 @@ bool G_OverloadPurchase( gentity_t *ent, const Cmd::Args& args, std::string* mes
 	}
 
 	return true;
+}
+void G_UpdateOverloadCostScaling()
+{
+	UpdateOverloadCostScalingInternal();
 }

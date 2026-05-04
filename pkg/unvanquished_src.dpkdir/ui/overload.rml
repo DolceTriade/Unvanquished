@@ -269,14 +269,14 @@
 
 			if row.kind ~= "bp" and remaining > 100 then
 				buttons = buttons .. string.format(
-					'<button%s onclick="OverloadBuy(\'%s\', 100)">+100</button>',
-					buttonClass, row.command)
+					'<button%s onclick="OverloadBuy(\'%s\', 100)">%s</button>',
+					buttonClass, row.command, row.quickBuySmallLabel)
 			end
 
 			if row.kind ~= "bp" and remaining > 500 then
 				buttons = buttons .. string.format(
-					'<button%s onclick="OverloadBuy(\'%s\', 500)">+500</button>',
-					buttonClass, row.command)
+					'<button%s onclick="OverloadBuy(\'%s\', 500)">%s</button>',
+					buttonClass, row.command, row.quickBuyLargeLabel)
 			end
 
 			return buttons
@@ -288,7 +288,7 @@
 
 		function ReadRows()
 			CDataSource.Build("overloadList", "default")
-			local raw = CDataSource.Read("overloadList", "default", "name,description,command,cost,progress,status,kind,group,remaining,requiredCompletedCount,completedPurchases,remainingCompletedCount,rank,maxRanks")
+			local raw = CDataSource.Read("overloadList", "default", "name,description,command,cost,progress,status,kind,group,remaining,currencyLabel,quickBuySmallLabel,quickBuyLargeLabel,requiredCompletedCount,completedPurchases,remainingCompletedCount,rank,maxRanks")
 			local rows = {}
 			for i = 1, #raw do
 				rows[#rows + 1] = {
@@ -301,11 +301,14 @@
 					kind = raw[i][7],
 					group = raw[i][8],
 					remaining = raw[i][9],
-					requiredCompletedCount = tonumber(raw[i][10]) or 0,
-					completedPurchases = tonumber(raw[i][11]) or 0,
-					remainingCompletedCount = tonumber(raw[i][12]) or 0,
-					rank = tonumber(raw[i][13]) or 0,
-					maxRanks = tonumber(raw[i][14]) or 0,
+					currencyLabel = raw[i][10],
+					quickBuySmallLabel = raw[i][11],
+					quickBuyLargeLabel = raw[i][12],
+					requiredCompletedCount = tonumber(raw[i][13]) or 0,
+					completedPurchases = tonumber(raw[i][14]) or 0,
+					remainingCompletedCount = tonumber(raw[i][15]) or 0,
+					rank = tonumber(raw[i][16]) or 0,
+					maxRanks = tonumber(raw[i][17]) or 0,
 				}
 			end
 			table.sort(rows, function(a, b)
@@ -319,8 +322,9 @@
 
 		function MetaHtml(row)
 			local meta = string.format(
-				'<div class="meta">Next cost: %s credits</div><div class="meta">Progress: %s</div>',
+				'<div class="meta">Next cost: %s %s</div><div class="meta">Progress: %s</div>',
 				Rocket_QuakeToRML(row.cost),
+				Rocket_QuakeToRML(row.currencyLabel),
 				Rocket_QuakeToRML(row.progress))
 
 			if row.requiredCompletedCount > 0 then
@@ -399,7 +403,7 @@
 </head>
 	<body id="overload" onshow="CloseOtherCirclemenus(event) BuildOverloadMenu(document)" onrefreshdata="BuildOverloadMenu(document)" onmousedown="RightClickClose(event, document)" onkeydown="OverloadHandleKey(event, document)">
 		<h1><translate>Overload</translate></h1>
-		<p class="subtitle"><translate>Spend personal credits at the main structure to fund team BP, unlocks, and upgrades.</translate></p>
+		<p class="subtitle"><translate>Spend personal resources at the main structure to fund team BP, unlocks, and upgrades.</translate></p>
 		<div class="filters">
 			<button id="filterAll" onclick="OverloadSetFilter('all', document)"><translate>All</translate></button>
 			<button id="filterAvailable" onclick="OverloadSetFilter('available', document)"><translate>Available</translate></button>
