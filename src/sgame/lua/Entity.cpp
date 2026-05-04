@@ -159,7 +159,8 @@ int pairs( lua_State* L )
 int New( lua_State* L )
 {
 	gentity_t* ent = G_NewEntity( initEntityStyle_t::NO_CBSE );
-	ent->classname = "lua";
+	BG_Free( ent->classname );
+	ent->classname = BG_strdup( "lua" );
 	ent->s.eType = entityType_t::ET_GENERAL;
 	trap_LinkEntity( ent );
 	LuaLib<EntityProxy>::push( L, Entity::CreateProxy( ent, L ) );
