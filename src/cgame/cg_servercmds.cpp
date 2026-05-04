@@ -196,6 +196,12 @@ void CG_ParseTeamEconomyConfig( team_t team, const char* config )
 			continue;
 		}
 
+		if ( key == "cm" )
+		{
+			state.costMultiplierThousandths = atoi( value.c_str() );
+			continue;
+		}
+
 		if ( key == "ic" || key == "rc" )
 		{
 			int* target = key == "ic" ? state.investedCredits : state.repeatCounts;

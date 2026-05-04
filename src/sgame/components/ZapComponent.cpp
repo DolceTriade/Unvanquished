@@ -3,6 +3,21 @@
 
 namespace {
 
+void FreeZapEffectEntity(zap_t& zap)
+{
+	if (!zap.effectChannel)
+	{
+		return;
+	}
+
+	if (zap.effectChannel->inuse)
+	{
+		G_FreeEntity(zap.effectChannel);
+	}
+
+	zap.effectChannel = nullptr;
+}
+
 void FindZapChainTargets(zap_t *zap)
 {
 	gentity_t *ent = zap->targets[0].get(); // the source
@@ -121,7 +136,8 @@ void ZapComponent::HandleZapTarget(Entity &target)
 	}
 	zap.effectChannel = G_NewEntity(NO_CBSE);
 	zap.effectChannel->s.eType = entityType_t::ET_LEV2_ZAP_CHAIN;
-	zap.effectChannel->classname = "lev2zapchain";
+	BG_Free(zap.effectChannel->classname);
+	zap.effectChannel->classname = BG_strdup("lev2zapchain");
 	UpdateZapEffect(muzzle, &zap);
 }
 
@@ -134,7 +150,7 @@ void ZapComponent::HandleClearZap(Entity &player)
 	// the disappearance of the creator or the first target destroys the whole zap effect
 	if (zap.creator.get() == player.oldEnt || zap.targets[0].get() == player.oldEnt)
 	{
-		G_FreeEntity(zap.effectChannel);
+		FreeZapEffectEntity(zap);
 		zap.used = false;
 	}
 
@@ -179,7 +195,7 @@ void ZapComponent::UpdateZap(int timeDelta)
 		}
 		else
 		{
-			G_FreeEntity(zap.effectChannel);
+			FreeZapEffectEntity(zap);
 			zap.used = false;
 			for (int j = 1; j < zap.numTargets; j++)
 			{

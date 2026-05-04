@@ -1457,6 +1457,8 @@ struct cgTeamEconomyState_t
 	int bpPurchased;
 	int totalBudget;
 	int spentBudget;
+	// Cost multiplier encoded in thousandths because this comes through a text configstring, not the engine's binary float netcode.
+	int costMultiplierThousandths;
 	int investedCredits[ MAX_OVERLOAD_PURCHASES ];
 	int repeatCounts[ MAX_OVERLOAD_PURCHASES ];
 	bool ownedPurchases[ MAX_OVERLOAD_PURCHASES ];
