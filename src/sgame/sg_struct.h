@@ -66,6 +66,7 @@ struct TeamEconomyState
 {
 	int   completedPurchases;
 	int   bpPurchased;
+	int   maxPlayersSeen;
 	int   investedCredits[ MAX_OVERLOAD_PURCHASES ];
 	int   repeatCounts[ MAX_OVERLOAD_PURCHASES ];
 	bool  ownedPurchases[ MAX_OVERLOAD_PURCHASES ];

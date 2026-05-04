@@ -53,14 +53,36 @@ static std::string OverloadCommandForEntry( const cgOverloadCatalogEntry_t& entr
 	return Str::Format( "upgrade %s %s", entry.thing, entry.stat );
 }
 
+static int OverloadScaleCost( int cost, const cgTeamEconomyState_t& state )
+{
+	if ( cost <= 0 )
+	{
+		return cost;
+	}
+
+	int64_t scaled = static_cast<int64_t>( cost ) * std::max( 1000, state.costMultiplierThousandths );
+	return static_cast<int>( ( scaled + 999 ) / 1000 );
+}
+
 static int OverloadNextCost( const cgOverloadCatalogEntry_t& entry, int index, const cgTeamEconomyState_t& state )
 {
 	if ( entry.kind == 2 )
 	{
-		return entry.baseCost + state.repeatCounts[ index ] * entry.costStep;
+		return OverloadScaleCost( entry.baseCost + state.repeatCounts[ index ] * entry.costStep, state );
 	}
 
-	return entry.baseCost;
+	return OverloadScaleCost( entry.baseCost, state );
+}
+
+static std::string OverloadFormatCurrency( int value, team_t team )
+{
+	if ( team == TEAM_ALIENS )
+	{
+		int tenths = value * 10 / CREDITS_PER_EVO;
+		return Str::Format( "%d.%d", tenths / 10, std::abs( tenths % 10 ) );
+	}
+
+	return Str::Format( "%d", value );
 }
 
 static int OverloadRemainingCost( const cgOverloadCatalogEntry_t& entry, int index, const cgTeamEconomyState_t& state )
@@ -110,7 +132,12 @@ static bool OverloadUpgradeHiddenUntilUnlocked( const cgOverloadCatalogEntry_t& 
 			continue;
 		}
 
-		if ( candidate.team != team || Q_stricmp( candidate.thing, entry.thing ) )
+		if ( candidate.team != team )
+		{
+			continue;
+		}
+
+		if ( Q_stricmp( candidate.thing, entry.thing ) )
 		{
 			continue;
 		}
@@ -138,6 +165,8 @@ static std::string OverloadGroupForEntry( const cgOverloadCatalogEntry_t& entry 
 
 static std::string OverloadProgressForEntry( const cgOverloadCatalogEntry_t& entry, int index, const cgTeamEconomyState_t& state )
 {
+	team_t team = CG_MyTeam();
+
 	if ( OverloadEntryLocked( entry, state ) && entry.kind != 1 )
 	{
 		return Str::Format( "Requires %d completed purchases", entry.requiredCompletedCount );
@@ -145,7 +174,8 @@ static std::string OverloadProgressForEntry( const cgOverloadCatalogEntry_t& ent
 
 	if ( entry.kind == 0 )
 	{
-		return Str::Format( "%d / %d", state.investedCredits[ index ], entry.baseCost );
+		return Str::Format( "%s / %s", OverloadFormatCurrency( state.investedCredits[ index ], team ),
+		                    OverloadFormatCurrency( OverloadNextCost( entry, index, state ), team ) );
 	}
 
 	if ( entry.kind == 1 )
@@ -155,7 +185,8 @@ static std::string OverloadProgressForEntry( const cgOverloadCatalogEntry_t& ent
 			return "Owned";
 		}
 
-		return Str::Format( "%d / %d", state.investedCredits[ index ], entry.baseCost );
+		return Str::Format( "%s / %s", OverloadFormatCurrency( state.investedCredits[ index ], team ),
+		                    OverloadFormatCurrency( OverloadNextCost( entry, index, state ), team ) );
 	}
 
 	if ( OverloadEntryMaxed( entry, index, state ) )
@@ -163,8 +194,10 @@ static std::string OverloadProgressForEntry( const cgOverloadCatalogEntry_t& ent
 		return Str::Format( "Max rank %d", state.repeatCounts[ index ] );
 	}
 
-	int nextCost = entry.baseCost + state.repeatCounts[ index ] * entry.costStep;
-	return Str::Format( "Rank %d, %d / %d", state.repeatCounts[ index ], state.investedCredits[ index ], nextCost );
+	int nextCost = OverloadNextCost( entry, index, state );
+	return Str::Format( "Rank %d, %s / %s", state.repeatCounts[ index ],
+	                    OverloadFormatCurrency( state.investedCredits[ index ], team ),
+	                    OverloadFormatCurrency( nextCost, team ) );
 }
 
 static const char* OverloadStatusForEntry( const cgOverloadCatalogEntry_t& entry, int index, const cgTeamEconomyState_t& state, int credits )
@@ -1632,6 +1665,7 @@ static void CG_Rocket_BuildOverloadList( const char *table )
 	}
 
 	int credits = cg.predictedPlayerState.persistant[ PERS_CREDIT ];
+	const bool usesMorphPoints = team == TEAM_ALIENS;
 	for ( int i = 0; i < MAX_OVERLOAD_PURCHASES; ++i )
 	{
 		const cgOverloadCatalogEntry_t& entry = rocketInfo.overloadCatalog[ i ];
@@ -1659,8 +1693,11 @@ static void CG_Rocket_BuildOverloadList( const char *table )
 		Info_SetValueForKey( buf, "group", OverloadGroupForEntry( entry ).c_str(), false );
 		Info_SetValueForKey( buf, "description", entry.description, false );
 		Info_SetValueForKey( buf, "command", OverloadCommandForEntry( entry ).c_str(), false );
-		Info_SetValueForKey( buf, "cost", va( "%d", OverloadNextCost( entry, i, state ) ), false );
+		Info_SetValueForKey( buf, "cost", OverloadFormatCurrency( OverloadNextCost( entry, i, state ), team ).c_str(), false );
 		Info_SetValueForKey( buf, "remaining", va( "%d", OverloadRemainingCost( entry, i, state ) ), false );
+		Info_SetValueForKey( buf, "currencyLabel", usesMorphPoints ? "morph points" : "credits", false );
+		Info_SetValueForKey( buf, "quickBuySmallLabel", usesMorphPoints ? "+1.0" : "+100", false );
+		Info_SetValueForKey( buf, "quickBuyLargeLabel", usesMorphPoints ? "+5.0" : "+500", false );
 		Info_SetValueForKey( buf, "requiredCompletedCount", va( "%d", entry.requiredCompletedCount ), false );
 		Info_SetValueForKey( buf, "completedPurchases", va( "%d", state.completedPurchases ), false );
 		Info_SetValueForKey( buf, "remainingCompletedCount",

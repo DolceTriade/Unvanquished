@@ -278,6 +278,7 @@ void              G_LeaveTeam( gentity_t *self );
 void              G_ChangeTeam( gentity_t *ent, team_t newTeam );
 void              G_SendSpawnLocations( int clientNum );
 void              G_UpdateSpawnLocationMask( team_t team );
+void              G_UpdateOverloadCostScaling();
 gentity_t         *GetCloseLocationEntity( gentity_t *ent );
 void              TeamplayInfoMessage( gentity_t *ent );
 int               G_PlayerCountForBalance( team_t team );
