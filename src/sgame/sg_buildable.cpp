@@ -1175,10 +1175,6 @@ itemBuildError_t G_CanBuild( gentity_t *ent, buildable_t buildable, int /*distan
 	{
 		reason = replacementError;
 	}
-	else if ( buildable == BA_H_DRILL || buildable == BA_A_LEECH )
-	{
-		reason = IBE_DISABLED;
-	}
 	else if ( ent->client->pers.team == TEAM_ALIENS )
 	{
 		// Check for Overmind

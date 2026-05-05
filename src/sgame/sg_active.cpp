@@ -30,6 +30,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "CBSE.h"
 #include "sg_cm_world.h"
 
+#include <cmath>
+
 bool ClientInactivityTimer( gentity_t *ent, bool active );
 
 static Cvar::Cvar<float> g_devolveReturnRate(
@@ -55,6 +57,59 @@ static Cvar::Range<Cvar::Cvar<int>> g_poisonDuration(
 	10,
 	0,
 	500);
+
+static int G_MinerTeamPayoutFromEfficiency( float sumEfficiency )
+{
+	if ( sumEfficiency <= 0.0f )
+	{
+		return 0;
+	}
+
+	return static_cast<int>(
+		std::lround( MINER_CREDITS_PER_INTERVAL * std::pow( sumEfficiency, MINER_MULTIPLIER ) ) );
+}
+
+static int G_EncodeMinerPrediction( team_t team, const glm::vec3& location )
+{
+	float currentSumEfficiency = 0.0f;
+	float predictedSumEfficiency = 0.0f;
+
+	MiningComponent::Efficiencies previewEfficiencies =
+		MiningComponent::FindEfficiencies( team, location, nullptr );
+	predictedSumEfficiency += previewEfficiencies.predicted;
+
+	ForEntities<MiningComponent>([&]( Entity& entity, MiningComponent& miningComponent ) {
+		if ( G_Team( entity.oldEnt ) != team || !Entities::IsAlive( entity ) || !miningComponent.Active() )
+		{
+			return;
+		}
+
+		float currentEfficiency = miningComponent.Efficiency();
+		currentSumEfficiency += currentEfficiency;
+
+		float interferenceMod = MiningComponent::InterferenceMod(
+			glm::distance( location, VEC2GLM( entity.oldEnt->s.origin ) ) );
+		predictedSumEfficiency += currentEfficiency * interferenceMod;
+	});
+
+	int currentPayout = G_MinerTeamPayoutFromEfficiency( currentSumEfficiency );
+	int predictedPayout = G_MinerTeamPayoutFromEfficiency( predictedSumEfficiency );
+	int payoutDelta = predictedPayout - currentPayout;
+
+	int encodedEfficiency = Math::Clamp(
+		static_cast<int>( std::lround( previewEfficiencies.predicted * 127.0f ) ), -128, 127 );
+
+	int encodedIncome = 0;
+	if ( payoutDelta != 0 )
+	{
+		float compressedIncome = std::sqrt( static_cast<float>( std::abs( payoutDelta ) ) );
+		encodedIncome = payoutDelta < 0 ? -static_cast<int>( std::lround( compressedIncome ) )
+		                                :  static_cast<int>( std::lround( compressedIncome ) );
+		encodedIncome = Math::Clamp( encodedIncome, -128, 127 );
+	}
+
+	return ( ( encodedIncome & 0xff ) << 8 ) | ( encodedEfficiency & 0xff );
+}
 
 /*
 ===============
@@ -942,7 +997,10 @@ static void ClientTimerActions( gentity_t *ent, int msec )
 					client->ps.stats[ STAT_BUILDABLE ] &= ~SB_BUILDABLE_STATE_MASK;
 					client->ps.stats[ STAT_BUILDABLE ] |= SB_BUILDABLE_FROM_IBE( G_CanBuild( ent, buildable, dist, dummy, dummy2, &dummy3 ) );
 
-					client->ps.stats[ STAT_PREDICTION ] = 0;
+					client->ps.stats[ STAT_PREDICTION ] =
+						( buildable == BA_H_DRILL || buildable == BA_A_LEECH )
+						? G_EncodeMinerPrediction( static_cast<team_t>( ent->client->pers.team ), VEC2GLM( dummy ) )
+						: 0;
 
 					// Let the client know which buildables will be removed by building
 					for ( i = 0; i < MAX_MISC; i++ )

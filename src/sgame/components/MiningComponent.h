@@ -64,6 +64,11 @@ class MiningComponent: public MiningComponentBase {
 		float Efficiency(bool predict = false);
 
 		/**
+		 * @return Whether the miner has completed construction and currently interferes with networks.
+		 */
+		bool Active() const;
+
+		/**
 		 * @return The the level time at which this buildable was built.
 		 */
 		int TimeBuilt() const;

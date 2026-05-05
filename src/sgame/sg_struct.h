@@ -664,6 +664,7 @@ struct level_locals_t
 		float            totalBudget; // Read access always rounds towards zero.
 		int              spentBudget;
 		int              queuedBudget;
+		int              nextMinerPayoutTime;
 		uint64_t         spawnLocationMask;
 		spawnQueue_t     spawnQueue;
 		bool             locked;
