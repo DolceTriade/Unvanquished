@@ -2321,7 +2321,7 @@ static void Cmd_TeamBuy_f( gentity_t *ent )
 	{
 		trap_SendServerCommand( ent->num(),
 		                        va( "print_tr %s",
-		                            QQ( N_("usage: /teambuy bp_25 <spend> | /teambuy unlock <thing> <spend> | /teambuy upgrade <thing> <stat> <spend>") ) ) );
+		                            QQ( N_("usage: /teambuy bp <spend> | /teambuy unlock <thing> <spend> | /teambuy upgrade <thing> <stat> <spend>") ) ) );
 		return;
 	}
 
