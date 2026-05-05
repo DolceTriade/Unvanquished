@@ -198,7 +198,7 @@
 			return "Upgrade"
 		end
 
-		OverloadFilter = "all"
+		OverloadFilter = "available"
 		OverloadUpgradeNameFilter = ""
 
 		function GroupLabel(group)
@@ -230,7 +230,7 @@
 
 		function FilterMatches(status)
 			if OverloadFilter == "all" then return true end
-			if OverloadFilter == "available" then return status == "available" or status == "expensive" end
+			if OverloadFilter == "available" then return status == "available" or status == "expensive" or status == "partial" end
 			if OverloadFilter == "progress" then return status == "partial" end
 			if OverloadFilter == "future" then return status == "locked" end
 			if OverloadFilter == "done" then return status == "owned" or status == "maxed" end
@@ -267,13 +267,13 @@
 				'<button%s onclick="OverloadBuy(\'%s\', %d)">%s</button>',
 				buttonClass, row.command, remaining, ActionLabel(row.kind, status))
 
-			if row.kind ~= "bp" and remaining > 100 then
+			if remaining > 100 then
 				buttons = buttons .. string.format(
 					'<button%s onclick="OverloadBuy(\'%s\', 100)">%s</button>',
 					buttonClass, row.command, row.quickBuySmallLabel)
 			end
 
-			if row.kind ~= "bp" and remaining > 500 then
+			if remaining > 500 then
 				buttons = buttons .. string.format(
 					'<button%s onclick="OverloadBuy(\'%s\', 500)">%s</button>',
 					buttonClass, row.command, row.quickBuyLargeLabel)
@@ -405,11 +405,11 @@
 		<h1><translate>Overload</translate></h1>
 		<p class="subtitle"><translate>Spend personal resources at the main structure to fund team BP, unlocks, and upgrades.</translate></p>
 		<div class="filters">
-			<button id="filterAll" onclick="OverloadSetFilter('all', document)"><translate>All</translate></button>
 			<button id="filterAvailable" onclick="OverloadSetFilter('available', document)"><translate>Available</translate></button>
 			<button id="filterProgress" onclick="OverloadSetFilter('progress', document)"><translate>In Progress</translate></button>
 			<button id="filterFuture" onclick="OverloadSetFilter('future', document)"><translate>Future</translate></button>
 			<button id="filterDone" onclick="OverloadSetFilter('done', document)"><translate>Completed</translate></button>
+			<button id="filterAll" onclick="OverloadSetFilter('all', document)"><translate>All</translate></button>
 		</div>
 		<div class="filters">
 			<span class="filter-label">Filter:</span><input id="upgradeNameFilter" type="text" class="text" value="" onkeyup="OverloadSetUpgradeNameFilter(event.target_element, document)" placeholder="Filter upgrade names"/>
