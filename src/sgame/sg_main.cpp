@@ -2405,6 +2405,8 @@ void G_RunFrame( int levelTime )
 		}
 	});
 
+	G_UpdateMinerIncome();
+
 	// perform final fixups on the players
 	ent = &g_entities[ 0 ];
 

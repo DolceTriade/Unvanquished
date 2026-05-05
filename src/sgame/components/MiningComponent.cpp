@@ -23,15 +23,13 @@ void MiningComponent::HandlePrepareNetCode() {
 
 void MiningComponent::HandleFinishConstruction() {
 	active = true;
+	timeBuilt = level.matchTime;
 
 	// Now that we are active, calculate the current efficiency.
 	CalculateEfficiency();
 
 	// Inform neighbouring miners so they can react immediately.
 	InformNeighbors();
-
-	// Update both team's budgets.
-	G_UpdateBuildPointBudgets();
 }
 
 void MiningComponent::HandleDie(gentity_t* /*killer*/, meansOfDeath_t /*meansOfDeath*/) {
@@ -43,24 +41,13 @@ void MiningComponent::HandleDie(gentity_t* /*killer*/, meansOfDeath_t /*meansOfD
 
 	// Inform neighbouring miners so they can react immediately.
 	InformNeighbors();
-
-	// Update both team's budgets.
-	G_UpdateBuildPointBudgets();
 }
 
 float MiningComponent::InterferenceMod(float distance) {
 	if (RGS_RANGE <= 0.0f) return 1.0f;
-	if (distance > 2.0f * RGS_RANGE) return 1.0f;
 
-	// q is the ratio of the part of a sphere with radius RGS_RANGE that intersects
-	// with another sphere of equal size and given distance
-	float dr = distance / RGS_RANGE;
-	float q  = ((dr * dr * dr) - 12.0f * dr + 16.0f) / 16.0f;
-
-	// Two miners together should mine at a rate proportional to the volume of the
-	// union of their areas of effect. If more miners intersect, this is just an
-	// approximation that tends to punish cluttering of miners.
-	return ((1.0f - q) + 0.5f * q);
+	float t = Math::Clamp(distance / (2.0f * RGS_RANGE), 0.0f, 1.0f);
+	return 0.1f + 0.9f * t * t;
 }
 
 MiningComponent::Efficiencies MiningComponent::FindEfficiencies(
@@ -106,6 +93,10 @@ void MiningComponent::InformNeighbors() {
 
 float MiningComponent::Efficiency(bool predict) {
 	return predict ? predictedEfficiency : currentEfficiency;
+}
+
+bool MiningComponent::Active() const {
+	return active;
 }
 
 int MiningComponent::TimeBuilt() const {

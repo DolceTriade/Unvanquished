@@ -111,27 +111,10 @@
 			<h2><translate>Mining mode options</translate></h2>
 			<row>
 				<parent>
-					<h3><translate>Miner bonus</translate></h3>
-					<tooltip><translate>Build point budget per miner</translate></tooltip>
+					<h3><translate>Overload miners</translate></h3>
+					<tooltip><translate>Drills and leeches now grant periodic teamwide credits instead of BP.</translate></tooltip>
 				</parent>
-				<input type="range" min="0" max="400" step="10" cvar="g_BPBudgetPerMiner"/>
-				<p><inlinecvar cvar="g_BPBudgetPerMiner" type="number" format="%g"/>&nbsp; bp<ilink onclick='Cmd.exec("reset g_BPBudgetPerMiner")'> (reset) </ilink></p>
-			</row>
-			<row>
-				<parent>
-					<h3><translate>Initial regeneration speed</translate></h3>
-					<tooltip><translate>The initial speed at which BP will be recovered (in BP per minute)</translate></tooltip>
-				</parent>
-				<input type="range" min="0" max="50" step="4" cvar="g_BPRecoveryInitialRate"/>
-				<p><inlinecvar cvar="g_BPRecoveryInitialRate" type="number" format="%g"/>&nbsp; bp/min<ilink onclick='Cmd.exec("reset g_BPRecoveryInitialRate")'> (reset) </ilink></p>
-			</row>
-			<row>
-				<parent>
-					<h3><translate>Half regeneration time</translate></h3>
-					<tooltip><translate>The duration one will wait before BP recovery gets twice as slow</translate></tooltip>
-				</parent>
-				<input type="range" min="0" max="60" step="2" cvar="g_BPRecoveryRateHalfLife"/>
-				<p><inlinecvar cvar="g_BPRecoveryRateHalfLife" type="number" format="%g"/>&nbsp; <translate>minutes</translate><ilink onclick='Cmd.exec("reset g_BPRecoveryRateHalfLife")'> (reset) </ilink></p>
+				<p><translate>Miner payout and interference are now controlled through gameplay variables rather than legacy BP-income cvars.</translate></p>
 			</row>
 		</panel>
 
