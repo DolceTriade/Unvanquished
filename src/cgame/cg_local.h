@@ -1713,10 +1713,6 @@ struct cgs_t
 
 	float    devolveMaxBaseDistance; // used for evolve/devolve ui
 
-	float    buildPointBudgetPerMiner;
-	float    buildPointRecoveryInitialRate;
-	float    buildPointRecoveryRateHalfLife;
-
 	int      voteTime[ NUM_TEAMS ];
 	int      voteYes[ NUM_TEAMS ];
 	int      voteNo[ NUM_TEAMS ];

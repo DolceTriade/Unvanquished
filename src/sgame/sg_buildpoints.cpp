@@ -25,8 +25,87 @@ along with Unvanquished. If not, see <http://www.gnu.org/licenses/>.
 #include "common/Common.h"
 #include "sg_local.h"
 #include "CBSE.h"
+#include "Entities.h"
+
+#include <cmath>
+#include <limits>
 
 void G_RecoverBuildPoints() {
+}
+
+static bool MinerReadyForPayout( team_t team, Entity& entity, MiningComponent& miningComponent )
+{
+	return G_Team( entity.oldEnt ) == team
+		&& Entities::IsAlive( entity )
+		&& miningComponent.Active()
+		&& level.matchTime - miningComponent.TimeBuilt() >= MINER_INTERVAL;
+}
+
+void G_UpdateMinerIncome()
+{
+	if ( MINER_INTERVAL <= 0 )
+	{
+		return;
+	}
+
+	for ( team_t team = TEAM_NONE; ( team = G_IterateTeams( team ) ); )
+	{
+		int earliestActiveMinerTime = std::numeric_limits<int>::max();
+		bool hasActiveMiner = false;
+
+		ForEntities<MiningComponent>([&]( Entity& entity, MiningComponent& miningComponent ) {
+			if ( G_Team( entity.oldEnt ) != team || !Entities::IsAlive( entity ) || !miningComponent.Active() )
+			{
+				return;
+			}
+
+			hasActiveMiner = true;
+			earliestActiveMinerTime = std::min( earliestActiveMinerTime, miningComponent.TimeBuilt() );
+		});
+
+		int& nextPayoutTime = level.team[ team ].nextMinerPayoutTime;
+		if ( !hasActiveMiner )
+		{
+			nextPayoutTime = 0;
+			continue;
+		}
+
+		if ( nextPayoutTime <= 0 )
+		{
+			nextPayoutTime = earliestActiveMinerTime + MINER_INTERVAL;
+		}
+
+		while ( level.matchTime >= nextPayoutTime )
+		{
+			float sumEfficiency = 0.0f;
+
+			ForEntities<MiningComponent>([&]( Entity& entity, MiningComponent& miningComponent ) {
+				if ( MinerReadyForPayout( team, entity, miningComponent ) )
+				{
+					sumEfficiency += miningComponent.Efficiency();
+				}
+			});
+
+			if ( sumEfficiency > 0.0f )
+			{
+				short payout = static_cast<short>(
+					std::lround( MINER_CREDITS_PER_INTERVAL * std::pow( sumEfficiency, MINER_MULTIPLIER ) ) );
+
+				for ( int i = 0; i < level.maxclients; i++ )
+				{
+					gclient_t* client = &level.clients[ i ];
+					if ( client->pers.connected != CON_CONNECTED || client->pers.team != team )
+					{
+						continue;
+					}
+
+					G_AddCreditToClient( client, payout, true );
+				}
+			}
+
+			nextPayoutTime += MINER_INTERVAL;
+		}
+	}
 }
 
 /**

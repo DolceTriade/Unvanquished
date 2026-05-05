@@ -2470,12 +2470,12 @@ public:
 			const char *msg = nullptr;
 			Color::Color color;
 
-			// The efficiency and budget deltas are signed values that are encode as the least and
-			// most significant byte of the de-facto short ps->stats[STAT_PREDICTION], respectively.
-			// The efficiency delta is a value between -1 and 1, the budget delta is an integer
-			// between -128 and 127.
-			float deltaEfficiency    = (float)(signed char)(ps->stats[STAT_PREDICTION] & 0xff) / (float)0x7f;
-			int   deltaBudget        = (int)(signed char)(ps->stats[STAT_PREDICTION] >> 8);
+			// Miner prediction uses a linear signed byte for efficiency and a sqrt-compressed
+			// signed byte for income delta. Income is approximate and shown with a leading '~'.
+			float deltaEfficiency = (float)(signed char)(ps->stats[STAT_PREDICTION] & 0xff) / (float)0x7f;
+			int compressedIncome = (int)(signed char)(ps->stats[STAT_PREDICTION] >> 8);
+			int deltaBudget = compressedIncome < 0 ? -( compressedIncome * compressedIncome )
+			                                       :  ( compressedIncome * compressedIncome );
 
 			int   deltaEfficiencyPct = (int)(deltaEfficiency * 100.0f);
 
@@ -2485,19 +2485,19 @@ public:
 				if        ( deltaBudget < 0 ) {
 					color = Color::Red;
 					// Icon U+E000
-					msg = va( "<span class='material-icon error'>\xee\x80\x80</span> You are losing build points!"
+					msg = va( "<span class='material-icon error'>\xee\x80\x80</span> You are collapsing team income!"
 					          " Build the %s%s further apart for greater efficiency.",
 					          BG_Buildable( buildable )->humanName, pluralSuffix_[ buildable ].c_str() );
-				} else if ( deltaBudget < cgs.buildPointBudgetPerMiner / 10 ) {
+				} else if ( deltaBudget < MINER_CREDITS_PER_INTERVAL / 10 ) {
 					color = Color::Orange;
 					// Icon U+E002
-					msg = va( "<span class='material-icon warning'>\xee\x80\x82</span> Minimal build point gain."
+					msg = va( "<span class='material-icon warning'>\xee\x80\x82</span> Minimal team income."
 					          " Build the %s%s further apart for greater efficiency.",
 					          BG_Buildable( buildable )->humanName, pluralSuffix_[ buildable ].c_str() );
-				} else if ( deltaBudget < cgs.buildPointBudgetPerMiner / 2 ) {
+				} else if ( deltaBudget < MINER_CREDITS_PER_INTERVAL / 2 ) {
 					color = Color::Yellow;
 					// Icon U+E002
-					msg = va( "<span class='material-icon warning'>\xee\x80\x82</span> Subpar build point gain."
+					msg = va( "<span class='material-icon warning'>\xee\x80\x82</span> Subpar team income."
 					          " Build the %s%s further apart for greater efficiency.",
 					          BG_Buildable( buildable )->humanName, pluralSuffix_[ buildable ].c_str() );
 				} else {
@@ -2507,10 +2507,10 @@ public:
 				std::string deltaEfficiencyPctStr = Rocket_QuakeToRML(
 					va( "%s%+d%%", Color::ToString(color).c_str(), deltaEfficiencyPct));
 				std::string deltaBudgetStr = Rocket_QuakeToRML(
-					va("%s%+d", Color::ToString(color).c_str(), deltaBudget));
+					va("%s~%+d", Color::ToString(color).c_str(), deltaBudget));
 
 				SetInnerRML(Str::Format(
-					"%s EFFICIENCY<br/>%s BUILD POINTS%s%s",
+					"%s EFFICIENCY<br/>%s TEAM INCOME%s%s",
 					deltaEfficiencyPctStr, deltaBudgetStr, msg ? "<br/>" : "", msg ? msg : ""
 				));
 
@@ -3408,15 +3408,12 @@ static void CG_Rocket_DrawMineRate()
 	int totalBudget  = cg.snap->ps.persistant[ PERS_TOTALBUDGET ];
 	int queuedBudget = cg.snap->ps.persistant[ PERS_QUEUEDBUDGET ];
 
-	if (queuedBudget != 0) {
-		float matchTime = (float)(cg.time - cgs.levelStartTime);
-		float rate = cgs.buildPointRecoveryInitialRate /
-		             std::pow(2.0f, matchTime / (60000.0f * cgs.buildPointRecoveryRateHalfLife));
-		Rocket_SetInnerRMLRaw( va( "Recovering %d / %d BP @ %.1f BP/min.",
-		                       queuedBudget, totalBudget, rate) );
+	if ( queuedBudget != 0 ) {
+		Rocket_SetInnerRMLRaw( va( "%d BP available. %d BP pending release.",
+		                       totalBudget, queuedBudget ) );
 	} else {
-		Rocket_SetInnerRMLRaw( va( "The full budget of %d BP is available.",
-		                       totalBudget) );
+		Rocket_SetInnerRMLRaw( va( "%d BP available for construction.",
+		                       totalBudget ) );
 	}
 }
 
