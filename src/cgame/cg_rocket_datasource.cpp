@@ -66,7 +66,7 @@ static int OverloadScaleCost( int cost, const cgTeamEconomyState_t& state )
 
 static int OverloadNextCost( const cgOverloadCatalogEntry_t& entry, int index, const cgTeamEconomyState_t& state )
 {
-	if ( entry.kind == 2 )
+	if ( entry.kind == 0 || entry.kind == 2 )
 	{
 		return OverloadScaleCost( entry.baseCost + state.repeatCounts[ index ] * entry.costStep, state );
 	}
@@ -99,11 +99,6 @@ static int OverloadRemainingCost( const cgOverloadCatalogEntry_t& entry, int ind
 	}
 
 	return std::max( 0, OverloadNextCost( entry, index, state ) - state.investedCredits[ index ] );
-}
-
-static bool OverloadEntryLocked( const cgOverloadCatalogEntry_t& entry, const cgTeamEconomyState_t& state )
-{
-	return state.completedPurchases < entry.requiredCompletedCount;
 }
 
 static bool OverloadEntryMaxed( const cgOverloadCatalogEntry_t& entry, int index, const cgTeamEconomyState_t& state )
@@ -167,11 +162,6 @@ static std::string OverloadProgressForEntry( const cgOverloadCatalogEntry_t& ent
 {
 	team_t team = CG_MyTeam();
 
-	if ( OverloadEntryLocked( entry, state ) && entry.kind != 1 )
-	{
-		return Str::Format( "Requires %d completed purchases", entry.requiredCompletedCount );
-	}
-
 	if ( entry.kind == 0 )
 	{
 		return Str::Format( "%s / %s", OverloadFormatCurrency( state.investedCredits[ index ], team ),
@@ -202,11 +192,6 @@ static std::string OverloadProgressForEntry( const cgOverloadCatalogEntry_t& ent
 
 static const char* OverloadStatusForEntry( const cgOverloadCatalogEntry_t& entry, int index, const cgTeamEconomyState_t& state, int credits )
 {
-	if ( OverloadEntryLocked( entry, state ) )
-	{
-		return "locked";
-	}
-
 	if ( entry.kind == 1 && state.ownedPurchases[ index ] )
 	{
 		return "owned";
