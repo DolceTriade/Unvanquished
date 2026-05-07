@@ -251,6 +251,13 @@ namespace Clustering {
 
 			void Clear() {
 				records.clear();
+				edges.clear();
+				mstEdges.clear();
+				forestEdges.clear();
+				clusters.clear();
+				mstAverageDistance = 0.0f;
+				mstStandardDeviation = 0.0f;
+				dirtyClusters = true;
 				dirtyMST = true;
 			}
 

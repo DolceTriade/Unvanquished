@@ -668,8 +668,10 @@ struct level_locals_t
 		uint64_t         spawnLocationMask;
 		spawnQueue_t     spawnQueue;
 		bool             locked;
-			float            overloadProgress;
+		float            overloadProgress;
 		TeamEconomyState economy;
+		int              overloadBotTargetPurchase;
+		int              overloadBotNextPurchaseTime;
 		int              layoutBuildPoints;
 		int              botFillTeamSize;
 		int              botFillSkillLevel;
