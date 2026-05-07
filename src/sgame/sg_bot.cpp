@@ -438,6 +438,8 @@ void G_BotThink( gentity_t *self )
 		G_AddCreditToClient( self->client, HUMAN_MAX_CREDITS, true );
 	}
 
+	G_BotOverloadThink( self );
+
 	//reset the user specified client number if the client disconnected
 	if ( self->botMind->userSpecifiedClientNum )
 	{

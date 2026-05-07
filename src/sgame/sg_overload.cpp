@@ -1406,6 +1406,8 @@ void G_InitOverloadEconomy()
 		level.team[ team ].queuedBudget = 0;
 		level.team[ team ].nextMinerPayoutTime = 0;
 		level.team[ team ].overloadProgress = 0;
+		level.team[ team ].overloadBotTargetPurchase = -1;
+		level.team[ team ].overloadBotNextPurchaseTime = 0;
 
 		TeamEconomyState& economy = TeamEconomy( team );
 		economy.completedPurchases = 0;
@@ -1432,6 +1434,12 @@ int G_OverloadProgressValue( team_t team )
 	return TeamEconomy( team ).completedPurchases;
 }
 
+int G_OverloadPurchaseCount()
+{
+	CheckOverloadCatalogReady();
+	return static_cast<int>( overloadPurchases.size() );
+}
+
 bool G_OverloadUnlockPurchased( team_t team, unlockableType_t type, int itemNum )
 {
 	if ( !G_IsPlayableTeam( team ) )
@@ -1454,6 +1462,72 @@ bool G_OverloadHasUnlockEntry( team_t team, unlockableType_t type, int itemNum )
 
 	CheckOverloadCatalogReady();
 	return GetUnlockPurchaseIndex( team, type, itemNum ) >= 0;
+}
+
+bool G_OverloadEntryIsPartial( team_t team, int purchaseIndex )
+{
+	if ( !G_IsPlayableTeam( team ) )
+	{
+		return false;
+	}
+
+	CheckOverloadCatalogReady();
+
+	if ( purchaseIndex < 0 || purchaseIndex >= static_cast<int>( overloadPurchases.size() ) )
+	{
+		return false;
+	}
+
+	const TeamEconomyState& economy = TeamEconomy( team );
+	const overloadPurchaseDef_t& entry = overloadPurchases[ purchaseIndex ];
+
+	return ( entry.team == TEAM_NONE || entry.team == team ) &&
+	       economy.investedCredits[ purchaseIndex ] > 0 &&
+	       EntryIsAvailable( team, entry ) &&
+	       RemainingSpendCapacity( entry, purchaseIndex, team ) > 0;
+}
+
+bool G_OverloadEntryCanBotStart( team_t team, int purchaseIndex )
+{
+	if ( !G_IsPlayableTeam( team ) )
+	{
+		return false;
+	}
+
+	CheckOverloadCatalogReady();
+
+	if ( purchaseIndex < 0 || purchaseIndex >= static_cast<int>( overloadPurchases.size() ) )
+	{
+		return false;
+	}
+
+	const overloadPurchaseDef_t& entry = overloadPurchases[ purchaseIndex ];
+	return entry.team == team &&
+	       EntryIsAvailable( team, entry ) &&
+	       ( entry.kind == overloadPurchaseKind_t::BP_BUNDLE || entry.kind == overloadPurchaseKind_t::UNLOCK );
+}
+
+int G_OverloadEntryRemainingSpendCapacity( team_t team, int purchaseIndex )
+{
+	if ( !G_IsPlayableTeam( team ) )
+	{
+		return 0;
+	}
+
+	CheckOverloadCatalogReady();
+
+	if ( purchaseIndex < 0 || purchaseIndex >= static_cast<int>( overloadPurchases.size() ) )
+	{
+		return 0;
+	}
+
+	const overloadPurchaseDef_t& entry = overloadPurchases[ purchaseIndex ];
+	if ( entry.team != TEAM_NONE && entry.team != team )
+	{
+		return 0;
+	}
+
+	return RemainingSpendCapacity( entry, purchaseIndex, team );
 }
 
 void G_OverloadUnlockAll( team_t team )
@@ -1576,6 +1650,49 @@ bool G_OverloadPurchase( gentity_t *ent, const Cmd::Args& args, std::string* mes
 
 	return true;
 }
+
+bool G_OverloadPurchaseByIndex( gentity_t *ent, int purchaseIndex, int spend, std::string* message )
+{
+	CheckOverloadCatalogReady();
+	if ( !ent || !ent->client )
+	{
+		if ( message ) *message = "invalid purchaser";
+		return false;
+	}
+
+	team_t team = static_cast<team_t>( ent->client->pers.team );
+	if ( !G_IsPlayableTeam( team ) )
+	{
+		if ( message ) *message = "you are not on a playable team";
+		return false;
+	}
+
+	if ( purchaseIndex < 0 || purchaseIndex >= static_cast<int>( overloadPurchases.size() ) )
+	{
+		if ( message ) *message = "unknown team purchase";
+		return false;
+	}
+
+	const overloadPurchaseDef_t& entry = overloadPurchases[ purchaseIndex ];
+	if ( entry.team != TEAM_NONE && entry.team != team )
+	{
+		if ( message ) *message = "purchase is not available";
+		return false;
+	}
+
+	if ( entry.kind == overloadPurchaseKind_t::BP_BUNDLE )
+	{
+		return G_OverloadPurchase( ent, Cmd::Args( Str::Format( "bp %d", spend ) ), message );
+	}
+
+	if ( entry.kind == overloadPurchaseKind_t::UNLOCK )
+	{
+		return G_OverloadPurchase( ent, Cmd::Args( Str::Format( "unlock %s %d", entry.thing, spend ) ), message );
+	}
+
+	return G_OverloadPurchase( ent, Cmd::Args( Str::Format( "upgrade %s %s %d", entry.thing, entry.stat, spend ) ), message );
+}
+
 void G_UpdateOverloadCostScaling()
 {
 	UpdateOverloadCostScalingInternal();
