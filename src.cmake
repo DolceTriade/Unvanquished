@@ -210,6 +210,7 @@ set(SGAMELIST
     ${GAMELOGIC_DIR}/sgame/sg_bot_ai.cpp
     ${GAMELOGIC_DIR}/sgame/sg_bot_ai.h
     ${GAMELOGIC_DIR}/sgame/sg_bot.cpp
+    ${GAMELOGIC_DIR}/sgame/sg_bot_overload.cpp
     ${GAMELOGIC_DIR}/sgame/sg_bot_local.h
     ${GAMELOGIC_DIR}/sgame/sg_bot_nav.cpp
     ${GAMELOGIC_DIR}/sgame/sg_bot_parse.cpp
