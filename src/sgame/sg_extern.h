@@ -160,6 +160,8 @@ extern Cvar::Cvar<bool> g_ignoreNobuild;
 extern Cvar::Cvar<float> g_evolveAroundHumans;
 extern Cvar::Cvar<float> g_devolveMaxBaseDistance;
 extern Cvar::Cvar<float> g_overloadCostPerPlayer;
+extern Cvar::Cvar<float> g_overloadUnlockCostSlope;
+extern Cvar::Cvar<float> g_overloadUnlockCostOffset;
 
 extern Cvar::Cvar<int> g_maxMiners;
 
