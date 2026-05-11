@@ -265,7 +265,7 @@ enum
   CS_OVERLOAD_CATALOG = CS_OVERLOAD + NUM_TEAMS, // MAX_OVERLOAD_PURCHASES catalog payloads
   // Everything before CS_PLAYERS gets a CG_ConfigStringModified(n) event generated in CG_Init
 
-  CS_PLAYERS,
+  CS_PLAYERS = CS_OVERLOAD_CATALOG + MAX_OVERLOAD_PURCHASES,
 
   // Stuff below this normally never changes after the match starts
 
