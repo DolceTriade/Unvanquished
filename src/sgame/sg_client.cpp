@@ -1308,6 +1308,10 @@ static void ResendPossiblyWrongConfigstrings( int clientNum )
 	{
 		char configstring[ 1022 ];
 		trap_GetConfigstring( cs, configstring, sizeof( configstring ) );
+		if ( strchr( configstring, '\n' ) != nullptr )
+		{
+			continue;
+		}
 		std::string command = Str::Format( "cs %d %s", cs, Cmd::Escape( configstring ) );
 		if ( command.size() > 1022 )
 		{
