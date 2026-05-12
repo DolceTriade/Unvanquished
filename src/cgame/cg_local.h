@@ -1475,7 +1475,9 @@ struct cgOverloadCatalogEntry_t
 	int requiredCompletedCount;
 	int maxRanks;
 	char thing[ 64 ];
+	char thingLabel[ 128 ];
 	char stat[ 64 ];
+	char statLabel[ 64 ];
 	char displayName[ 128 ];
 	char description[ 256 ];
 };

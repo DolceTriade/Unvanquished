@@ -53,6 +53,83 @@ static std::string OverloadCommandForEntry( const cgOverloadCatalogEntry_t& entr
 	return Str::Format( "upgrade %s %s", entry.thing, entry.stat );
 }
 
+static std::string OverloadWeaponIcon( const char* thing )
+{
+	if ( !thing || !*thing )
+	{
+		return "";
+	}
+
+	const weaponAttributes_t* weapon = BG_WeaponByName( thing );
+	if ( !weapon )
+	{
+		return "";
+	}
+
+	const int weaponNum = weapon->number;
+	if ( weaponNum >= 0 && weaponNum < static_cast<int>( ARRAY_LEN( cg_weapons ) ) )
+	{
+		qhandle_t icon = cg_weapons[ weaponNum ].ammoIcon ? cg_weapons[ weaponNum ].ammoIcon : cg_weapons[ weaponNum ].weaponIcon;
+		if ( icon )
+		{
+			return Str::Format( "$handle/%d", icon );
+		}
+	}
+
+	return "";
+}
+
+static std::string OverloadIconForThing( const cgOverloadCatalogEntry_t& entry, team_t team )
+{
+	if ( entry.kind == 0 )
+	{
+		const buildableAttributes_t* mainStructure = BG_Buildable( team == TEAM_ALIENS ? BA_A_OVERMIND : BA_H_REACTOR );
+		return mainStructure && mainStructure->icon ? mainStructure->icon : "";
+	}
+
+	if ( const upgradeAttributes_t* upgrade = BG_UpgradeByName( entry.thing ) )
+	{
+		if ( upgrade->icon )
+		{
+			return upgrade->icon;
+		}
+	}
+
+	if ( const buildableAttributes_t* buildable = BG_BuildableByName( entry.thing ) )
+	{
+		if ( buildable->icon )
+		{
+			return buildable->icon;
+		}
+	}
+
+	if ( const classAttributes_t* class_ = BG_ClassByName( entry.thing ) )
+	{
+		if ( class_->icon )
+		{
+			return class_->icon;
+		}
+	}
+
+	const std::string weaponIcon = OverloadWeaponIcon( entry.thing );
+	if ( !weaponIcon.empty() )
+	{
+		return weaponIcon;
+	}
+
+	if ( !Q_stricmp( entry.thing, "armor" ) )
+	{
+		return "icons/iconu_bsuit";
+	}
+
+	if ( !Q_stricmp( entry.thing, "aliens" ) )
+	{
+		return "icons/icona_lev0";
+	}
+
+	return team == TEAM_ALIENS ? "icons/icona_lev0" : "icons/iconu_biokit";
+}
+
 static int OverloadScaleCost( int cost, const cgTeamEconomyState_t& state )
 {
 	if ( cost <= 0 )
@@ -1676,6 +1753,9 @@ static void CG_Rocket_BuildOverloadList( const char *table )
 		                            entry.kind == 1 ? "unlock" : "upgrade", false );
 		Info_SetValueForKey( buf, "thing", entry.thing, false );
 		Info_SetValueForKey( buf, "group", OverloadGroupForEntry( entry ).c_str(), false );
+		Info_SetValueForKey( buf, "thingLabel", entry.thingLabel, false );
+		Info_SetValueForKey( buf, "icon", OverloadIconForThing( entry, team ).c_str(), false );
+		Info_SetValueForKey( buf, "statLabel", entry.statLabel, false );
 		Info_SetValueForKey( buf, "description", entry.description, false );
 		Info_SetValueForKey( buf, "command", OverloadCommandForEntry( entry ).c_str(), false );
 		Info_SetValueForKey( buf, "cost", OverloadFormatCurrency( OverloadNextCost( entry, i, state ), team ).c_str(), false );
