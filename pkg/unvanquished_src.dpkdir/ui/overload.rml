@@ -4,209 +4,337 @@
 	<link type="text/rcss" href="/ui/shared/infobox.rcss" />
 	<script src="lua/util.lua" />
 	<style>
+		/* Fullscreen shell */
 		body {
-			width: 60em;
-			height: 38em;
-			margin: 6% auto auto auto;
-			padding: 1.2em 1.4em;
-			background: #041518f2;
+			width: 100%;
+			height: 100%;
+			background: #01090bcc;
 			color: #d9ffff;
 		}
-		body::scrollbar {
-			margin-left: 0.4em;
+		#backdrop {
+			width: 100%;
+			height: 100%;
+			padding: 1.4em;
+			background: #031316dd;
+		}
+		#shell {
+			width: 100%;
+			height: 100%;
+			padding: 1em 1.1em 1em 1.1em;
+			background: #06191cf2;
+			border-width: 1px;
+			border-color: #1a4d53;
+		}
+
+		/* Two-column workspace */
+		#workspace {
+			display: flex;
+			align-items: stretch;
+			gap: 1em;
+			height: 100%;
+		}
+		#mainColumn {
+			display: inline-block;
+			width: 80%;
+			height: 100%;
+			vertical-align: top;
+		}
+		#sideColumn {
+			display: inline-block;
+			width: 20%;
+			height: 100%;
+			vertical-align: top;
+		}
+
+		/* Header and filters */
+		.headerbar {
+			margin-bottom: 0.5em;
 		}
 		h1 {
-			margin: 0 0 0.2em 0;
-			font-size: 1.5em;
+			margin: 0 0 0.15em 0;
+			text-align: left;
+			font-size: 1.55em;
 			color: #9efcff;
+			border-bottom-width: 0px;
 		}
-		p.subtitle {
-			margin: 0 0 1em 0;
+		.subtitle {
+			margin: 0 0 0.45em 0;
 			color: #8abdc2;
 		}
-		#content {
-			height: 29.5em;
-			overflow-y: auto;
-			padding-right: 0.5em;
+		.hint {
+			margin: 0;
+			color: #7ba8ac;
+			font-size: 0.9em;
 		}
-		.filters {
-			margin: 0 0 0.9em 0;
+		.controls {
+			margin-bottom: 0.8em;
+			padding: 0.7em 0.8em;
+			background: #0c2428cc;
+			border-width: 1px;
+			border-color: #184147;
+		}
+		.filter-row {
+			margin-bottom: 0.45em;
 		}
 		.filter-label {
 			display: inline-block;
+			width: 4.4em;
+			color: #8abdc2;
+		}
+		.controls button {
 			margin-right: 0.45em;
-			vertical-align: middle;
-		}
-		.filters button {
-			margin-right: 0.45em;
-			padding: 0.3em 0.65em;
-			background: #0f2629;
-			color: #9ed2d7;
-		}
-		.filters button.active {
-			background: #1b4f58;
-			color: #ffffff;
-		}
-		.section {
-			margin-bottom: 1.1em;
-		}
-		.section h2 {
-			margin: 0 0 0.45em 0;
-			padding-bottom: 0.2em;
-			border-bottom-width: 1px;
-			border-bottom-color: #1b4448;
-			font-size: 1.15em;
-			color: #9efcff;
-		}
-		.group-title {
-			margin: 0.7em 0 0.35em 0;
-			color: #7dd0d6;
-			font-size: 0.95em;
-			text-transform: uppercase;
-		}
-		.purchase {
-			margin-bottom: 0.7em;
-			padding: 0.75em 0.9em;
-			background: #0c2428dd;
-		}
-		.purchase.bp {
-			background: #173238dd;
-		}
-		.purchase.unlock {
-			background: #2b2115dd;
-		}
-		.purchase.upgrade {
-			background: #0c2428dd;
-		}
-		.purchase.owned {
-			background: #112216dd;
-		}
-		.purchase.partial {
-			background: #2c2815dd;
-		}
-		.purchase.locked {
-			background: #1b1d25dd;
-		}
-		.purchase.expensive {
-			background: #241818dd;
-		}
-		.purchase.maxed {
-			background: #10211bdd;
-		}
-		.purchase-header {
-			display: block;
-			margin-bottom: 0.2em;
-		}
-		.kind {
-			display: inline-block;
-			margin-right: 0.6em;
-			padding: 0.1em 0.45em;
-			background: #27474d;
-			color: #d9ffff;
-			font-size: 0.78em;
-			text-transform: uppercase;
-		}
-		.kind.unlock {
-			background: #5a3f1a;
-		}
-		.kind.upgrade {
-			background: #1d4e56;
-		}
-		.kind.bp {
-			background: #355a23;
-		}
-		.purchase h2 {
-			margin: 0;
-			font-size: 1.05em;
-			color: #ffffff;
-		}
-		.purchase p {
-			margin: 0.28em 0 0 0;
-			color: #9ed2d7;
-			white-space: pre-wrap;
-		}
-		.meta {
-			margin-top: 0.5em;
-			font-size: 0.92em;
-			color: #b8e7eb;
-		}
-		.actions {
-			margin-top: 0.55em;
-		}
-		.actions button {
-			margin-right: 0.45em;
-			padding: 0.35em 0.7em;
+			margin-bottom: 0.35em;
+			padding: 0.28em 0.7em;
 			background: #12373d;
 			color: #dfffff;
 		}
-		.actions button:hover {
-			background: #1a4b53;
+		.controls button.active {
+			background: #1b5d67;
+			color: #ffffff;
 		}
-		.actions button.owned {
+		#searchFilter {
+			display: inline-block;
+			width: 18em;
+			border-width: 1px;
+			border-color: #235359;
+		}
+
+		/* Sidebar detail panel */
+		#detailPanel {
+			padding: 0.9em;
+			background: #0d2429f2;
+			border-width: 1px;
+			border-color: #24535a;
+			height: 100%;
+			overflow-y: auto;
+		}
+		.detail-empty {
+			margin-top: 4em;
+			text-align: center;
+			color: #8abdc2;
+		}
+		.detail-layout {
+			display: block;
+		}
+		.detail-icon {
+			width: 4.2em;
+			height: 4.2em;
+			padding: 0.35em;
+			margin-bottom: 0.7em;
+			background: #102f35;
+			border-width: 1px;
+			border-color: #2e6970;
+		}
+		.detail-icon img {
+			width: 100%;
+			height: 100%;
+		}
+		.detail-info {
+			display: block;
+			width: 100%;
+		}
+		.detail-badges {
+			margin-bottom: 0.35em;
+		}
+		.badge {
+			display: inline-block;
+			margin-right: 0.45em;
+			padding: 0.12em 0.45em;
+			background: #21474d;
+			color: #d9ffff;
+			font-size: 0.8em;
+			text-transform: uppercase;
+		}
+		.badge.progress {
+			background: #6a5718;
+			color: #fff4c0;
+		}
+		.badge.complete {
+			background: #214825;
+			color: #cbf8ca;
+		}
+		.badge.locked {
+			background: #2a3440;
+			color: #c0ccd7;
+		}
+		.badge.expensive {
+			background: #4e2626;
+			color: #ffd2d2;
+		}
+		.detail-name {
+			margin: 0 0 0.15em 0;
+			font-size: 1.25em;
+			color: #ffffff;
+		}
+		.detail-category {
+			margin: 0 0 0.3em 0;
+			color: #85d5dc;
+		}
+		.detail-description {
+			margin: 0 0 0.55em 0;
+			color: #b6e6ea;
+			white-space: pre-wrap;
+		}
+		.detail-meta {
+			display: block;
+			margin-bottom: 0.15em;
+			color: #a4d8dc;
+		}
+		.detail-actions {
+			margin-top: 0.7em;
+		}
+		.detail-actions button {
+			margin-right: 0.45em;
+			padding: 0.35em 0.75em;
+			background: #14444b;
+			color: #e0ffff;
+		}
+		.detail-actions button.owned {
 			background: #244128;
 			color: #b9efb3;
 		}
-		.actions button.locked {
+		.detail-actions button.locked {
 			background: #29323a;
 			color: #9aa9b1;
 		}
-		.footer {
-			margin-top: 0.9em;
-			text-align: right;
-			color: #8abdc2;
+		.detail-upgrade {
+			margin-top: 0.95em;
+			padding-top: 0.75em;
+			border-top-width: 1px;
+			border-top-color: #1b4248;
 		}
-		#upgradeNameFilter {
+		.detail-upgrade-title {
+			margin: 0 0 0.22em 0;
+			color: #d9ffff;
+			font-size: 0.92em;
+		}
+
+		/* Scrollable content column */
+		#content {
+			height: 74%;
+			overflow-y: auto;
+			padding-right: 0.5em;
+		}
+		.section {
+			margin-bottom: 0.8em;
+			padding: 0.75em;
+			background: #091d21d9;
+			border-width: 1px;
+			border-color: #14383d;
+		}
+		.section-title {
+			margin: 0 0 0.6em 0;
+			padding-bottom: 0.18em;
+			border-bottom-width: 1px;
+			border-bottom-color: #1f4950;
+			font-size: 1.15em;
+			color: #9efcff;
+		}
+
+		/* Progression cards */
+		.progress-card {
 			display: inline-block;
-			border: 1px;
-			width: 20em;
-			vertical-align: middle;
+			width: 14.3em;
+			margin: 0 0.55em 0.55em 0;
+			padding: 0.55em;
+			background: #0d2429;
+			border-width: 1px;
+			border-color: #1f5058;
+			vertical-align: top;
+		}
+		.progress-card.available {
+			border-color: #2f7a84;
+		}
+		.progress-card.partial {
+			border-color: #9d7a21;
+		}
+		.progress-card.owned,
+		.progress-card.maxed {
+			border-color: #3f7e49;
+		}
+		.progress-card.locked {
+			border-color: #41515b;
+		}
+		.progress-card.expensive {
+			border-color: #7d3f3f;
+		}
+		.progress-header {
+			display: flex;
+			align-items: center;
+			margin-bottom: 0.4em;
+		}
+		.progress-main {
+			width: 2.9em;
+			height: 2.9em;
+			padding: 0.2em;
+			margin-right: 0.9em;
+			background: #102f35;
+			border-width: 1px;
+			border-color: #2e6970;
+		}
+		.progress-main img {
+			width: 100%;
+			height: 100%;
+		}
+		.progress-main.selected {
+			border-color: #bafcff;
+		}
+		.progress-summary {
+			display: inline-block;
+			width: 9.6em;
+			vertical-align: top;
+		}
+		.progress-name {
+			margin: 0 0 0.2em 0;
+			color: #ffffff;
+			font-size: 0.92em;
+		}
+		.progress-status {
+			color: #9ad8de;
+			font-size: 0.78em;
+		}
+		.progress-meta {
+			margin-top: 0.22em;
+			color: #7fb8bd;
+			font-size: 0.72em;
+		}
+		.progress-lines {
+			margin-top: 0.42em;
+		}
+		.progress-line {
+			display: block;
+			margin-top: 0.2em;
+			color: #9ed2d7;
+			font-size: 0.72em;
+		}
+
+		/* Shared grid / empty states */
+		.progress-grid {
+			display: flex;
+			flex-wrap: wrap;
+			gap: 0.5em;
+		}
+		.tile-icon-fallback {
+			display: inline-block;
+			width: 2.3em;
+			height: 2.3em;
+			padding-top: 0.45em;
+			background: #21474d;
+			color: #d9ffff;
+		}
+		.empty-state {
+			color: #8abdc2;
 		}
 	</style>
 	<script>
-		function printTable(t, indent)
-			indent = indent or 0
-			local spacing = string.rep("  ", indent)
-
-			if type(t) ~= "table" then
-				print(spacing .. tostring(t))
-				return
-			end
-
-			for k, v in pairs(t) do
-				local key = type(k) == "string" and '["' .. k .. '"]' or "[" .. tostring(k) .. "]"
-
-				if type(v) == "table" then
-					print(spacing .. key .. " = {")
-					printTable(v, indent + 1)
-					print(spacing .. "}")
-				else
-					local value = type(v) == "string" and '"' .. v .. '"' or tostring(v)
-					print(spacing .. key .. " = " .. value)
-				end
-			end
-		end
-
-		function KindClass(kind)
-			if kind == "bp" then return "bp" end
-			if kind == "unlock" then return "unlock" end
-			return "upgrade"
-		end
+		OverloadFilter = "available"
+		OverloadSearchFilter = ""
+		OverloadSelectedThing = ""
 
 		function KindLabel(kind)
 			if kind == "bp" then return "BP" end
 			if kind == "unlock" then return "Unlock" end
 			return "Upgrade"
-		end
-
-		OverloadFilter = "available"
-		OverloadUpgradeNameFilter = ""
-
-		function GroupLabel(group)
-			if group == nil or group == "" then return "" end
-			group = string.gsub(group, "_", " ")
-			return string.gsub(group, "(%a)([%w']*)", function(a, b)
-				return string.upper(a) .. string.lower(b)
-			end)
 		end
 
 		function StatusPriority(status)
@@ -216,6 +344,23 @@
 			if status == "locked" then return 4 end
 			if status == "owned" or status == "maxed" then return 5 end
 			return 6
+		end
+
+		function StatusLabel(status)
+			if status == "partial" then return "In Progress" end
+			if status == "available" then return "Available" end
+			if status == "expensive" then return "Need More Credits" end
+			if status == "locked" then return "Locked" end
+			if status == "owned" or status == "maxed" then return "Complete" end
+			return "Unknown"
+		end
+
+		function StatusBadgeClass(status)
+			if status == "partial" then return "progress" end
+			if status == "owned" or status == "maxed" then return "complete" end
+			if status == "locked" then return "locked" end
+			if status == "expensive" then return "expensive" end
+			return ""
 		end
 
 		function ActionLabel(kind, status)
@@ -237,17 +382,14 @@
 			return true
 		end
 
-		function UpgradeFilterMatches(row)
-			if row.kind ~= "upgrade" then return true end
-			if OverloadUpgradeNameFilter == "" then return true end
-			return string.find(string.lower(row.name or ""), string.lower(OverloadUpgradeNameFilter), 1, true) ~= nil
+		function SearchMatches(row)
+			if OverloadSearchFilter == "" then return true end
+			local haystack = string.lower((row.name or "") .. " " .. (row.thingLabel or "") .. " " .. (row.description or ""))
+			return string.find(haystack, string.lower(OverloadSearchFilter), 1, true) ~= nil
 		end
 
-		function SetFilterButtonState(document, id, active)
-			local element = document:GetElementById(id)
-			if element ~= nil then
-				element:SetClass("active", active)
-			end
+		function RowVisible(row)
+			return FilterMatches(row.status) and SearchMatches(row)
 		end
 
 		function SpendButtons(row)
@@ -286,96 +428,401 @@
 			Cmd.exec("teambuy " .. command .. " " .. spend)
 		end
 
+		-- Read and normalize the overload datasource once per redraw.
 		function ReadRows()
 			CDataSource.Build("overloadList", "default")
-			local raw = CDataSource.Read("overloadList", "default", "name,description,command,cost,progress,status,kind,group,remaining,currencyLabel,quickBuySmallLabel,quickBuyLargeLabel,requiredCompletedCount,completedPurchases,remainingCompletedCount,rank,maxRanks")
+			local raw = CDataSource.Read("overloadList", "default", "index,name,description,command,cost,progress,status,kind,thing,remaining,currencyLabel,quickBuySmallLabel,quickBuyLargeLabel,requiredCompletedCount,completedPurchases,remainingCompletedCount,rank,maxRanks,icon,thingLabel,statLabel")
 			local rows = {}
 			for i = 1, #raw do
 				rows[#rows + 1] = {
-					name = raw[i][1],
-					description = raw[i][2],
-					command = raw[i][3],
-					cost = raw[i][4],
-					progress = raw[i][5],
-					status = raw[i][6],
-					kind = raw[i][7],
-					group = raw[i][8],
-					remaining = raw[i][9],
-					currencyLabel = raw[i][10],
-					quickBuySmallLabel = raw[i][11],
-					quickBuyLargeLabel = raw[i][12],
-					requiredCompletedCount = tonumber(raw[i][13]) or 0,
-					completedPurchases = tonumber(raw[i][14]) or 0,
-					remainingCompletedCount = tonumber(raw[i][15]) or 0,
-					rank = tonumber(raw[i][16]) or 0,
-					maxRanks = tonumber(raw[i][17]) or 0,
+					index = tonumber(raw[i][1]) or i,
+					name = raw[i][2],
+					description = raw[i][3],
+					command = raw[i][4],
+					cost = raw[i][5],
+					progress = raw[i][6],
+					status = raw[i][7],
+					kind = raw[i][8],
+					thing = raw[i][9],
+					remaining = raw[i][10],
+					currencyLabel = raw[i][11],
+					quickBuySmallLabel = raw[i][12],
+					quickBuyLargeLabel = raw[i][13],
+					requiredCompletedCount = tonumber(raw[i][14]) or 0,
+					completedPurchases = tonumber(raw[i][15]) or 0,
+					remainingCompletedCount = tonumber(raw[i][16]) or 0,
+					rank = tonumber(raw[i][17]) or 0,
+					maxRanks = tonumber(raw[i][18]) or 0,
+					icon = raw[i][19],
+					thingLabel = raw[i][20],
+					statLabel = raw[i][21],
 				}
 			end
 			table.sort(rows, function(a, b)
+				if (a.thingLabel or "") ~= (b.thingLabel or "") then return (a.thingLabel or "") < (b.thingLabel or "") end
 				if a.kind ~= b.kind then return a.kind < b.kind end
-				if a.group ~= b.group then return a.group < b.group end
 				if a.status ~= b.status then return StatusPriority(a.status) < StatusPriority(b.status) end
 				return a.name < b.name
 			end)
 			return rows
 		end
 
-		function MetaHtml(row)
-			local meta = string.format(
-				'<div class="meta">Next cost: %s %s</div><div class="meta">Progress: %s</div>',
-				Rocket_QuakeToRML(row.cost),
-				Rocket_QuakeToRML(row.currencyLabel),
-				Rocket_QuakeToRML(row.progress))
-
-			if row.requiredCompletedCount > 0 then
-				meta = meta .. string.format(
-					'<div class="meta">Team progression: %d / %d completed purchases</div>',
-					row.completedPurchases,
-					row.requiredCompletedCount)
-			end
-
-			return meta
+		function GenericThingLabel(row)
+			local text = row.thing or ""
+			text = string.gsub(text, "_", " ")
+			text = string.gsub(text, "(%a)([%w_]*)", function(first, rest)
+				return string.upper(first) .. string.lower(rest)
+			end)
+			return text
 		end
 
-		function RenderRows(rows, filterKind)
-			local html = ""
-			local lastGroup = ""
+		function FallbackLabel(row)
+			if row.kind == "bp" then return "BP" end
+			if row.kind == "unlock" then return "UN" end
+			return "UP"
+		end
+
+		function TileIconHtml(row)
+			if row.icon ~= nil and row.icon ~= "" then
+				return string.format('<img src="/%s"/>', row.icon)
+			end
+			return string.format('<div class="tile-icon-fallback">%s</div>', FallbackLabel(row))
+		end
+
+		function DisplayLabel(row)
+			if row.thingLabel ~= nil and row.thingLabel ~= "" then
+				return row.thingLabel
+			end
+			local generic = GenericThingLabel(row)
+			if generic ~= "" then
+				return generic
+			end
+			return row.name or ""
+		end
+
+		function RowRemainingCost(row)
+			return tonumber(row.remaining) or 0
+		end
+
+		-- Merge unlocks, upgrades, and BP into one progression card per thing.
+		function VisibleProgressionGroups(rows)
+			local groups = {}
 			for i = 1, #rows do
 				local row = rows[i]
-				if row.kind == filterKind and FilterMatches(row.status) and UpgradeFilterMatches(row) then
-					local typeClass = KindClass(row.kind)
-					if filterKind == "upgrade" and row.group ~= lastGroup then
-						html = html .. string.format('<div class="group-title">%s</div>', Rocket_QuakeToRML(GroupLabel(row.group)))
-						lastGroup = row.group
+				if RowVisible(row) then
+					local key = row.thing or row.thingLabel or row.name
+					local group = groups[key]
+					if group == nil then
+						group = {
+							key = key,
+							unlock = nil,
+							upgrades = {},
+							mainRow = row,
+						}
+						groups[key] = group
 					end
-					html = html .. string.format(
-						'<div class="purchase %s %s">' ..
-						'<div class="purchase-header"><span class="kind %s">%s</span><h2>%s</h2></div>' ..
-						'<p>%s</p>' ..
-						'%s' ..
-						'<div class="actions">%s</div>' ..
-						'</div>',
-						typeClass,
-						row.status,
-						typeClass,
-						KindLabel(row.kind),
-						Rocket_QuakeToRML(row.name),
-						row.description,
-						MetaHtml(row),
-						SpendButtons(row))
+
+					if row.kind == "unlock" then
+						group.unlock = row
+						group.mainRow = row
+					else
+						group.upgrades[#group.upgrades + 1] = row
+						if group.unlock == nil and #group.upgrades == 1 then
+							group.mainRow = row
+						end
+					end
 				end
 			end
-			if html == "" then
-				html = '<p class="subtitle">No matching entries.</p>'
+
+			local order = {}
+			for key, _ in pairs(groups) do
+				order[#order + 1] = key
 			end
-			return html
+
+			table.sort(order, function(a, b)
+				local groupA = groups[a]
+				local groupB = groups[b]
+				local costA = GroupSortCost(groupA)
+				local costB = GroupSortCost(groupB)
+				if costA ~= costB then return costA < costB end
+				return string.lower(DisplayLabel(groupA.mainRow)) < string.lower(DisplayLabel(groupB.mainRow))
+			end)
+
+			return groups, order
 		end
 
-		function BuildOverloadMenu(document)
-			local rows = ReadRows()
-			document:GetElementById("bpRows").inner_rml = RenderRows(rows, "bp")
-			document:GetElementById("unlockRows").inner_rml = RenderRows(rows, "unlock")
-			document:GetElementById("upgradeRows").inner_rml = RenderRows(rows, "upgrade")
+		function EnsureSelectedGroup(groups, order)
+			if OverloadSelectedThing ~= "" and groups[OverloadSelectedThing] ~= nil then
+				return groups[OverloadSelectedThing]
+			end
+
+			if #order > 0 then
+				OverloadSelectedThing = order[1]
+				return groups[order[1]]
+			end
+
+			OverloadSelectedThing = ""
+			return nil
+		end
+
+		function GroupSortCost(group)
+			if group.mainRow ~= nil and group.mainRow.kind == "bp" then
+				return RowRemainingCost(group.mainRow)
+			end
+
+			if group.unlock ~= nil and group.unlock.status ~= "owned" and group.unlock.status ~= "maxed" then
+				return RowRemainingCost(group.unlock)
+			end
+
+			local best = nil
+			for i = 1, #group.upgrades do
+				local row = group.upgrades[i]
+				local cost = RowRemainingCost(row)
+				if best == nil or cost < best then
+					best = cost
+				end
+			end
+
+			return best or 0
+		end
+
+		function GroupStatus(group)
+			if group.mainRow ~= nil and group.mainRow.kind == "bp" then
+				return group.mainRow.status
+			end
+
+			if group.unlock ~= nil and #group.upgrades == 0 then
+				return group.unlock.status
+			end
+
+			local best = group.unlock ~= nil and group.unlock.status or "maxed"
+			for i = 1, #group.upgrades do
+				local status = group.upgrades[i].status
+				if StatusPriority(status) < StatusPriority(best) then
+					best = status
+				end
+			end
+			return best
+		end
+
+		function GroupStatusText(group)
+			if group.mainRow ~= nil and group.mainRow.kind == "bp" then
+				return StatusLabel(group.mainRow.status)
+			end
+
+			if group.unlock ~= nil and group.unlock.status ~= "owned" and group.unlock.status ~= "maxed" then
+				return "LOCKED"
+			end
+
+			if #group.upgrades == 0 then
+				return StatusLabel(GroupStatus(group))
+			end
+
+			return string.format('%d upgrades, %s', #group.upgrades, StatusLabel(GroupStatus(group)))
+		end
+
+		function GroupMetaText(group)
+			if group.mainRow ~= nil and group.mainRow.kind == "bp" then
+				return string.format('Bundle: %s', group.mainRow.progress or "")
+			end
+
+			if group.unlock ~= nil and group.unlock.status ~= "owned" and group.unlock.status ~= "maxed" then
+				return string.format('%s to unlock', group.unlock.progress or "")
+			end
+
+			if #group.upgrades == 0 then
+				if group.unlock ~= nil then
+					return "Unlocked"
+				end
+				return "No upgrades"
+			end
+
+			local partialCount = 0
+			local availableCount = 0
+			local expensiveCount = 0
+			local doneCount = 0
+
+			for i = 1, #group.upgrades do
+				local status = group.upgrades[i].status
+				if status == "partial" then partialCount = partialCount + 1 end
+				if status == "available" then availableCount = availableCount + 1 end
+				if status == "expensive" then expensiveCount = expensiveCount + 1 end
+				if status == "owned" or status == "maxed" then doneCount = doneCount + 1 end
+			end
+
+			if partialCount > 0 then
+				return string.format('%d in progress, %d complete', partialCount, doneCount)
+			end
+
+			if availableCount > 0 then
+				return string.format('%d ready, %d complete', availableCount, doneCount)
+			end
+
+			if expensiveCount > 0 then
+				return string.format('%d waiting for credits', expensiveCount)
+			end
+
+			return string.format('%d complete', doneCount)
+		end
+
+		function UpgradeLineText(row)
+			local nextRank = (tonumber(row.rank) or 0) + 1
+			return string.format('%s for %s +%d', row.progress or "", row.statLabel or "upgrade", nextRank)
+		end
+
+		function UpgradeDetailTitle(row)
+			local nextRank = (tonumber(row.rank) or 0) + 1
+			return string.format('%s +%d', row.statLabel or "upgrade", nextRank)
+		end
+
+		function GroupBodyHtml(group)
+			if #group.upgrades == 0 then
+				return '<div class="empty-state">No upgrades yet.</div>'
+			end
+
+			local html = ""
+			for i = 1, #group.upgrades do
+				local row = group.upgrades[i]
+				html = html .. string.format(
+					'<div class="progress-line">%s</div>',
+					Rocket_QuakeToRML(UpgradeLineText(row)))
+			end
+			return '<div class="progress-lines">' .. html .. '</div>'
+		end
+
+		-- Render the main browsing surface.
+		function RenderProgression(groups, order)
+			local html = ""
+			local count = 0
+			for i = 1, #order do
+				local group = groups[order[i]]
+				local main = group.mainRow
+				local status = GroupStatus(group)
+				html = html .. string.format(
+					'<div class="progress-card %s">' ..
+					'<div class="progress-header">' ..
+					'<button class="progress-main %s" onclick="OverloadSelectThing(\'%s\', document)">%s</button>' ..
+					'<div class="progress-summary"><div class="progress-name">%s</div><div class="progress-status">%s</div><div class="progress-meta">%s</div></div>' ..
+					'</div>' ..
+					'%s' ..
+					'</div>',
+					status,
+					group.key == OverloadSelectedThing and "selected" or "",
+					group.key,
+					TileIconHtml(main),
+					Rocket_QuakeToRML(DisplayLabel(main)),
+					Rocket_QuakeToRML(GroupStatusText(group)),
+					Rocket_QuakeToRML(GroupMetaText(group)),
+					GroupBodyHtml(group))
+				count = count + 1
+			end
+
+			if count == 0 then
+				return '<div class="empty-state">No matching entries.</div>'
+			end
+
+			return '<div class="progress-grid">' .. html .. '</div>'
+		end
+
+		function RenderUpgradeDetail(row)
+			return string.format(
+				'<div class="detail-upgrade">' ..
+				'<div class="detail-upgrade-title">%s</div>' ..
+				'<div class="detail-meta">%s</div>' ..
+				'<div class="detail-meta">Next cost: %s %s</div>' ..
+				'<div class="detail-meta">%s</div>' ..
+				'<div class="detail-actions">%s</div>' ..
+				'</div>',
+				Rocket_QuakeToRML(UpgradeDetailTitle(row)),
+				Rocket_QuakeToRML(row.progress or ""),
+				Rocket_QuakeToRML(row.cost),
+				Rocket_QuakeToRML(row.currencyLabel),
+				Rocket_QuakeToRML(row.description or ""),
+				SpendButtons(row))
+		end
+
+		-- Render the right-hand inspector for the selected thing.
+		function RenderDetail(group)
+			if group == nil then
+				return '<div class="detail-empty">No matching entries.</div>'
+			end
+
+			local row = group.mainRow
+			local detailCategory = ""
+			if row.thingLabel ~= nil and row.thingLabel ~= "" and row.thingLabel ~= row.name then
+				detailCategory = string.format('<div class="detail-category">%s</div>', Rocket_QuakeToRML(row.thingLabel))
+			end
+
+			local detailBody = ""
+			if row.kind == "bp" then
+				detailBody = string.format(
+					'<div class="detail-meta">Next cost: %s %s</div>' ..
+					'<div class="detail-meta">Progress: %s</div>' ..
+					'<div class="detail-actions">%s</div>',
+					Rocket_QuakeToRML(row.cost),
+					Rocket_QuakeToRML(row.currencyLabel),
+					Rocket_QuakeToRML(row.progress),
+					SpendButtons(row))
+			elseif group.unlock ~= nil and group.unlock.status ~= "owned" and group.unlock.status ~= "maxed" then
+				local unlock = group.unlock
+				local progression = ""
+				if unlock.requiredCompletedCount > 0 then
+					progression = string.format(
+						'<div class="detail-meta">Team progression: %d / %d completed purchases</div>',
+						unlock.completedPurchases,
+						unlock.requiredCompletedCount)
+				end
+
+				detailBody = string.format(
+					'<div class="detail-meta">Next cost: %s %s</div>' ..
+					'<div class="detail-meta">%s to unlock</div>' ..
+					'%s' ..
+					'<div class="detail-actions">%s</div>',
+					Rocket_QuakeToRML(unlock.cost),
+					Rocket_QuakeToRML(unlock.currencyLabel),
+					Rocket_QuakeToRML(unlock.progress),
+					progression,
+					SpendButtons(unlock))
+			else
+				local blocks = ""
+				for i = 1, #group.upgrades do
+					blocks = blocks .. RenderUpgradeDetail(group.upgrades[i])
+				end
+				if blocks == "" then
+					blocks = '<div class="empty-state">No upgrades yet.</div>'
+				end
+				detailBody = blocks
+			end
+
+			return string.format(
+				'<div class="detail-layout">' ..
+				'<div class="detail-icon">%s</div>' ..
+				'<div class="detail-info">' ..
+				'<div class="detail-badges"><span class="badge">%s</span><span class="badge %s">%s</span></div>' ..
+				'<div class="detail-name">%s</div>' ..
+				'%s' ..
+				'<div class="detail-description">%s</div>' ..
+				'%s' ..
+				'</div>' ..
+				'</div>',
+				TileIconHtml(row),
+				row.kind == "bp" and KindLabel(row.kind) or (group.unlock ~= nil and group.unlock.status ~= "owned" and group.unlock.status ~= "maxed" and "Unlock" or "Upgrades"),
+				StatusBadgeClass(GroupStatus(group)),
+				GroupStatusText(group),
+				Rocket_QuakeToRML(DisplayLabel(row)),
+				detailCategory,
+				Rocket_QuakeToRML(row.description or ""),
+				detailBody)
+		end
+
+		function SetFilterButtonState(document, id, active)
+			local element = document:GetElementById(id)
+			if element ~= nil then
+				element:SetClass("active", active)
+			end
+		end
+
+		function RefreshFilterButtons(document)
 			SetFilterButtonState(document, "filterAll", OverloadFilter == "all")
 			SetFilterButtonState(document, "filterAvailable", OverloadFilter == "available")
 			SetFilterButtonState(document, "filterProgress", OverloadFilter == "progress")
@@ -383,13 +830,27 @@
 			SetFilterButtonState(document, "filterDone", OverloadFilter == "done")
 		end
 
+		function BuildOverloadMenu(document)
+			local rows = ReadRows()
+			local groups, order = VisibleProgressionGroups(rows)
+			local selected = EnsureSelectedGroup(groups, order)
+			document:GetElementById("detailPanel").inner_rml = RenderDetail(selected)
+			document:GetElementById("progressionRows").inner_rml = RenderProgression(groups, order)
+			RefreshFilterButtons(document)
+		end
+
+		function OverloadSelectThing(thing, document)
+			OverloadSelectedThing = thing or ""
+			BuildOverloadMenu(document)
+		end
+
 		function OverloadSetFilter(filter, document)
 			OverloadFilter = filter
 			BuildOverloadMenu(document)
 		end
 
-		function OverloadSetUpgradeNameFilter(element, document)
-			OverloadUpgradeNameFilter = element.attributes["value"] or ""
+		function OverloadSetSearchFilter(element, document)
+			OverloadSearchFilter = element.attributes["value"] or ""
 			BuildOverloadMenu(document)
 		end
 
@@ -402,32 +863,41 @@
 	</script>
 </head>
 	<body id="overload" onshow="CloseOtherCirclemenus(event) BuildOverloadMenu(document)" onrefreshdata="BuildOverloadMenu(document)" onmousedown="RightClickClose(event, document)" onkeydown="OverloadHandleKey(event, document)">
-		<h1><translate>Overload</translate></h1>
-		<p class="subtitle"><translate>Spend personal resources at the main structure to fund team BP, unlocks, and upgrades.</translate></p>
-		<div class="filters">
-			<button id="filterAvailable" onclick="OverloadSetFilter('available', document)"><translate>Available</translate></button>
-			<button id="filterProgress" onclick="OverloadSetFilter('progress', document)"><translate>In Progress</translate></button>
-			<button id="filterFuture" onclick="OverloadSetFilter('future', document)"><translate>Future</translate></button>
-			<button id="filterDone" onclick="OverloadSetFilter('done', document)"><translate>Completed</translate></button>
-			<button id="filterAll" onclick="OverloadSetFilter('all', document)"><translate>All</translate></button>
-		</div>
-		<div class="filters">
-			<span class="filter-label">Filter:</span><input id="upgradeNameFilter" type="text" class="text" value="" onkeyup="OverloadSetUpgradeNameFilter(event.target_element, document)" placeholder="Filter upgrade names"/>
-		</div>
-		<div id="content">
-			<div class="section">
-				<h2><translate>Build Points</translate></h2>
-				<div id="bpRows"></div>
+		<div id="backdrop">
+			<div id="shell">
+				<div id="workspace">
+					<div id="mainColumn">
+						<div class="headerbar">
+							<h1><translate>Overload</translate></h1>
+							<p class="subtitle"><translate>Fund team progression by buying bundles, unlocks, and upgrades at the main structure.</translate></p>
+							<p class="hint"><translate>Press ESC or right click to close.</translate></p>
+						</div>
+						<div class="controls">
+							<div class="filter-row">
+								<span class="filter-label"><translate>Show</translate></span>
+								<button id="filterAvailable" onclick="OverloadSetFilter('available', document)"><translate>Available</translate></button>
+								<button id="filterProgress" onclick="OverloadSetFilter('progress', document)"><translate>In Progress</translate></button>
+								<button id="filterFuture" onclick="OverloadSetFilter('future', document)"><translate>Future</translate></button>
+								<button id="filterDone" onclick="OverloadSetFilter('done', document)"><translate>Completed</translate></button>
+								<button id="filterAll" onclick="OverloadSetFilter('all', document)"><translate>All</translate></button>
+							</div>
+							<div class="filter-row">
+								<span class="filter-label"><translate>Search</translate></span>
+								<input id="searchFilter" type="text" class="text" value="" onkeyup="OverloadSetSearchFilter(event.target_element, document)" placeholder="Filter upgrades, unlocks, or items"/>
+							</div>
+						</div>
+						<div id="content">
+						<div class="section">
+							<div class="section-title"><translate>Progression</translate></div>
+							<div id="progressionRows"></div>
+						</div>
+						</div>
+					</div>
+					<div id="sideColumn">
+						<div id="detailPanel"></div>
+					</div>
+				</div>
 			</div>
-			<div class="section">
-				<h2><translate>Unlocks</translate></h2>
-				<div id="unlockRows"></div>
-			</div>
-			<div class="section">
-				<h2><translate>Upgrades</translate></h2>
-				<div id="upgradeRows"></div>
-			</div>
 		</div>
-		<div class="footer"><translate>Press ESC or right click to close.</translate></div>
 	</body>
 </rml>
