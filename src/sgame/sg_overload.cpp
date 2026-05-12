@@ -634,16 +634,16 @@ static int DefaultUpgradeStepCost( int requiredCompletedCount )
 	return OVERLOAD_UPGRADE_STEP_COST_STAGE1;
 }
 
-static int UnlockCost( bgAttributeFamily_t family, int objectIndex )
+static int UnlockCost( unlockableType_t unlockableType, int itemNum )
 {
 	int authoredUnlockValue = 0;
 
-	switch ( family )
+	switch ( unlockableType )
 	{
-		case BG_ATTR_WEAPON: authoredUnlockValue = BG_Weapon( objectIndex + 1 )->unlockThreshold; break;
-		case BG_ATTR_UPGRADE: authoredUnlockValue = BG_Upgrade( objectIndex + 1 )->unlockThreshold; break;
-		case BG_ATTR_BUILDABLE: authoredUnlockValue = BG_Buildable( objectIndex + 1 )->unlockThreshold; break;
-		case BG_ATTR_CLASS: authoredUnlockValue = BG_Class( objectIndex )->unlockThreshold; break;
+		case UNLT_WEAPON: authoredUnlockValue = BG_Weapon( itemNum )->unlockThreshold; break;
+		case UNLT_UPGRADE: authoredUnlockValue = BG_Upgrade( itemNum )->unlockThreshold; break;
+		case UNLT_BUILDABLE: authoredUnlockValue = BG_Buildable( itemNum )->unlockThreshold; break;
+		case UNLT_CLASS: authoredUnlockValue = BG_Class( itemNum )->unlockThreshold; break;
 		default: authoredUnlockValue = 0; break;
 	}
 
@@ -711,7 +711,7 @@ static void AddUnlock( team_t team, int requiredCompletedCount, unlockableType_t
 {
 	(void) requiredCompletedCount;
 	AddUnlockWithCost( team, unlockableType, itemNum, family, objectIndex, unlockField,
-	                   UnlockCost( family, objectIndex ),
+	                   UnlockCost( unlockableType, itemNum ),
 	                   thing, thingLabel, displayName, uiDescription );
 }
 
