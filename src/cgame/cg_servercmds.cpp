@@ -141,7 +141,9 @@ void CG_ParseOverloadCatalogConfig( int index, const char* config )
 	entry.requiredCompletedCount = atoi( Info_ValueForKey( config, "req" ) );
 	entry.maxRanks = atoi( Info_ValueForKey( config, "mr" ) );
 	Q_strncpyz( entry.thing, Info_ValueForKey( config, "thing" ), sizeof( entry.thing ) );
+	Q_strncpyz( entry.thingLabel, Info_ValueForKey( config, "tl" ), sizeof( entry.thingLabel ) );
 	Q_strncpyz( entry.stat, Info_ValueForKey( config, "stat" ), sizeof( entry.stat ) );
+	Q_strncpyz( entry.statLabel, Info_ValueForKey( config, "sl" ), sizeof( entry.statLabel ) );
 	Q_strncpyz( entry.displayName, Info_ValueForKey( config, "name" ), sizeof( entry.displayName ) );
 	Q_strncpyz( entry.description, Info_ValueForKey( config, "desc" ), sizeof( entry.description ) );
 
