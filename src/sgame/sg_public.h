@@ -111,9 +111,9 @@ void              G_BuildableTouchTriggers( gentity_t *ent );
 void ABarricade_Shrink( gentity_t *self, bool shrink );
 
 // sg_buildpoints
-void              G_UpdateBuildPointBudgets();
-void              G_RecoverBuildPoints();
 void              G_UpdateMinerIncome();
+int               G_InitialBudgetForTeam( team_t team );
+void              G_SetTeamBuildPoints( team_t team, int amount );
 int               G_GetFreeBudget(team_t team);
 int               G_GetMarkedBudget(team_t team);
 int               G_GetSpendableBudget(team_t team);
