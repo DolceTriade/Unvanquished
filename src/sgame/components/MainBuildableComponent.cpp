@@ -28,8 +28,6 @@ void MainBuildableComponent::HandleDamage(float /*amount*/, gentity_t* /*source*
 }
 
 void MainBuildableComponent::HandleDie(gentity_t* /*killer*/, meansOfDeath_t meansOfDeath) {
-	G_UpdateBuildPointBudgets();
-
 	if (G_IsWarnableMOD(meansOfDeath)) {
 		// TODO: Use TeamComponent.
 		G_BroadcastEvent(EV_MAIN_DYING, 0, entity.oldEnt->buildableTeam);
@@ -37,7 +35,5 @@ void MainBuildableComponent::HandleDie(gentity_t* /*killer*/, meansOfDeath_t mea
 }
 
 void MainBuildableComponent::HandleFinishConstruction() {
-	G_UpdateBuildPointBudgets();
-
 	// TODO: Generate event that informs team here.
 }

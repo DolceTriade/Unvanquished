@@ -30,9 +30,6 @@ along with Unvanquished. If not, see <http://www.gnu.org/licenses/>.
 #include <cmath>
 #include <limits>
 
-void G_RecoverBuildPoints() {
-}
-
 static bool MinerReadyForPayout( team_t team, Entity& entity, MiningComponent& miningComponent )
 {
 	return G_Team( entity.oldEnt ) == team
@@ -106,6 +103,17 @@ void G_UpdateMinerIncome()
 			nextPayoutTime += MINER_INTERVAL;
 		}
 	}
+}
+
+void G_SetTeamBuildPoints( team_t team, int amount )
+{
+	if ( !G_IsPlayableTeam( team ) )
+	{
+		return;
+	}
+
+	level.team[ team ].totalBudget = amount;
+	G_PublishOverloadState( team );
 }
 
 /**
