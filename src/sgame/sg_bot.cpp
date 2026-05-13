@@ -799,6 +799,8 @@ void G_Bot_ResetBehaviorState( botMemory_t &memory )
 	memory.runningNodes.clear();
 	memory.goal.clear();
 	memory.clearNav();
+	memory.overloadTargetPurchase = -1;
+	memory.overloadNextPurchaseTime = 0;
 	memory.lastNavconTime = 0;
 	memory.lastNavconDistance = 0;
 	memory.hasOffmeshGoal = false;

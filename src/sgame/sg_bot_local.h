@@ -157,6 +157,8 @@ struct botMemory_t
 	// Alive state, reset when bot spawns {
 		int spawnTime;
 		int lastThink;
+		int overloadTargetPurchase;
+		int overloadNextPurchaseTime;
 
 		int stuckTime;
 		glm::vec3 stuckPosition;
