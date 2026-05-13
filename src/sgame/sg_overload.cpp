@@ -1431,8 +1431,6 @@ void G_InitOverloadEconomy()
 		level.team[ team ].queuedBudget = 0;
 		level.team[ team ].nextMinerPayoutTime = 0;
 		level.team[ team ].overloadProgress = 0;
-		level.team[ team ].overloadBotTargetPurchase = -1;
-		level.team[ team ].overloadBotNextPurchaseTime = 0;
 
 		TeamEconomyState& economy = TeamEconomy( team );
 		economy.completedPurchases = 0;
@@ -1707,15 +1705,15 @@ bool G_OverloadPurchaseByIndex( gentity_t *ent, int purchaseIndex, int spend, st
 
 	if ( entry.kind == overloadPurchaseKind_t::BP_BUNDLE )
 	{
-		return G_OverloadPurchase( ent, Cmd::Args( Str::Format( "bp %d", spend ) ), message );
+		return G_OverloadPurchase( ent, Cmd::Args( Str::Format( "teambuy %s %d", entry.thing, spend ) ), message );
 	}
 
 	if ( entry.kind == overloadPurchaseKind_t::UNLOCK )
 	{
-		return G_OverloadPurchase( ent, Cmd::Args( Str::Format( "unlock %s %d", entry.thing, spend ) ), message );
+		return G_OverloadPurchase( ent, Cmd::Args( Str::Format( "teambuy unlock %s %d", entry.thing, spend ) ), message );
 	}
 
-	return G_OverloadPurchase( ent, Cmd::Args( Str::Format( "upgrade %s %s %d", entry.thing, entry.stat, spend ) ), message );
+	return G_OverloadPurchase( ent, Cmd::Args( Str::Format( "teambuy upgrade %s %s %d", entry.thing, entry.stat, spend ) ), message );
 }
 
 void G_UpdateOverloadCostScaling()
