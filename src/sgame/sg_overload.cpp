@@ -165,7 +165,7 @@ static void CheckOverloadCatalogReady()
 
 constexpr int OVERLOAD_UNCAPPED_RANKS = std::numeric_limits<int>::max();
 
-static int InitialBudgetForTeam( team_t team )
+int G_InitialBudgetForTeam( team_t team )
 {
 	if ( team == TEAM_ALIENS && g_BPInitialBudgetAliens.Get() >= 0 )
 	{
@@ -1420,24 +1420,13 @@ void G_PublishOverloadState( team_t team )
 	PublishOverloadStateInternal( team );
 }
 
-void G_UpdateBuildPointBudgets()
-{
-	for ( team_t team = TEAM_NONE; ( team = G_IterateTeams( team ) ); )
-	{
-		if ( level.team[ team ].totalBudget == 0 && level.team[ team ].spentBudget == 0 )
-		{
-			level.team[ team ].totalBudget = InitialBudgetForTeam( team );
-		}
-	}
-}
-
 void G_InitOverloadEconomy()
 {
 	BuildOverloadCatalog();
 
 	for ( team_t team = TEAM_NONE; ( team = G_IterateTeams( team ) ); )
 	{
-		level.team[ team ].totalBudget = InitialBudgetForTeam( team );
+		level.team[ team ].totalBudget = G_InitialBudgetForTeam( team );
 		level.team[ team ].spentBudget = 0;
 		level.team[ team ].queuedBudget = 0;
 		level.team[ team ].nextMinerPayoutTime = 0;

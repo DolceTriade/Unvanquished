@@ -105,6 +105,14 @@ Cvar::Cvar<bool> pmove_accurate("pmove_accurate", "don't round player velocity t
 Cvar::Cvar<float> g_minNameChangePeriod("g_minNameChangePeriod", "player must wait x seconds to change name", Cvar::NONE, 5);
 Cvar::Cvar<int> g_maxNameChanges("g_maxNameChanges", "max name changes per game", Cvar::NONE, 5);
 
+static void G_ApplyInitialBuildPointBudgets()
+{
+	for ( team_t team = TEAM_NONE; ( team = G_IterateTeams( team ) ); )
+	{
+		G_SetTeamBuildPoints( team, G_InitialBudgetForTeam( team ) );
+	}
+}
+
 // gameplay: mining
 Cvar::Callback<Cvar::Cvar<int>> g_buildPointInitialBudget(
 		"g_BPInitialBudget",
@@ -112,7 +120,7 @@ Cvar::Callback<Cvar::Cvar<int>> g_buildPointInitialBudget(
 		Cvar::SERVERINFO,
 		DEFAULT_BP_INITIAL_BUDGET,
 		[](int) {
-			G_UpdateBuildPointBudgets();
+			G_ApplyInitialBuildPointBudgets();
 		});
 Cvar::Callback<Cvar::Cvar<int>> g_BPInitialBudgetHumans(
 		"g_BPInitialBudgetHumans",
@@ -120,7 +128,7 @@ Cvar::Callback<Cvar::Cvar<int>> g_BPInitialBudgetHumans(
 		Cvar::SERVERINFO,
 		-1,
 		[](int) {
-			G_UpdateBuildPointBudgets();
+			G_ApplyInitialBuildPointBudgets();
 		});
 Cvar::Callback<Cvar::Cvar<int>> g_BPInitialBudgetAliens(
 		"g_BPInitialBudgetAliens",
@@ -128,7 +136,7 @@ Cvar::Callback<Cvar::Cvar<int>> g_BPInitialBudgetAliens(
 		Cvar::SERVERINFO,
 		-1,
 		[](int) {
-			G_UpdateBuildPointBudgets();
+			G_ApplyInitialBuildPointBudgets();
 		});
 Cvar::Cvar<bool> g_humanAllowBuilding(
 		"g_humanAllowBuilding",
@@ -647,11 +655,6 @@ void G_InitGame( int levelTime, int randomSeed, bool inClient )
 
 	G_InitOverloadEconomy();
 
-	// Spend build points for layout buildables.
-	for (team_t team = TEAM_NONE; (team = G_IterateTeams(team)); ) {
-		G_SpendBudget(team, level.team[team].layoutBuildPoints);
-	}
-
 	Log::Notice( "-----------------------------------" );
 
 	G_UpdateTeamConfigStrings();
@@ -666,9 +669,6 @@ void G_InitGame( int levelTime, int randomSeed, bool inClient )
 	}
 
 	G_notify_sensor_start();
-
-	// Ensure the consumable BP state matches the initial layout.
-	G_UpdateBuildPointBudgets();
 
 	// Initialize Lua
 	Lua::Initialize();
@@ -2426,9 +2426,6 @@ void G_RunFrame( int levelTime )
 
 	// save position information for all active clients
 	G_UnlaggedStore();
-
-	// Check if a build point can be removed from the queue.
-	G_RecoverBuildPoints();
 
 	// Power down buildables if there is a budget deficit.
 	G_UpdateBuildablePowerStates();

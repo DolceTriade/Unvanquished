@@ -416,6 +416,7 @@ void G_UpdateBuildablePowerStates()
 		ForEntities<BuildableComponent>([&](Entity& entity, BuildableComponent& buildableComponent) {
 			if (G_Team(entity.oldEnt) != team) return;
 			if ( entity.Get<MainBuildableComponent>() ) return;
+			if ( entity.Get<SpawnerComponent>() ) return;
 			buildableComponent.SetPowerState( activeMainBuildable != nullptr );
 		});
 	}
