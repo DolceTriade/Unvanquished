@@ -670,8 +670,6 @@ struct level_locals_t
 		bool             locked;
 		float            overloadProgress;
 		TeamEconomyState economy;
-		int              overloadBotTargetPurchase;
-		int              overloadBotNextPurchaseTime;
 		int              layoutBuildPoints;
 		int              botFillTeamSize;
 		int              botFillSkillLevel;

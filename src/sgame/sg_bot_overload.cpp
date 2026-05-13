@@ -24,6 +24,7 @@ along with Unvanquished. If not, see <http://www.gnu.org/licenses/>.
 
 #include "common/Common.h"
 #include "sg_local.h"
+#include "sg_bot_local.h"
 
 static constexpr int OVERLOAD_BOT_PURCHASE_COOLDOWN = 3000;
 static constexpr int OVERLOAD_BOT_FAILURE_COOLDOWN = 1000;
@@ -81,7 +82,7 @@ void G_BotOverloadThink( gentity_t *ent )
 		return;
 	}
 
-	if ( level.time < level.team[ team ].overloadBotNextPurchaseTime )
+	if ( level.time < ent->botMind->overloadNextPurchaseTime )
 	{
 		return;
 	}
@@ -95,29 +96,29 @@ void G_BotOverloadThink( gentity_t *ent )
 	int purchaseIndex = FindBotPartialPurchase( team );
 	if ( purchaseIndex >= 0 )
 	{
-		level.team[ team ].overloadBotTargetPurchase = purchaseIndex;
+		ent->botMind->overloadTargetPurchase = purchaseIndex;
 	}
 	else
 	{
-		purchaseIndex = level.team[ team ].overloadBotTargetPurchase;
+		purchaseIndex = ent->botMind->overloadTargetPurchase;
 		if ( G_OverloadEntryRemainingSpendCapacity( team, purchaseIndex ) <= 0 )
 		{
 			purchaseIndex = FindBotFreshPurchase( team );
-			level.team[ team ].overloadBotTargetPurchase = purchaseIndex;
+			ent->botMind->overloadTargetPurchase = purchaseIndex;
 		}
 	}
 
 	if ( purchaseIndex < 0 )
 	{
-		level.team[ team ].overloadBotNextPurchaseTime = level.time + OVERLOAD_BOT_PURCHASE_COOLDOWN;
+		ent->botMind->overloadNextPurchaseTime = level.time + OVERLOAD_BOT_PURCHASE_COOLDOWN;
 		return;
 	}
 
 	const int remaining = G_OverloadEntryRemainingSpendCapacity( team, purchaseIndex );
 	if ( remaining <= 0 )
 	{
-		level.team[ team ].overloadBotTargetPurchase = -1;
-		level.team[ team ].overloadBotNextPurchaseTime = level.time + OVERLOAD_BOT_FAILURE_COOLDOWN;
+		ent->botMind->overloadTargetPurchase = -1;
+		ent->botMind->overloadNextPurchaseTime = level.time + OVERLOAD_BOT_FAILURE_COOLDOWN;
 		return;
 	}
 
@@ -129,21 +130,32 @@ void G_BotOverloadThink( gentity_t *ent )
 
 	if ( spend <= 0 )
 	{
-		level.team[ team ].overloadBotNextPurchaseTime = level.time + OVERLOAD_BOT_FAILURE_COOLDOWN;
+		ent->botMind->overloadNextPurchaseTime = level.time + OVERLOAD_BOT_FAILURE_COOLDOWN;
 		return;
 	}
 
-	if ( !G_OverloadPurchaseByIndex( ent, purchaseIndex, spend ) )
+	std::string error;
+	if ( !G_OverloadPurchaseByIndex( ent, purchaseIndex, spend, &error ) )
 	{
-		level.team[ team ].overloadBotTargetPurchase = -1;
-		level.team[ team ].overloadBotNextPurchaseTime = level.time + OVERLOAD_BOT_FAILURE_COOLDOWN;
+		Log::Warn( "%s: Bot failed purchase: %d: %s", ent->client->pers.netname, purchaseIndex, error );
+		ent->botMind->overloadTargetPurchase = -1;
+		ent->botMind->overloadNextPurchaseTime = level.time + OVERLOAD_BOT_FAILURE_COOLDOWN;
 		return;
 	}
 
-	level.team[ team ].overloadBotNextPurchaseTime = level.time + OVERLOAD_BOT_PURCHASE_COOLDOWN;
+	ent->botMind->overloadNextPurchaseTime = level.time + OVERLOAD_BOT_PURCHASE_COOLDOWN;
 
-	if ( G_OverloadEntryRemainingSpendCapacity( team, purchaseIndex ) <= 0 )
+	const int nextPartialPurchase = FindBotPartialPurchase( team );
+	if ( nextPartialPurchase >= 0 )
 	{
-		level.team[ team ].overloadBotTargetPurchase = -1;
+		ent->botMind->overloadTargetPurchase = nextPartialPurchase;
+	}
+	else if ( G_OverloadEntryRemainingSpendCapacity( team, purchaseIndex ) > 0 )
+	{
+		ent->botMind->overloadTargetPurchase = purchaseIndex;
+	}
+	else
+	{
+		ent->botMind->overloadTargetPurchase = FindBotFreshPurchase( team );
 	}
 }
