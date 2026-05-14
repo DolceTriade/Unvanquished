@@ -155,14 +155,6 @@ static int GetUnlockPurchaseIndex( team_t team, unlockableType_t type, int itemN
 	return -1;
 }
 
-static void CheckOverloadCatalogReady()
-{
-	if ( !overloadCatalogReady )
-	{
-		Sys::Error( "Overload catalog accessed before initialization" );
-	}
-}
-
 constexpr int OVERLOAD_UNCAPPED_RANKS = std::numeric_limits<int>::max();
 
 int G_InitialBudgetForTeam( team_t team )
@@ -352,8 +344,6 @@ static std::string UnlockableDescription( unlockableType_t type, int itemNum )
 
 static void PublishOverloadCatalog()
 {
-	CheckOverloadCatalogReady();
-
 	for ( int i = 0; i < MAX_OVERLOAD_PURCHASES; ++i )
 	{
 		char config[ BIG_INFO_STRING ];
@@ -1089,8 +1079,6 @@ static bool EntryMatches( const overloadPurchaseDef_t& entry, const Cmd::Args& a
 
 static const overloadPurchaseDef_t* FindPurchase( team_t team, const Cmd::Args& args, int* purchaseIndex = nullptr )
 {
-	CheckOverloadCatalogReady();
-
 	for ( size_t i = 0; i < overloadPurchases.size(); ++i )
 	{
 		const overloadPurchaseDef_t& entry = overloadPurchases[ i ];
@@ -1340,8 +1328,6 @@ static int ApplyPurchaseToTeamState( const overloadPurchaseDef_t& entry, int ent
 
 static void ApplyAllOverloadState()
 {
-	CheckOverloadCatalogReady();
-
 	bool gameplayDirty = false;
 	bool attributeDirty = false;
 
@@ -1477,7 +1463,6 @@ int G_OverloadProgressValue( team_t team )
 
 int G_OverloadPurchaseCount()
 {
-	CheckOverloadCatalogReady();
 	return static_cast<int>( overloadPurchases.size() );
 }
 
@@ -1487,8 +1472,6 @@ bool G_OverloadUnlockPurchased( team_t team, unlockableType_t type, int itemNum 
 	{
 		return false;
 	}
-
-	CheckOverloadCatalogReady();
 
 	int purchaseIndex = GetUnlockPurchaseIndex( team, type, itemNum );
 	return purchaseIndex >= 0 && TeamEconomy( team ).ownedPurchases[ purchaseIndex ];
@@ -1500,8 +1483,6 @@ bool G_OverloadHasUnlockEntry( team_t team, unlockableType_t type, int itemNum )
 	{
 		return false;
 	}
-
-	CheckOverloadCatalogReady();
 	return GetUnlockPurchaseIndex( team, type, itemNum ) >= 0;
 }
 
@@ -1511,8 +1492,6 @@ bool G_OverloadEntryIsPartial( team_t team, int purchaseIndex )
 	{
 		return false;
 	}
-
-	CheckOverloadCatalogReady();
 
 	if ( purchaseIndex < 0 || purchaseIndex >= static_cast<int>( overloadPurchases.size() ) )
 	{
@@ -1535,7 +1514,23 @@ bool G_OverloadEntryCanBotStart( team_t team, int purchaseIndex )
 		return false;
 	}
 
-	CheckOverloadCatalogReady();
+	if ( purchaseIndex < 0 || purchaseIndex >= static_cast<int>( overloadPurchases.size() ) )
+	{
+		return false;
+	}
+
+	const overloadPurchaseDef_t& entry = overloadPurchases[ purchaseIndex ];
+	return ( entry.team == TEAM_NONE || entry.team == team ) &&
+	       EntryIsAvailable( team, entry ) &&
+	       RemainingSpendCapacity( entry, purchaseIndex, team ) > 0;
+}
+
+bool G_OverloadEntryIsBPBundle( team_t team, int purchaseIndex )
+{
+	if ( !G_IsPlayableTeam( team ) )
+	{
+		return false;
+	}
 
 	if ( purchaseIndex < 0 || purchaseIndex >= static_cast<int>( overloadPurchases.size() ) )
 	{
@@ -1543,9 +1538,39 @@ bool G_OverloadEntryCanBotStart( team_t team, int purchaseIndex )
 	}
 
 	const overloadPurchaseDef_t& entry = overloadPurchases[ purchaseIndex ];
-	return entry.team == team &&
-	       EntryIsAvailable( team, entry ) &&
-	       ( entry.kind == overloadPurchaseKind_t::BP_BUNDLE || entry.kind == overloadPurchaseKind_t::UNLOCK );
+	return ( entry.team == TEAM_NONE || entry.team == team ) && entry.kind == overloadPurchaseKind_t::BP_BUNDLE;
+}
+
+bool G_OverloadEntryIsUnlock( team_t team, int purchaseIndex )
+{
+	if ( !G_IsPlayableTeam( team ) )
+	{
+		return false;
+	}
+
+	if ( purchaseIndex < 0 || purchaseIndex >= static_cast<int>( overloadPurchases.size() ) )
+	{
+		return false;
+	}
+
+	const overloadPurchaseDef_t& entry = overloadPurchases[ purchaseIndex ];
+	return ( entry.team == TEAM_NONE || entry.team == team ) && entry.kind == overloadPurchaseKind_t::UNLOCK;
+}
+
+bool G_OverloadEntryIsUpgrade( team_t team, int purchaseIndex )
+{
+	if ( !G_IsPlayableTeam( team ) )
+	{
+		return false;
+	}
+
+	if ( purchaseIndex < 0 || purchaseIndex >= static_cast<int>( overloadPurchases.size() ) )
+	{
+		return false;
+	}
+
+	const overloadPurchaseDef_t& entry = overloadPurchases[ purchaseIndex ];
+	return ( entry.team == TEAM_NONE || entry.team == team ) && entry.kind == overloadPurchaseKind_t::UPGRADE;
 }
 
 int G_OverloadEntryRemainingSpendCapacity( team_t team, int purchaseIndex )
@@ -1554,8 +1579,6 @@ int G_OverloadEntryRemainingSpendCapacity( team_t team, int purchaseIndex )
 	{
 		return 0;
 	}
-
-	CheckOverloadCatalogReady();
 
 	if ( purchaseIndex < 0 || purchaseIndex >= static_cast<int>( overloadPurchases.size() ) )
 	{
@@ -1577,8 +1600,6 @@ void G_OverloadUnlockAll( team_t team )
 	{
 		return;
 	}
-
-	CheckOverloadCatalogReady();
 
 	TeamEconomyState& economy = TeamEconomy( team );
 
@@ -1694,7 +1715,6 @@ bool G_OverloadPurchase( gentity_t *ent, const Cmd::Args& args, std::string* mes
 
 bool G_OverloadPurchaseByIndex( gentity_t *ent, int purchaseIndex, int spend, std::string* message )
 {
-	CheckOverloadCatalogReady();
 	if ( !ent || !ent->client )
 	{
 		if ( message ) *message = "invalid purchaser";
