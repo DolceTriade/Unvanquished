@@ -708,12 +708,9 @@ void G_Deconstruct( gentity_t *self, gentity_t *deconner, meansOfDeath_t deconTy
 		return;
 	}
 
-	const buildableAttributes_t *attr = BG_Buildable( self->s.modelindex );
-
 	// Consumable BP refunds only the surviving fraction of the structure.
 	int immediateRefund = G_BuildableDeconValue( self );
-	G_RemoveBudget( self->buildableTeam, attr->buildPoints );
-	G_FreeBudget( self->buildableTeam, immediateRefund, 0 );
+	G_FreeBudget( self->buildableTeam, immediateRefund );
 
 	// reward attackers if the structure was hurt before deconstruction
 	float healthFraction = self->entity->Get<HealthComponent>()->HealthFraction();
@@ -2131,6 +2128,8 @@ buildLog_t *G_BuildLogNew( gentity_t *actor, buildFate_t fate )
 
 	log->humanBP = level.team[ TEAM_HUMANS ].totalBudget;
 	log->alienBP = level.team[ TEAM_ALIENS ].totalBudget;
+	log->humanSpentBP = level.team[ TEAM_HUMANS ].spentBudget;
+	log->alienSpentBP = level.team[ TEAM_ALIENS ].spentBudget;
 
 	return log;
 }
@@ -2256,7 +2255,7 @@ void G_BuildLogRevert( int id )
 						else
 						{
 							// Free a pseudo-entity (see the destruction case below)
-								G_FreeBudget( log->buildableTeam, BG_Buildable( ent->s.modelindex )->buildPoints, 0 );
+								G_FreeBudget( log->buildableTeam, BG_Buildable( ent->s.modelindex )->buildPoints );
 								G_FreeEntity( ent );
 						}
 
@@ -2295,6 +2294,8 @@ void G_BuildLogRevert( int id )
 	if ( log != nullptr ) {
 		level.team[ TEAM_HUMANS ].totalBudget = log->humanBP;
 		level.team[ TEAM_ALIENS ].totalBudget = log->alienBP;
+		level.team[ TEAM_HUMANS ].spentBudget = log->humanSpentBP;
+		level.team[ TEAM_ALIENS ].spentBudget = log->alienSpentBP;
 	}
 
 }

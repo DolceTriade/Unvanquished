@@ -90,10 +90,6 @@ GET_TEAM_FUNC( total_budget, lua_pushnumber( L, team.totalBudget ) )
 // @tfield integer spent_budget Read only.
 // @within TeamProxy
 GET_TEAM_FUNC( spent_budget, lua_pushinteger( L, team.spentBudget ) )
-/// Number of queued build points.
-// @tfield integer spent_budget Read only.
-// @within TeamProxy
-GET_TEAM_FUNC( queued_budget, lua_pushinteger( L, team.queuedBudget ) )
 /// Whether a team is locked or not.
 // @tfield boolean locked Read/Write.
 // @within TeamProxy
@@ -114,7 +110,7 @@ static int SetTeamlocked( lua_State* L )
 static int SetTeamtotal_budget( lua_State* L )
 {
 	TeamProxy* t = LuaLib<TeamProxy>::check( L, 1 );
-	level.team[ t->team ].totalBudget = luaL_checknumber( L, 2 );
+	G_SetTeamBuildPoints( t->team, luaL_checknumber( L, 2 ) );
 	return 0;
 }
 
@@ -135,7 +131,6 @@ luaL_Reg TeamProxyGetters[] = {
 	TEAM_GETTER( num_bots ),
 	TEAM_GETTER( total_budget ),
 	TEAM_GETTER( spent_budget ),
-	TEAM_GETTER( queued_budget ),
 	TEAM_GETTER( locked ),
 	TEAM_GETTER( overload_progress ),
 

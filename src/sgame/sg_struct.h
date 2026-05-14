@@ -528,6 +528,8 @@ struct buildLog_t
 	buildable_t modelindex;
 	int humanBP;
 	int alienBP;
+	int humanSpentBP;
+	int alienSpentBP;
 	bool        markedForDeconstruction;
 	vec3_t      origin;
 	vec3_t      angles;
@@ -663,7 +665,6 @@ struct level_locals_t
 		int              numAliveClients;
 		float            totalBudget; // Read access always rounds towards zero.
 		int              spentBudget;
-		int              queuedBudget;
 		int              nextMinerPayoutTime;
 		uint64_t         spawnLocationMask;
 		spawnQueue_t     spawnQueue;

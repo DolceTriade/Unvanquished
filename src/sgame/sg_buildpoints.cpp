@@ -112,16 +112,19 @@ void G_SetTeamBuildPoints( team_t team, int amount )
 		return;
 	}
 
-	level.team[ team ].totalBudget = amount;
+	level.team[ team ].totalBudget = amount + level.team[ team ].economy.bpPurchased;
 	G_PublishOverloadState( team );
 }
 
 /**
- * @brief Get the potentially negative number of free build points for a team.
+ * @brief Get the number of free build points for a team.
  */
 int G_GetFreeBudget(team_t team)
 {
-	return level.team[ team ].totalBudget;
+	int freeBudget = (int)level.team[ team ].totalBudget
+		- level.team[ team ].spentBudget;
+
+	return freeBudget > 0 ? freeBudget : 0;
 }
 
 /**
@@ -165,13 +168,11 @@ int G_GetEffectiveBudget( team_t team, int replacementCount, gentity_t *const *r
 	return budget;
 }
 
-void G_FreeBudget( team_t team, int immediateAmount, int queuedAmount )
+void G_FreeBudget( team_t team, int amount )
 {
 	if ( G_IsPlayableTeam( team ) )
 	{
-		level.team[ team ].spentBudget -= ( immediateAmount + queuedAmount );
-		level.team[ team ].totalBudget += ( immediateAmount + queuedAmount );
-		level.team[ team ].queuedBudget = 0;
+		level.team[ team ].spentBudget -= amount;
 
 		if ( level.team[ team ].spentBudget < 0 ) {
 			level.team[ team ].spentBudget = 0;
@@ -185,26 +186,9 @@ void G_SpendBudget( team_t team, int amount )
 {
 	if ( G_IsPlayableTeam( team ) )
 	{
-		level.team[ team ].totalBudget -= amount;
 		level.team[ team ].spentBudget += amount;
 		G_PublishOverloadState( team );
 	}
-}
-
-void G_RemoveBudget( team_t team, int amount )
-{
-	if ( !G_IsPlayableTeam( team ) )
-	{
-		return;
-	}
-
-	level.team[ team ].spentBudget -= amount;
-	if ( level.team[ team ].spentBudget < 0 )
-	{
-		level.team[ team ].spentBudget = 0;
-	}
-
-	G_PublishOverloadState( team );
 }
 
 int G_BuildableDeconValue(gentity_t *ent)
