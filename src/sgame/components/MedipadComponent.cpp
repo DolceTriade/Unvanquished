@@ -158,7 +158,7 @@ void MedipadComponent::Think(int timeDelta)
 		}
 
 		// restore health
-		newTarget->entity->Heal(timeDelta * 0.01f, nullptr);
+		newTarget->entity->Heal(timeDelta * MEDISTAT_HEAL_RATE, nullptr);
 
 		// check if fully healed
 		if (newTarget->entity->Get<HealthComponent>()->FullHealth())
