@@ -180,7 +180,7 @@ void G_BotSetSkill( int clientNum, int skill )
 {
 	gentity_t *bot = &g_entities[clientNum];
 
-	if ( bot->client->pers.connected == CON_DISCONNECTED || !bot->client->pers.isBot )
+	if ( !bot || !bot->client || bot->client->pers.connected == CON_DISCONNECTED || !bot->client->pers.isBot )
 	{
 		return;
 	}
