@@ -978,19 +978,21 @@ static void BuildOverloadCatalog()
 	            { AttributeEffect( BG_ATTR_WEAPON, "lcannon", "ammo", 10.0, 1.0 ) } );
 
 	// Human equipment upgrades.
-	// Covered upgrades: jetpack, medkit.
-	// Intentionally missing for now: lightarmour, medarmour, bsuit, radar, grenade, firebomb.
+	// Covered upgrades: jetpack, human stamina.
+	// Intentionally missing for now: medkit, lightarmour, medarmour, bsuit, radar, grenade, firebomb.
 	AddUpgrade( TEAM_HUMANS, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), DefaultUpgradeStepCost( OVERLOAD_STAGE3_COUNT ), OVERLOAD_UNCAPPED_RANKS, "armor", "Armour", "integrity", "armor integrity", "Armor Integrity", "Increase max health for all human armour classes.",
 	            { PercentAttributeEffect( BG_ATTR_CLASS, "human_light", "health", 0.05, 1.0 ),
 	              PercentAttributeEffect( BG_ATTR_CLASS, "human_medium", "health", 0.05, 1.0 ),
 	              PercentAttributeEffect( BG_ATTR_CLASS, "human_bsuit", "health", 0.05, 1.0 ) } );
 	AddUpgrade( TEAM_HUMANS, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), DefaultUpgradeStepCost( OVERLOAD_STAGE2_COUNT ), OVERLOAD_UNCAPPED_RANKS, "jetpack", "Jetpack", "fuel", "fuel", "Jetpack Fuel", "Increase jetpack fuel capacity.",
 	            { GameplayEffect( "JETPACK_FUEL_MAX", 2500.0, 1.0 ) } );
-	AddUpgrade( TEAM_HUMANS, DefaultUpgradeBaseCost( 0 ), DefaultUpgradeStepCost( 0 ), OVERLOAD_UNCAPPED_RANKS, "medkit", "Bio Kit", "poison", "poison resist", "Medkit Poison Protection", "Extend medkit poison immunity.",
-	            { GameplayEffect( "MEDKIT_POISON_IMMUNITY_TIME", 1000.0, 0.0 ) } );
+	AddUpgrade( TEAM_HUMANS, DefaultUpgradeBaseCost( 0 ), DefaultUpgradeStepCost( 0 ), OVERLOAD_UNCAPPED_RANKS, "humans", "Humans", "stamina", "stamina", "Human Stamina", "Increase maximum human stamina.",
+	            { GameplayEffect( "STAMINA_MAX", 2500.0, 1.0 ) } );
 
 	// Human buildable weapon upgrades.
-	// Covered buildables: mgturret, rocketpod.
+	// Covered buildables: medistat, mgturret, rocketpod.
+	AddUpgrade( TEAM_HUMANS, DefaultUpgradeBaseCost( 0 ), DefaultUpgradeStepCost( 0 ), OVERLOAD_UNCAPPED_RANKS, "medistat", "Medistation", "healing_rate", "healing rate", "Medistation Healing Rate", "Increase medistation health restoration.",
+	            { GameplayEffect( "MEDISTAT_HEAL_RATE", 0.0025f, 0.0 ) } );
 	AddUpgrade( TEAM_HUMANS, DefaultUpgradeBaseCost( 0 ), DefaultUpgradeStepCost( 0 ), OVERLOAD_UNCAPPED_RANKS, "mgturret", "Machinegun Turret", "damage", "damage", "Machinegun Turret Damage", "Increase machinegun turret damage.",
 	            { GameplayEffect( "MGTURRET_MIN_DAMAGE", 1.0, 0.0 ),
 	              GameplayEffect( "MGTURRET_MAX_DAMAGE", 2.0, 1.0 ) } );
@@ -1020,6 +1022,16 @@ static void BuildOverloadCatalog()
 	              PercentAttributeEffect( BG_ATTR_CLASS, "level3", "health", 0.05, 1.0 ),
 	              PercentAttributeEffect( BG_ATTR_CLASS, "level3upg", "health", 0.05, 1.0 ),
 	              PercentAttributeEffect( BG_ATTR_CLASS, "level4", "health", 0.05, 1.0 ) } );
+	AddUpgrade( TEAM_ALIENS, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), DefaultUpgradeStepCost( OVERLOAD_STAGE2_COUNT ), OVERLOAD_UNCAPPED_RANKS, "aliens", "Alien Lifeforms", "heal_rate", "heal rate", "Alien Heal Rate", "Increase passive healing rate for all alien classes.",
+	            { PercentAttributeEffect( BG_ATTR_CLASS, "builder", "regen_rate", 0.05, 0.001 ),
+	              PercentAttributeEffect( BG_ATTR_CLASS, "builderupg", "regen_rate", 0.05, 0.001 ),
+	              PercentAttributeEffect( BG_ATTR_CLASS, "level0", "regen_rate", 0.05, 0.001 ),
+	              PercentAttributeEffect( BG_ATTR_CLASS, "level1", "regen_rate", 0.05, 0.001 ),
+	              PercentAttributeEffect( BG_ATTR_CLASS, "level2", "regen_rate", 0.05, 0.001 ),
+	              PercentAttributeEffect( BG_ATTR_CLASS, "level2upg", "regen_rate", 0.05, 0.001 ),
+	              PercentAttributeEffect( BG_ATTR_CLASS, "level3", "regen_rate", 0.05, 0.001 ),
+	              PercentAttributeEffect( BG_ATTR_CLASS, "level3upg", "regen_rate", 0.05, 0.001 ),
+	              PercentAttributeEffect( BG_ATTR_CLASS, "level4", "regen_rate", 0.05, 0.001 ) } );
 	AddUpgrade( TEAM_ALIENS, DefaultUpgradeBaseCost( 0 ), DefaultUpgradeStepCost( 0 ), OVERLOAD_UNCAPPED_RANKS, "level0", "Dretch", "damage", "damage", "Dretch Damage", "Increase dretch bite damage.",
 	            { GameplayEffect( "LEVEL0_BITE_DMG", 3.0 ) } );
 	AddUpgrade( TEAM_ALIENS, DefaultUpgradeBaseCost( 0 ), DefaultUpgradeStepCost( 0 ), OVERLOAD_UNCAPPED_RANKS, "level1", "Mantis", "damage", "damage", "Mantis Damage", "Increase mantis claw damage.",
@@ -1032,6 +1044,13 @@ static void BuildOverloadCatalog()
 	            { GameplayEffect( "LEVEL3_CLAW_DMG", 5.0 ) } );
 	AddUpgrade( TEAM_ALIENS, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), DefaultUpgradeStepCost( OVERLOAD_STAGE2_COUNT ), OVERLOAD_UNCAPPED_RANKS, "level3", "Dragoon", "pounce_damage", "pounce damage", "Dragoon Pounce Damage", "Increase dragoon pounce damage.",
 	            { GameplayEffect( "LEVEL3_POUNCE_DMG", 10.0 ) } );
+	AddUpgrade( TEAM_ALIENS, DefaultUpgradeBaseCost( OVERLOAD_STAGE3_COUNT ), DefaultUpgradeStepCost( OVERLOAD_STAGE3_COUNT ), OVERLOAD_UNCAPPED_RANKS, "level3upg", "Advanced Dragoon", "barb_refresh", "barb refresh", "Advanced Dragoon Barb Refresh", "Reduce advanced dragoon barb regeneration time.",
+	            { GameplayEffect( "LEVEL3_BOUNCEBALL_REGEN", -100.0, 100.0 ),
+	              GameplayEffect( "LEVEL3_BOUNCEBALL_REGEN_BOOSTER", -100.0, 100.0 ),
+	              GameplayEffect( "LEVEL3_BOUNCEBALL_REGEN_CREEP", -100.0, 100.0 ) } );
+	AddUpgrade( TEAM_ALIENS, DefaultUpgradeBaseCost( OVERLOAD_STAGE3_COUNT ), DefaultUpgradeStepCost( OVERLOAD_STAGE3_COUNT ), OVERLOAD_UNCAPPED_RANKS, "level3upg", "Advanced Dragoon", "barb_damage", "barb damage", "Advanced Dragoon Barb Damage", "Increase advanced dragoon barb impact and splash damage.",
+	            { AttributeEffect( BG_ATTR_MISSILE, "bounceball", "damage", 8.0, 1.0 ),
+	              AttributeEffect( BG_ATTR_MISSILE, "bounceball", "splash_damage", 4.0, 0.0 ) } );
 	AddUpgrade( TEAM_ALIENS, DefaultUpgradeBaseCost( OVERLOAD_STAGE3_COUNT ), DefaultUpgradeStepCost( OVERLOAD_STAGE3_COUNT ), OVERLOAD_UNCAPPED_RANKS, "level4", "Tyrant", "damage", "damage", "Tyrant Damage", "Increase tyrant claw damage.",
 	            { GameplayEffect( "LEVEL4_CLAW_DMG", 8.0 ) } );
 	AddUpgrade( TEAM_ALIENS, DefaultUpgradeBaseCost( OVERLOAD_STAGE3_COUNT ), DefaultUpgradeStepCost( OVERLOAD_STAGE3_COUNT ), OVERLOAD_UNCAPPED_RANKS, "level4", "Tyrant", "trample_damage", "trample damage", "Tyrant Trample Damage", "Increase tyrant trample damage.",
