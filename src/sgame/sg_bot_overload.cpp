@@ -26,12 +26,15 @@ along with Unvanquished. If not, see <http://www.gnu.org/licenses/>.
 #include "sg_local.h"
 #include "sg_bot_local.h"
 
+#include <limits>
+
 static constexpr int OVERLOAD_BOT_PURCHASE_COOLDOWN = 3000;
 static constexpr int OVERLOAD_BOT_FAILURE_COOLDOWN = 1000;
 static constexpr int OVERLOAD_BOT_SPEND_CHUNK = 200;
 static constexpr int OVERLOAD_BOT_HUMAN_RESERVE = 400;
 static constexpr int OVERLOAD_BOT_ALIEN_RESERVE = 400;
 static constexpr int OVERLOAD_BOT_BP_PRESSURE_THRESHOLD = 20;
+static constexpr int OVERLOAD_BOT_BP_AFTER_DESTRUCTION_WINDOW = 30000;
 
 static int BotReserveCredits( team_t team )
 {
@@ -40,33 +43,94 @@ static int BotReserveCredits( team_t team )
 
 static int FindBotPartialPurchase( team_t team )
 {
+	int bestPurchaseIndex = -1;
+	int bestRemaining = std::numeric_limits<int>::max();
+
 	for ( int i = 0; i < G_OverloadPurchaseCount(); ++i )
 	{
 		if ( G_OverloadEntryIsPartial( team, i ) )
 		{
-			return i;
+			const int remaining = G_OverloadEntryRemainingSpendCapacity( team, i );
+			if ( remaining > 0 && remaining < bestRemaining )
+			{
+				bestPurchaseIndex = i;
+				bestRemaining = remaining;
+			}
 		}
 	}
 
-	return -1;
+	return bestPurchaseIndex;
+}
+
+static bool BotStructureRecentlyDestroyed( team_t team )
+{
+	for ( int i = 0; i < level.numBuildLogs; ++i )
+	{
+		const buildLog_t& log = level.buildLog[ ( level.buildId - i - 1 ) % MAX_BUILDLOG ];
+		if ( level.time - log.time > OVERLOAD_BOT_BP_AFTER_DESTRUCTION_WINDOW )
+		{
+			return false;
+		}
+
+		if ( log.buildableTeam != team )
+		{
+			continue;
+		}
+
+		switch ( log.fate )
+		{
+			case BF_DESTROY:
+			case BF_TEAMKILL:
+			case BF_AUTO:
+				return true;
+
+			case BF_CONSTRUCT:
+			case BF_DECONSTRUCT:
+			case BF_REPLACE:
+				break;
+		}
+	}
+
+	return false;
 }
 
 static int FindBotFreshPurchase( team_t team )
 {
-	if ( G_GetFreeBudget( team ) < OVERLOAD_BOT_BP_PRESSURE_THRESHOLD )
-	{
-		return 0;
-	}
+	int bpPurchaseIndex = -1;
+	int upgradePurchaseIndex = -1;
 
 	for ( int i = 0; i < G_OverloadPurchaseCount(); ++i )
 	{
-		if ( G_OverloadEntryCanBotStart( team, i ) )
+		if ( !G_OverloadEntryCanBotStart( team, i ) )
+		{
+			continue;
+		}
+
+		if ( G_OverloadEntryIsUnlock( team, i ) )
 		{
 			return i;
 		}
+
+		if ( bpPurchaseIndex < 0 && G_OverloadEntryIsBPBundle( team, i ) )
+		{
+			bpPurchaseIndex = i;
+			continue;
+		}
+
+		if ( upgradePurchaseIndex < 0 && G_OverloadEntryIsUpgrade( team, i ) )
+		{
+			upgradePurchaseIndex = i;
+		}
 	}
 
-	return -1;
+	if ( bpPurchaseIndex >= 0 &&
+	     G_GetFreeBudget( team ) < OVERLOAD_BOT_BP_PRESSURE_THRESHOLD &&
+	     BotStructureRecentlyDestroyed( team ) )
+	{
+		return bpPurchaseIndex;
+	}
+
+	return upgradePurchaseIndex;
 }
 
 void G_BotOverloadThink( gentity_t *ent )
