@@ -1428,7 +1428,6 @@ void G_InitOverloadEconomy()
 	{
 		level.team[ team ].totalBudget = G_InitialBudgetForTeam( team );
 		level.team[ team ].spentBudget = 0;
-		level.team[ team ].queuedBudget = 0;
 		level.team[ team ].nextMinerPayoutTime = 0;
 		level.team[ team ].overloadProgress = 0;
 

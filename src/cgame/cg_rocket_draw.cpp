@@ -374,8 +374,7 @@ public:
 			ammo_( 0 ),
 			spentBudget_( 0 ),
 			markedBudget_( 0 ),
-			totalBudget_( 0 ),
-			queuedBudget_( 0 ) {}
+			totalBudget_( 0 ) {}
 
 	void OnAttributeChange( const Rml::ElementAttributes& changed_attributes ) override
 	{
@@ -403,8 +402,7 @@ public:
 				if ( builder_ &&
 				     spentBudget_  == cg.snap->ps.persistant[ PERS_SPENTBUDGET ] &&
 				     markedBudget_ == cg.snap->ps.persistant[ PERS_MARKEDBUDGET ] &&
-				     totalBudget_  == cg.snap->ps.persistant[ PERS_TOTALBUDGET ] &&
-				     queuedBudget_ == cg.snap->ps.persistant[ PERS_QUEUEDBUDGET ] )
+				     totalBudget_  == cg.snap->ps.persistant[ PERS_TOTALBUDGET ] )
 				{
 					return;
 				}
@@ -412,7 +410,6 @@ public:
 				spentBudget_  = cg.snap->ps.persistant[ PERS_SPENTBUDGET ];
 				markedBudget_ = cg.snap->ps.persistant[ PERS_MARKEDBUDGET ];
 				totalBudget_  = cg.snap->ps.persistant[ PERS_TOTALBUDGET ];
-				queuedBudget_ = cg.snap->ps.persistant[ PERS_QUEUEDBUDGET ];
 				builder_      = true;
 
 				break;
@@ -447,7 +444,7 @@ public:
 
 		if ( builder_ )
 		{
-			int freeBudget = totalBudget_ - (spentBudget_ + queuedBudget_);
+			int freeBudget = std::max( totalBudget_ - spentBudget_, 0 );
 			int available  = freeBudget + markedBudget_;
 
 			if ( markedBudget_ != 0 )
@@ -472,7 +469,6 @@ private:
 	int  spentBudget_;
 	int  markedBudget_;
 	int  totalBudget_;
-	int  queuedBudget_;
 };
 
 
@@ -3405,15 +3401,11 @@ static void CG_Rocket_DrawChatType()
 static void CG_Rocket_DrawMineRate()
 {
 	int totalBudget  = cg.snap->ps.persistant[ PERS_TOTALBUDGET ];
-	int queuedBudget = cg.snap->ps.persistant[ PERS_QUEUEDBUDGET ];
+	int spentBudget  = cg.snap->ps.persistant[ PERS_SPENTBUDGET ];
+	int freeBudget   = std::max( totalBudget - spentBudget, 0 );
 
-	if ( queuedBudget != 0 ) {
-		Rocket_SetInnerRMLRaw( va( "%d BP available. %d BP pending release.",
-		                       totalBudget, queuedBudget ) );
-	} else {
-		Rocket_SetInnerRMLRaw( va( "%d BP available for construction.",
-		                       totalBudget ) );
-	}
+	Rocket_SetInnerRMLRaw( va( "%d BP available for construction.",
+	                       freeBudget ) );
 }
 
 static void CG_Rocket_DrawVote_internal( team_t team )
