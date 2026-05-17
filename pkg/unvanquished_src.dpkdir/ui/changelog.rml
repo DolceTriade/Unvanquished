@@ -1,15 +1,25 @@
+<template name="changelog">
+<head></head>
+<body>
 <div>
     <p><h1>Changelog</h1></p>
-    <p><h3>2024-07-07</h3>
+    <p><h3>2026-05-17</h3>
         <ul>
             <li>Marazap requires constant aim</li>
             <li>Mantis and Creep effects are debuffed by armor</li>
             <li>Can shove people around</li>
-            <li>Scale BP from miners with time (ie, more time, less BP from new miners)</li>
             <li>Bsuits can walk over dretches</li>
-            <li>Fix jiggly mouse bug in circle menus</li>
-            <li>kai's scoreboard</li>
             <li>kai's biokit</li>
+            <li>Redsky's circle menus</li>
+            <li>Momentum and Vampire removed...
+                <ul>
+                    <li>Go to OM/RC and press "Q" to open Overload menu and purchase upgrades</li>
+                    <li>On killed building, BP not recovered. Must always buy more.</li>
+                    <li>Miners eventually give you money, not BP (takes a few minutes for money)</li>
+                </ul>
+            </li>
         </ul>
     </p>
 </div>
+</body>
+</template>

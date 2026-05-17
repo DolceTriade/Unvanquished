@@ -2,6 +2,7 @@
 	<head>
 		<link type="text/rcss" href="/ui/shared/basics.rcss" />
 		<link type="text/rcss" href="loading.rcss" />
+		<link type="text/template" href="/ui/changelog.rml" />
 		<style>
 			div.levelshot,
 			div.levelshot img {
@@ -136,7 +137,7 @@
 		</div>
 
 		<changelog>
-			<include src="ui/changelog.rml" />
+			<template src="changelog" />
 		</changelog>
 
 		<infobox>
