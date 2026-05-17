@@ -111,6 +111,72 @@ static void CG_MarkOverloadMenuDirty()
 	rocketInfo.overloadMenuDirty = true;
 }
 
+static void CG_NotifyOverloadUpgradeCompletions( team_t team, const cgTeamEconomyState_t& oldState,
+                                                 const cgTeamEconomyState_t& newState )
+{
+	team_t localTeam = CG_MyTeam();
+	if ( localTeam != TEAM_ALIENS && localTeam != TEAM_HUMANS )
+	{
+		return;
+	}
+
+	if ( team != localTeam || !oldState.valid || !newState.valid )
+	{
+		return;
+	}
+
+	std::string text;
+	int completionCount = 0;
+
+	for ( int i = 0; i < MAX_OVERLOAD_PURCHASES; ++i )
+	{
+		const cgOverloadCatalogEntry_t& entry = rocketInfo.overloadCatalog[ i ];
+		if ( !entry.valid || entry.kind != 2 )
+		{
+			continue;
+		}
+
+		if ( entry.team != TEAM_NONE && entry.team != team )
+		{
+			continue;
+		}
+
+		int gainedRanks = newState.repeatCounts[ i ] - oldState.repeatCounts[ i ];
+		if ( gainedRanks <= 0 )
+		{
+			continue;
+		}
+
+		for ( int rank = 0; rank < gainedRanks; ++rank )
+		{
+			if ( completionCount > 0 )
+			{
+				text += ", ";
+			}
+
+			text += entry.displayName;
+			completionCount++;
+		}
+	}
+
+	if ( completionCount <= 0 )
+	{
+		return;
+	}
+
+	if ( team == TEAM_ALIENS )
+	{
+		trap_S_StartLocalSound( cgs.media.weHaveEvolved, soundChannel_t::CHAN_ANNOUNCER );
+	}
+	else
+	{
+		trap_S_StartLocalSound( cgs.media.reinforcement, soundChannel_t::CHAN_ANNOUNCER );
+	}
+
+	text = Str::Format( "^2UPGRADE%s COMPLETE: ^*%s", completionCount > 1 ? "S" : "", text.c_str() );
+	CG_CenterPrint( text.c_str(), 1.0f );
+}
+
 void CG_ParseOverloadCatalogConfig( int index, const char* config )
 {
 	if ( index < 0 || index >= MAX_OVERLOAD_PURCHASES )
@@ -157,6 +223,7 @@ void CG_ParseTeamEconomyConfig( team_t team, const char* config )
 		return;
 	}
 
+	cgTeamEconomyState_t oldState = rocketInfo.teamEconomy[ team ];
 	cgTeamEconomyState_t& state = rocketInfo.teamEconomy[ team ];
 	memset( &state, 0, sizeof( state ) );
 	state.valid = true;
@@ -246,6 +313,7 @@ void CG_ParseTeamEconomyConfig( team_t team, const char* config )
 		}
 	}
 
+	CG_NotifyOverloadUpgradeCompletions( team, oldState, state );
 	CG_MarkOverloadMenuDirty();
 }
 
