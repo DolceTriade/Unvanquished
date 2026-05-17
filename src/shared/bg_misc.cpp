@@ -1537,6 +1537,15 @@ void BG_PlayerStateToEntityState( playerState_t *ps, entityState_t *s, bool snap
 		SnapVector( s->pos.trBase );
 		SnapVector( s->apos.trBase );
 	}
+	union {
+		short orig;
+		unsigned short fixed;
+	} u;
+	union u;
+	u.orig = ps->stats[ STAT_FUEL ];
+	ps->stats[ STAT_FUEL ] = u.fixed;
+	u.orig = ps->stats[ STAT_STAMINA ];
+	ps->stats[ STAT_STAMINA ] = u.fixed;
 }
 
 /*
