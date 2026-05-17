@@ -1556,21 +1556,6 @@ void CG_AddPlayerWeapon( refEntity_t* parent, playerState_t* ps, centity_t* cent
 
 	if ( CG_IsParticleSystemValid( &cent->muzzlePS ) )
 	{
-		if ( ps || cg.renderingThirdPerson ||
-		     cent->currentState.number != cg.predictedPlayerState.clientNum )
-		{
-			if ( noGunModel )
-			{
-				CG_SetAttachmentTag( &cent->muzzlePS->attachment, cent, weaponAttachmentEntityID, parent->hModel, "tag_weapon" );
-				CG_AttachmentPoint( &cent->muzzlePS->attachment, cent->muzzle );
-			}
-			else
-			{
-				CG_SetAttachmentTag( &cent->muzzlePS->attachment, cent, gunAttachmentEntityID, gun.hModel, "tag_flash" );
-				CG_AttachmentPoint( &cent->muzzlePS->attachment, cent->muzzle );
-			}
-		}
-
 		//if the PS is infinite disable it when not firing
 		if ( !firing && CG_IsParticleSystemInfinite( cent->muzzlePS ) )
 		{
@@ -1594,6 +1579,26 @@ void CG_AddPlayerWeapon( refEntity_t* parent, playerState_t* ps, centity_t* cent
 	if ( weaponNum != WP_LUCIFER_CANNON && cent->lcannonChargeStartTime > 0 )
 	{
 		cent->lcannonChargeStartTime = 0;
+	}
+
+	// Keep the visual muzzle point fresh even when no flash is currently drawn.
+	// The hit event may arrive outside the flash window but still needs a tag-based fallback.
+	if ( noGunModel || gunAttachmentEntityID >= 0 )
+	{
+		refEntity_t muzzleTag{};
+		vec3_t angles = {};
+		AnglesToAxis( angles, muzzleTag.axis );
+
+		if ( noGunModel )
+		{
+			CG_PositionRotatedEntityOnTag( &muzzleTag, weaponAttachmentEntityID, "tag_weapon" );
+		}
+		else
+		{
+			CG_PositionRotatedEntityOnTag( &muzzleTag, gunAttachmentEntityID, "tag_flash" );
+		}
+
+		VectorCopy( muzzleTag.origin, cent->muzzle );
 	}
 
 	// add the flash
@@ -1658,17 +1663,11 @@ void CG_AddPlayerWeapon( refEntity_t* parent, playerState_t* ps, centity_t* cent
 		{
 			if ( noGunModel )
 			{
-				if ( noGunModel )
-				{
-					CG_SetAttachmentTag( &cent->muzzlePS->attachment, cent, weaponAttachmentEntityID, parent->hModel, "tag_weapon" );
-				}
-				else
-				{
-					CG_SetAttachmentTag( &cent->muzzlePS->attachment, cent, gunAttachmentEntityID, gun.hModel, "tag_flash" );
-				}
-
-				CG_SetAttachmentCent( &cent->muzzlePS->attachment, cent );
-				CG_AttachToTag( &cent->muzzlePS->attachment );
+				CG_SetAttachmentTag( &cent->muzzlePS->attachment, cent, weaponAttachmentEntityID, parent->hModel, "tag_weapon" );
+			}
+			else
+			{
+				CG_SetAttachmentTag( &cent->muzzlePS->attachment, cent, gunAttachmentEntityID, gun.hModel, "tag_flash" );
 			}
 
 			CG_SetAttachmentCent( &cent->muzzlePS->attachment, cent );
@@ -2264,26 +2263,38 @@ TODO: Put this into cg_event_weapon.c?
 ===================================================================================================
 */
 
-static bool CalcMuzzlePoint( int entityNum, vec3_t muzzle )
+static bool CalcRangedHitMuzzlePoint( entityState_t *es, int /*attackerNum*/, vec3_t muzzle )
 {
-	centity_t *cent;
-
-	if ( entityNum < 0 || entityNum >= MAX_ENTITIES )
+	if ( es->origin2[ 0 ] || es->origin2[ 1 ] || es->origin2[ 2 ] )
 	{
-		return false;
+		VectorCopy( es->origin2, muzzle );
+		return true;
 	}
 
-	if ( entityNum == cg.predictedPlayerState.clientNum )
+	return false;
+}
+
+static bool CalcTracerStartPoint( vec3_t source, vec3_t dest, vec3_t startPoint, float* visibleLength = nullptr )
+{
+	vec3_t forward;
+	float distance;
+	float startOffset;
+	float remainingDistance;
+
+	VectorSubtract( dest, source, forward );
+	distance = VectorNormalize( forward );
+
+	startOffset = Math::Clamp( cg_tracerOffset.Get(), 0.0f, distance );
+	remainingDistance = distance - startOffset;
+
+	VectorMA( source, startOffset, forward, startPoint );
+
+	if ( visibleLength )
 	{
-		cent = &cg.predictedPlayerEntity;
-	}
-	else if ( !( cent = &cg_entities[ entityNum ] ) || !cent->currentValid )
-	{
-		return false;
+		*visibleLength = std::min( cg_tracerLength.Get(), remainingDistance );
 	}
 
-	VectorCopy( cent->muzzle, muzzle );
-	return true;
+	return remainingDistance > 0.0f;
 }
 
 static void PlayHitSound( vec3_t origin, const sfxHandle_t *impactSound )
@@ -2401,7 +2412,7 @@ static void DrawTracer( vec3_t source, vec3_t dest, float chance, float length, 
 	vec3_t     forward, right;
 	polyVert_t verts[ 4 ];
 	vec3_t     line;
-	float      distance, begin, end;
+	float      visibleLength;
 	vec3_t     start, finish;
 
 	if ( BG_random() > chance )
@@ -2410,20 +2421,22 @@ static void DrawTracer( vec3_t source, vec3_t dest, float chance, float length, 
 	}
 
 	VectorSubtract( dest, source, forward );
-	distance = VectorNormalize( forward );
+	VectorNormalize( forward );
 
-	// Start at least a little away from the muzzle.
-	if ( distance < TRACER_MIN_DISTANCE )
+	if ( !CalcTracerStartPoint( source, dest, start, &visibleLength ) )
 	{
 		return;
 	}
 
-	// Guarantee a minimum length of 1/4 * length.
-	begin = BG_random() * Math::Clamp( distance - 0.25f * length, TRACER_MIN_DISTANCE, distance );
-	end   = Math::Clamp( begin + length, begin, distance );
+	visibleLength = std::min( length, visibleLength );
 
-	VectorMA( source, begin, forward, start );
-	VectorMA( source, end, forward, finish );
+	// Keep very short segments from drawing close to the muzzle source.
+	if ( Distance( source, start ) + visibleLength < TRACER_MIN_DISTANCE )
+	{
+		return;
+	}
+
+	VectorMA( start, visibleLength, forward, finish );
 
 	line[ 0 ] = DotProduct( forward, cg.refdef.viewaxis[ 1 ] );
 	line[ 1 ] = DotProduct( forward, cg.refdef.viewaxis[ 2 ] );
@@ -2654,29 +2667,38 @@ void CG_HandleWeaponHitEntity( entityState_t *es, vec3_t origin )
 	}
 
 	// tracer
-	if ( CalcMuzzlePoint( attackerNum, muzzle ) )
+	const bool haveShotMuzzle = CalcRangedHitMuzzlePoint( es, attackerNum, muzzle );
+
+	if ( haveShotMuzzle )
 	{
 		DrawTracer( muzzle, origin, cg_tracerChance.Get(), cg_tracerLength.Get(),
 		            cg_tracerWidth.Get() );
-		if ( weapon == WP_MASS_DRIVER )
+	}
+
+	if ( weapon == WP_MASS_DRIVER && haveShotMuzzle )
+	{
+		centity_t *attacker = ( attackerNum == cg.predictedPlayerState.clientNum ) ? &cg.predictedPlayerEntity : &cg_entities[ attackerNum ];
+		vec3_t startPoint;
+
+		if ( !CalcTracerStartPoint( muzzle, origin, startPoint ) )
 		{
-			centity_t *attacker = ( attackerNum == cg.predictedPlayerState.clientNum ) ? &cg.predictedPlayerEntity : &cg_entities[ attackerNum ];
-
-			if ( CG_IsTrailSystemValid( &attacker->muzzleTS ) )
-			{
-				CG_DestroyTrailSystem( attacker->muzzleTS );
-				attacker->muzzleTS = nullptr;
-			}
-
-			attacker->muzzleTS = CG_SpawnNewTrailSystem( cgs.media.mdriverTS );
-			if ( !attacker->muzzleTS ) return;
-			attacker->muzzleTSDeathTime = cg.time + cg_teslaTrailTime.Get();
-
-			CG_SetAttachmentPoint( &attacker->muzzleTS->frontAttachment, muzzle );
-			CG_AttachToPoint( &attacker->muzzleTS->frontAttachment );
-			CG_SetAttachmentPoint( &attacker->muzzleTS->backAttachment, origin );
-			CG_AttachToPoint( &attacker->muzzleTS->backAttachment );
+			return;
 		}
+
+		if ( CG_IsTrailSystemValid( &attacker->muzzleTS ) )
+		{
+			CG_DestroyTrailSystem( attacker->muzzleTS );
+			attacker->muzzleTS = nullptr;
+		}
+
+		attacker->muzzleTS = CG_SpawnNewTrailSystem( cgs.media.mdriverTS );
+		if ( !attacker->muzzleTS ) return;
+		attacker->muzzleTSDeathTime = cg.time + cg_teslaTrailTime.Get();
+
+		CG_SetAttachmentPoint( &attacker->muzzleTS->frontAttachment, startPoint );
+		CG_AttachToPoint( &attacker->muzzleTS->frontAttachment );
+		CG_SetAttachmentPoint( &attacker->muzzleTS->backAttachment, origin );
+		CG_AttachToPoint( &attacker->muzzleTS->backAttachment );
 	}
 }
 
@@ -2718,30 +2740,38 @@ void CG_HandleWeaponHitWall( entityState_t *es, vec3_t origin )
 	}
 
 	// tracer
-	if ( CalcMuzzlePoint( attackerNum, muzzle ) )
+	const bool haveShotMuzzle = CalcRangedHitMuzzlePoint( es, attackerNum, muzzle );
+
+	if ( haveShotMuzzle )
 	{
 		DrawTracer( muzzle, origin, cg_tracerChance.Get(), cg_tracerLength.Get(),
 		            cg_tracerWidth.Get() );
+	}
 
-		if ( weapon == WP_MASS_DRIVER )
+	if ( weapon == WP_MASS_DRIVER && haveShotMuzzle )
+	{
+		centity_t *attacker = ( attackerNum == cg.predictedPlayerState.clientNum ) ? &cg.predictedPlayerEntity : &cg_entities[ attackerNum ];
+		vec3_t startPoint;
+
+		if ( !CalcTracerStartPoint( muzzle, origin, startPoint ) )
 		{
-			centity_t *attacker = ( attackerNum == cg.predictedPlayerState.clientNum ) ? &cg.predictedPlayerEntity : &cg_entities[ attackerNum ];
-
-			if ( CG_IsTrailSystemValid( &attacker->muzzleTS ) )
-			{
-				CG_DestroyTrailSystem( attacker->muzzleTS );
-				attacker->muzzleTS = nullptr;
-			}
-
-			attacker->muzzleTS = CG_SpawnNewTrailSystem( cgs.media.mdriverTS );
-			if ( !attacker->muzzleTS ) return;
-			attacker->muzzleTSDeathTime = cg.time + cg_teslaTrailTime.Get();
-
-			CG_SetAttachmentPoint( &attacker->muzzleTS->frontAttachment, muzzle );
-			CG_AttachToPoint( &attacker->muzzleTS->frontAttachment );
-			CG_SetAttachmentPoint( &attacker->muzzleTS->backAttachment, origin );
-			CG_AttachToPoint( &attacker->muzzleTS->backAttachment );
+			return;
 		}
+
+		if ( CG_IsTrailSystemValid( &attacker->muzzleTS ) )
+		{
+			CG_DestroyTrailSystem( attacker->muzzleTS );
+			attacker->muzzleTS = nullptr;
+		}
+
+		attacker->muzzleTS = CG_SpawnNewTrailSystem( cgs.media.mdriverTS );
+		if ( !attacker->muzzleTS ) return;
+		attacker->muzzleTSDeathTime = cg.time + cg_teslaTrailTime.Get();
+
+		CG_SetAttachmentPoint( &attacker->muzzleTS->frontAttachment, startPoint );
+		CG_AttachToPoint( &attacker->muzzleTS->frontAttachment );
+		CG_SetAttachmentPoint( &attacker->muzzleTS->backAttachment, origin );
+		CG_AttachToPoint( &attacker->muzzleTS->backAttachment );
 	}
 }
 
