@@ -1845,6 +1845,7 @@ extern Cvar::Cvar<bool> cg_mirrorgun;
 extern Cvar::Range<Cvar::Cvar<float>> cg_tracerChance;
 extern Cvar::Cvar<float> cg_tracerWidth;
 extern Cvar::Cvar<float> cg_tracerLength;
+extern Cvar::Cvar<float> cg_tracerOffset;
 extern Cvar::Cvar<bool> cg_thirdPerson;
 extern Cvar::Cvar<float> cg_thirdPersonAngle;
 extern Cvar::Range<Cvar::Cvar<int>> cg_thirdPersonShoulderViewMode;
