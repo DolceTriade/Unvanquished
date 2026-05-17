@@ -552,21 +552,6 @@ static overloadEffect_t AttributeEffect( bgAttributeFamily_t family, const char*
 {
 	int objectIndex = BG_FindAttributeObject( family, objectName );
 	int fieldIndex = BG_FindAttributeField( family, fieldName );
-	if ( fieldIndex < 0 )
-	{
-		if ( !Q_stricmp( fieldName, "maxClips" ) )
-		{
-			fieldIndex = BG_FindAttributeField( family, "clips" );
-		}
-		else if ( !Q_stricmp( fieldName, "maxAmmo" ) )
-		{
-			fieldIndex = BG_FindAttributeField( family, "ammo" );
-		}
-		else if ( !Q_stricmp( fieldName, "unlockThreshold" ) )
-		{
-			fieldIndex = BG_FindAttributeField( family, "unlock_threshold" );
-		}
-	}
 	if ( objectIndex < 0 || fieldIndex < 0 )
 	{
 		Sys::Error( "unknown attribute target %s.%s", objectName, fieldName );
@@ -861,14 +846,7 @@ static void ValidateOverloadGraph()
 
 static int FindUnlockThresholdField( bgAttributeFamily_t family )
 {
-	int field = BG_FindAttributeField( family, "unlock_threshold" );
-	if ( field >= 0 )
-	{
-		return field;
-	}
-
-	// Tolerate legacy camelCase naming if a family ever exposes it that way.
-	return BG_FindAttributeField( family, "unlockThreshold" );
+	return BG_FindAttributeField( family, "unlock_threshold" );
 }
 
 static void BuildOverloadCatalog()
