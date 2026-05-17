@@ -50,6 +50,9 @@ const bgAttributeTrackedField_t classAttributeFields[] =
 {
 	ATTR_INT( classAttributes_t, "unlock_threshold", unlockThreshold ),
 	ATTR_INT( classAttributes_t, "health", health ),
+	ATTR_INT( classAttributes_t, "staminaJogRestore", staminaJogRestore ),
+	ATTR_INT( classAttributes_t, "staminaWalkRestore", staminaWalkRestore ),
+	ATTR_INT( classAttributes_t, "staminaStopRestore", staminaStopRestore ),
 	ATTR_FLOAT( classAttributes_t, "regen_rate", regenRate ),
 	ATTR_FLOAT( classAttributes_t, "speed", speed ),
 	ATTR_INT( classAttributes_t, "mass", mass ),
@@ -99,6 +102,9 @@ GET_FUNC( icon, string )
 GET_FUNC2( fov_cvar, proxy->attributes->fovCvar, string )
 GET_FUNC2( unlock_threshold, proxy->attributes->unlockThreshold, integer )
 GET_FUNC( health, integer )
+GET_FUNC( staminaJogRestore, integer )
+GET_FUNC( staminaWalkRestore, integer )
+GET_FUNC( staminaStopRestore, integer )
 GET_FUNC2( regen_rate, proxy->attributes->regenRate, number )
 GET_FUNC( speed, number )
 GET_FUNC( mass, integer )
@@ -122,6 +128,9 @@ static int Set##name( lua_State* L ) \
 
 SET_INT(unlock_threshold, "unlock_threshold")
 SET_INT(health, "health")
+SET_INT(staminaJogRestore, "staminaJogRestore")
+SET_INT(staminaWalkRestore, "staminaWalkRestore")
+SET_INT(staminaStopRestore, "staminaStopRestore")
 SET_FLOAT(regen_rate, "regen_rate")
 SET_FLOAT(speed, "speed")
 SET_INT(mass, "mass")
@@ -154,6 +163,9 @@ luaL_Reg ClassProxyGetters[] =
 	GETTER(team),
 	GETTER(unlock_threshold),
 	GETTER(health),
+	GETTER(staminaJogRestore),
+	GETTER(staminaWalkRestore),
+	GETTER(staminaStopRestore),
 	GETTER(regen_rate),
 	GETTER(speed),
 	GETTER(mass),
@@ -167,6 +179,9 @@ luaL_Reg ClassProxySetters[] =
 {
 	{ "unlock_threshold", Setunlock_threshold },
 	{ "health", Sethealth },
+	{ "staminaJogRestore", SetstaminaJogRestore },
+	{ "staminaWalkRestore", SetstaminaWalkRestore },
+	{ "staminaStopRestore", SetstaminaStopRestore },
 	{ "regen_rate", Setregen_rate },
 	{ "speed", Setspeed },
 	{ "mass", Setmass },
