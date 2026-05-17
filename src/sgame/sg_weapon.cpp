@@ -32,7 +32,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "Entities.h"
 #include "CBSE.h"
 
-static void SendHitEvent( gentity_t *attacker, gentity_t *target, glm::vec3 const& origin, glm::vec3 const&  normal, entity_event_t evType );
+static void SendHitEvent( gentity_t *attacker, gentity_t *target, glm::vec3 const& origin,
+                          glm::vec3 const& normal, entity_event_t evType,
+                          const glm::vec3* muzzle = nullptr );
 
 static bool TakesDamages( gentity_t const* ent )
 {
@@ -354,10 +356,12 @@ static void SendRangedHitEvent( gentity_t *attacker, const glm::vec3 &muzzle, ge
 	VectorCopy(endpos, tr->endpos);
 
 	entity_event_t evType = HasComponents<HealthComponent>(*target->entity) ? EV_WEAPON_HIT_ENTITY : EV_WEAPON_HIT_ENVIRONMENT;
-	SendHitEvent( attacker, target, endpos, VEC2GLM( tr->plane.normal ), evType );
+	SendHitEvent( attacker, target, endpos, VEC2GLM( tr->plane.normal ), evType, &muzzle );
 }
 
-static void SendHitEvent( gentity_t *attacker, gentity_t *target, glm::vec3 const& origin, glm::vec3 const&  normal, entity_event_t evType )
+static void SendHitEvent( gentity_t *attacker, gentity_t *target, glm::vec3 const& origin,
+                          glm::vec3 const& normal, entity_event_t evType,
+                          const glm::vec3* muzzle )
 {
 	gentity_t *event = G_NewTempEntity( origin, evType );
 
@@ -375,6 +379,15 @@ static void SendHitEvent( gentity_t *attacker, gentity_t *target, glm::vec3 cons
 
 	// weapon mode
 	event->s.generic1 = attacker->s.generic1;
+
+	if ( muzzle )
+	{
+		VectorCopy( GLM4READ( *muzzle ), event->s.origin2 );
+	}
+	else
+	{
+		VectorClear( event->s.origin2 );
+	}
 }
 
 static void SendMeleeHitEvent( gentity_t *attacker, gentity_t *target, trace_t *tr )
