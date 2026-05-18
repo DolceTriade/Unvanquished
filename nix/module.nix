@@ -93,7 +93,7 @@
       User = server.user;
       Group = server.group;
       WorkingDirectory = "/";
-      Restart = "on-failure";
+      Restart = "always";
       RestartSec = 5;
       TimeoutStopSec = 15;
       ExecStart = startScript;
