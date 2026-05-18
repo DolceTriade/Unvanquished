@@ -135,6 +135,7 @@ bool BG_IsMainStructure( entityState_t *es )
 
 bool BG_EntityIsUsable( const entityState_t& es, team_t team )
 {
+	if ( es.eType == entityType_t::ET_PLAYER || es.eType == entityType_t::ET_BEACON ) return false;
 	if ( es.eType == entityType_t::ET_BUILDABLE && es.modelindex == BA_H_ARMOURY )
 	{
 		return team == TEAM_HUMANS;
