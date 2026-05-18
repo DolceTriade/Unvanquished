@@ -160,7 +160,7 @@ end
 function CirclemenuMouseToIndex(document, event, num)
 	local r_y = -event.parameters.mouse_y/document.client_height + 0.5
 	local r_x = event.parameters.mouse_x/document.client_width - 0.5
-	local tau = (math.atan2(r_y, r_x) + 2*math.pi)%(2*math.pi)
+	local tau = (math.atan(r_y, r_x) + 2*math.pi)%(2*math.pi)
 
 	return CirclemenuIndexSelect(tau, num)
 end
