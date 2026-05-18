@@ -897,7 +897,7 @@ static void BuildOverloadCatalog()
 	AddBuildableUnlock( TEAM_ALIENS, OVERLOAD_STAGE2_COUNT, BA_A_TRAPPER );
 	AddBuildableUnlock( TEAM_ALIENS, OVERLOAD_STAGE2_COUNT, BA_A_HIVE );
 	AddClassUnlock( TEAM_ALIENS, 0, PCL_ALIEN_LEVEL2 );
-	AddClassUnlock( TEAM_ALIENS, OVERLOAD_STAGE2_COUNT, PCL_ALIEN_BUILDER0_UPG );
+	AddClassUnlock( TEAM_ALIENS, 0, PCL_ALIEN_BUILDER0_UPG );
 	AddClassUnlock( TEAM_ALIENS, OVERLOAD_STAGE2_COUNT, PCL_ALIEN_LEVEL2_UPG );
 	AddClassUnlock( TEAM_ALIENS, OVERLOAD_STAGE2_COUNT, PCL_ALIEN_LEVEL3 );
 	AddClassUnlock( TEAM_ALIENS, OVERLOAD_STAGE3_COUNT, PCL_ALIEN_LEVEL3_UPG );
@@ -909,15 +909,15 @@ static void BuildOverloadCatalog()
 
 	// Human weapons: stage 1 / always available.
 	AddUpgrade( TEAM_HUMANS, DefaultUpgradeBaseCost( 0 ), DefaultUpgradeStepCost( 0 ), OVERLOAD_UNCAPPED_RANKS, "rifle", "Rifle", "damage", "damage", "Rifle Damage", "Increase rifle damage.",
-	            { GameplayEffect( "RIFLE_DMG", 3.0 ) } );
+	            { GameplayEffect( "RIFLE_DMG", 2.0 ) } );
 	AddUpgrade( TEAM_HUMANS, DefaultUpgradeBaseCost( 0 ), DefaultUpgradeStepCost( 0 ), OVERLOAD_UNCAPPED_RANKS, "rifle", "Rifle", "ammo", "ammo", "Rifle Ammo", "Increase rifle ammo reserve.",
-	            { AttributeEffect( BG_ATTR_WEAPON, "rifle", "ammo", 40.0, 1.0 ) } );
+	            { AttributeEffect( BG_ATTR_WEAPON, "rifle", "ammo", 10.0, 1.0 ) } );
 	AddUpgrade( TEAM_HUMANS, DefaultUpgradeBaseCost( 0 ), DefaultUpgradeStepCost( 0 ), OVERLOAD_UNCAPPED_RANKS, "psaw", "Pain Saw", "damage", "damage", "Pain Saw Damage", "Increase pain saw damage per hit.",
 	            { GameplayEffect( "PAINSAW_DAMAGE", 2.0, 1.0 ) } );
 	AddUpgrade( TEAM_HUMANS, DefaultUpgradeBaseCost( 0 ), DefaultUpgradeStepCost( 0 ), OVERLOAD_UNCAPPED_RANKS, "shotgun", "Shotgun", "damage", "damage", "Shotgun Damage", "Increase shotgun pellet damage.",
 	            { GameplayEffect( "SHOTGUN_DMG", 1.0 ) } );
 	AddUpgrade( TEAM_HUMANS, DefaultUpgradeBaseCost( 0 ), DefaultUpgradeStepCost( 0 ), OVERLOAD_UNCAPPED_RANKS, "shotgun", "Shotgun", "ammo", "ammo", "Shotgun Ammo", "Increase shotgun ammo reserve.",
-	            { AttributeEffect( BG_ATTR_WEAPON, "shotgun", "ammo", 8.0, 1.0 ) } );
+	            { AttributeEffect( BG_ATTR_WEAPON, "shotgun", "ammo", 2.0, 1.0 ) } );
 
 	// Human weapons: stage 2 unlocks.
 	AddUpgrade( TEAM_HUMANS, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), DefaultUpgradeStepCost( OVERLOAD_STAGE2_COUNT ), OVERLOAD_UNCAPPED_RANKS, "lgun", "Lasgun", "damage", "damage", "Lasgun Damage", "Increase lasgun damage.",
@@ -931,9 +931,9 @@ static void BuildOverloadCatalog()
 	AddUpgrade( TEAM_HUMANS, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), DefaultUpgradeStepCost( OVERLOAD_STAGE2_COUNT ), OVERLOAD_UNCAPPED_RANKS, "chaingun", "Chaingun", "damage", "damage", "Chaingun Damage", "Increase chaingun damage.",
 	            { GameplayEffect( "CHAINGUN_DMG", 2.0 ) } );
 	AddUpgrade( TEAM_HUMANS, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), DefaultUpgradeStepCost( OVERLOAD_STAGE2_COUNT ), OVERLOAD_UNCAPPED_RANKS, "chaingun", "Chaingun", "ammo", "ammo", "Chaingun Ammo", "Increase chaingun ammo reserve.",
-	            { AttributeEffect( BG_ATTR_WEAPON, "chaingun", "ammo", 80.0, 1.0 ) } );
+	            { AttributeEffect( BG_ATTR_WEAPON, "chaingun", "ammo", 40.0, 1.0 ) } );
 	AddUpgrade( TEAM_HUMANS, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), DefaultUpgradeStepCost( OVERLOAD_STAGE2_COUNT ), OVERLOAD_UNCAPPED_RANKS, "flamer", "Flamethrower", "ammo", "ammo", "Flamer Ammo", "Increase flamer ammo reserve.",
-	            { AttributeEffect( BG_ATTR_WEAPON, "flamer", "ammo", 50.0, 1.0 ) } );
+	            { AttributeEffect( BG_ATTR_WEAPON, "flamer", "ammo", 25.0, 1.0 ) } );
 	AddUpgrade( TEAM_HUMANS, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), DefaultUpgradeStepCost( OVERLOAD_STAGE2_COUNT ), OVERLOAD_UNCAPPED_RANKS, "prifle", "Pulse Rifle", "damage", "damage", "Pulse Rifle Damage", "Increase pulse rifle projectile damage.",
 	            { AttributeEffect( BG_ATTR_MISSILE, "prifle", "damage", 2.0, 1.0 ) } );
 	AddUpgrade( TEAM_HUMANS, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), DefaultUpgradeStepCost( OVERLOAD_STAGE2_COUNT ), OVERLOAD_UNCAPPED_RANKS, "prifle", "Pulse Rifle", "ammo", "ammo", "Pulse Rifle Ammo", "Increase pulse rifle ammo reserve.",
@@ -1026,11 +1026,11 @@ static void BuildOverloadCatalog()
 	            { GameplayEffect( "LEVEL3_CLAW_DMG", 5.0 ) } );
 	AddUpgrade( TEAM_ALIENS, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), DefaultUpgradeStepCost( OVERLOAD_STAGE2_COUNT ), OVERLOAD_UNCAPPED_RANKS, "level3", "Dragoon", "pounce_damage", "pounce damage", "Dragoon Pounce Damage", "Increase dragoon pounce damage.",
 	            { GameplayEffect( "LEVEL3_POUNCE_DMG", 10.0 ) } );
-	AddUpgrade( TEAM_ALIENS, DefaultUpgradeBaseCost( OVERLOAD_STAGE3_COUNT ), DefaultUpgradeStepCost( OVERLOAD_STAGE3_COUNT ), OVERLOAD_UNCAPPED_RANKS, "level3upg", "Advanced Dragoon", "barb_refresh", "barb refresh", "Advanced Dragoon Barb Refresh", "Reduce advanced dragoon barb regeneration time.",
+	AddUpgrade( TEAM_ALIENS, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), DefaultUpgradeStepCost( OVERLOAD_STAGE3_COUNT ), OVERLOAD_UNCAPPED_RANKS, "level3upg", "Advanced Dragoon", "barb_refresh", "barb refresh", "Advanced Dragoon Barb Refresh", "Reduce advanced dragoon barb regeneration time.",
 	            { GameplayEffect( "LEVEL3_BOUNCEBALL_REGEN", -500.0, 100.0 ),
 	              GameplayEffect( "LEVEL3_BOUNCEBALL_REGEN_BOOSTER", -500.0, 100.0 ),
 	              GameplayEffect( "LEVEL3_BOUNCEBALL_REGEN_CREEP", -500.0, 100.0 ) } );
-	AddUpgrade( TEAM_ALIENS, DefaultUpgradeBaseCost( OVERLOAD_STAGE3_COUNT ), DefaultUpgradeStepCost( OVERLOAD_STAGE3_COUNT ), OVERLOAD_UNCAPPED_RANKS, "level3upg", "Advanced Dragoon", "barb_damage", "barb damage", "Advanced Dragoon Barb Damage", "Increase advanced dragoon barb impact and splash damage.",
+	AddUpgrade( TEAM_ALIENS, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), DefaultUpgradeStepCost( OVERLOAD_STAGE3_COUNT ), OVERLOAD_UNCAPPED_RANKS, "level3upg", "Advanced Dragoon", "barb_damage", "barb damage", "Advanced Dragoon Barb Damage", "Increase advanced dragoon barb impact and splash damage.",
 	            { AttributeEffect( BG_ATTR_MISSILE, "bounceball", "damage", 10.0, 1.0 ),
 	              AttributeEffect( BG_ATTR_MISSILE, "bounceball", "splash_damage", 6.0, 0.0 ) } );
 	AddUpgrade( TEAM_ALIENS, DefaultUpgradeBaseCost( OVERLOAD_STAGE3_COUNT ), DefaultUpgradeStepCost( OVERLOAD_STAGE3_COUNT ), OVERLOAD_UNCAPPED_RANKS, "level4", "Tyrant", "damage", "damage", "Tyrant Damage", "Increase tyrant claw damage.",
