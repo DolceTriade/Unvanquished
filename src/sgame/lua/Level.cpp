@@ -82,6 +82,18 @@ GET_TEAM_FUNC( num_players, lua_pushinteger( L, team.numPlayers ) )
 // @tfield integer num_bots Read only.
 // @within TeamProxy
 GET_TEAM_FUNC( num_bots, lua_pushinteger( L, team.numBots ) )
+/// Average number of clients.
+// @tfield float average_num_clients Read only.
+// @within TeamProxy
+GET_TEAM_FUNC( average_num_clients, lua_pushnumber( L, team.averageNumClients ) )
+/// Average number of players.
+// @tfield float average_num_players Read only.
+// @within TeamProxy
+GET_TEAM_FUNC( average_num_players, lua_pushnumber( L, team.averageNumPlayers ) )
+/// Average number of bots.
+// @tfield float average_num_bots Read only.
+// @within TeamProxy
+GET_TEAM_FUNC( average_num_bots, lua_pushnumber( L, team.averageNumBots ) )
 /// Total number of build points.
 // @tfield float total_budget Read/Write.
 // @within TeamProxy
@@ -129,6 +141,9 @@ luaL_Reg TeamProxyGetters[] = {
 	TEAM_GETTER( num_clients ),
 	TEAM_GETTER( num_players ),
 	TEAM_GETTER( num_bots ),
+	TEAM_GETTER( average_num_clients ),
+	TEAM_GETTER( average_num_players ),
+	TEAM_GETTER( average_num_bots ),
 	TEAM_GETTER( total_budget ),
 	TEAM_GETTER( spent_budget ),
 	TEAM_GETTER( locked ),

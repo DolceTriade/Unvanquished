@@ -180,7 +180,7 @@ static TeamEconomyState& TeamEconomy( team_t team )
 static int OverloadCostMultiplierPermille( team_t team )
 {
 	const TeamEconomyState& economy = TeamEconomy( team );
-	const int extraPlayers = std::max( 0, economy.maxPlayersSeen - 1 );
+	const int extraPlayers = std::max( 0, economy.peakClientsSeen - 1 );
 	const float scale = std::max( 1.0f, 1.0f + g_overloadCostPerPlayer.Get() * extraPlayers );
 	return std::max( 1000, static_cast<int>( std::lround( scale * 1000.0f ) ) );
 }
@@ -306,12 +306,13 @@ static void UpdateOverloadCostScalingInternal()
 	for ( team_t team = TEAM_NONE; ( team = G_IterateTeams( team ) ); )
 	{
 		TeamEconomyState& economy = TeamEconomy( team );
-		if ( level.team[ team ].numPlayers <= economy.maxPlayersSeen )
+		const int currentClients = level.team[ team ].numClients;
+		if ( currentClients <= economy.peakClientsSeen )
 		{
 			continue;
 		}
 
-		economy.maxPlayersSeen = level.team[ team ].numPlayers;
+		economy.peakClientsSeen = currentClients;
 		PublishOverloadStateInternal( team );
 	}
 }
@@ -1431,7 +1432,7 @@ void G_InitOverloadEconomy()
 		TeamEconomyState& economy = TeamEconomy( team );
 		economy.completedPurchases = 0;
 		economy.bpPurchased = 0;
-		economy.maxPlayersSeen = 0;
+		economy.peakClientsSeen = 0;
 		memset( economy.investedCredits, 0, sizeof( economy.investedCredits ) );
 		memset( economy.repeatCounts, 0, sizeof( economy.repeatCounts ) );
 		memset( economy.ownedPurchases, 0, sizeof( economy.ownedPurchases ) );
