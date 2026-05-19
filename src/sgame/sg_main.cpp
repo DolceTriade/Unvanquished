@@ -204,7 +204,7 @@ Cvar::Cvar<float> g_shove("g_shove", "force multiplier when pushing players", Cv
 Cvar::Cvar<bool> g_antiSpawnBlock("g_antiSpawnBlock", "push away players who block their spawns", Cvar::NONE, false);
 Cvar::Cvar<float> g_overloadCostPerPlayer("g_overloadCostPerPlayer",
 	"additional overload cost multiplier per extra player seen on a team; overload costs only go upward during a match",
-	Cvar::NONE, 1.0f);
+	Cvar::NONE, 0.55f);
 Cvar::Cvar<float> g_overloadUnlockCostSlope("g_overloadUnlockCostSlope",
 	"multiplier applied to authored unlock values when deriving overload unlock costs",
 	Cvar::NONE, 17.213f);
