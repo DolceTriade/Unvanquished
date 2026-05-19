@@ -130,12 +130,6 @@ void              G_OverloadUnlockAll( team_t team );
 void              G_PublishOverloadState( team_t team );
 bool              G_OverloadPurchase( gentity_t *ent, const Cmd::Args& args, std::string* message = nullptr );
 int               G_OverloadPurchaseCount();
-bool              G_OverloadEntryIsPartial( team_t team, int purchaseIndex );
-bool              G_OverloadEntryCanBotStart( team_t team, int purchaseIndex );
-bool              G_OverloadEntryIsBPBundle( team_t team, int purchaseIndex );
-bool              G_OverloadEntryIsUnlock( team_t team, int purchaseIndex );
-bool              G_OverloadEntryIsUpgrade( team_t team, int purchaseIndex );
-int               G_OverloadEntryRemainingSpendCapacity( team_t team, int purchaseIndex );
 bool              G_OverloadPurchaseByIndex( gentity_t *ent, int purchaseIndex, int spend, std::string* message = nullptr );
 void              G_BotOverloadThink( gentity_t *ent );
 
