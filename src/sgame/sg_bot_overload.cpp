@@ -23,6 +23,7 @@ along with Unvanquished. If not, see <http://www.gnu.org/licenses/>.
 */
 
 #include "common/Common.h"
+#include "sg_overload.h"
 #include "sg_local.h"
 #include "sg_bot_local.h"
 
@@ -31,14 +32,122 @@ along with Unvanquished. If not, see <http://www.gnu.org/licenses/>.
 static constexpr int OVERLOAD_BOT_PURCHASE_COOLDOWN = 3000;
 static constexpr int OVERLOAD_BOT_FAILURE_COOLDOWN = 1000;
 static constexpr int OVERLOAD_BOT_SPEND_CHUNK = 200;
-static constexpr int OVERLOAD_BOT_HUMAN_RESERVE = 400;
-static constexpr int OVERLOAD_BOT_ALIEN_RESERVE = 400;
+static constexpr int OVERLOAD_BOT_HUMAN_RESERVE = 200;
+static constexpr int OVERLOAD_BOT_ALIEN_RESERVE = 200;
 static constexpr int OVERLOAD_BOT_BP_PRESSURE_THRESHOLD = 20;
 static constexpr int OVERLOAD_BOT_BP_AFTER_DESTRUCTION_WINDOW = 30000;
 
 static int BotReserveCredits( team_t team )
 {
 	return team == TEAM_ALIENS ? OVERLOAD_BOT_ALIEN_RESERVE : OVERLOAD_BOT_HUMAN_RESERVE;
+}
+
+static bool OverloadEntryIsPartial( team_t team, int purchaseIndex )
+{
+	if ( !G_IsPlayableTeam( team ) )
+	{
+		return false;
+	}
+
+	if ( purchaseIndex < 0 || purchaseIndex >= static_cast<int>( overloadPurchases.size() ) )
+	{
+		return false;
+	}
+
+	const overloadPurchaseDef_t& entry = overloadPurchases[ purchaseIndex ];
+	const TeamEconomyState& economy = TeamEconomy( team );
+
+	return ( entry.team == TEAM_NONE || entry.team == team ) &&
+	       economy.investedCredits[ purchaseIndex ] > 0 &&
+	       EntryIsAvailable( team, entry ) &&
+	       RemainingSpendCapacity( entry, purchaseIndex, team ) > 0;
+}
+
+static bool OverloadEntryCanBotStart( team_t team, int purchaseIndex )
+{
+	if ( !G_IsPlayableTeam( team ) )
+	{
+		return false;
+	}
+
+	if ( purchaseIndex < 0 || purchaseIndex >= static_cast<int>( overloadPurchases.size() ) )
+	{
+		return false;
+	}
+
+	const overloadPurchaseDef_t& entry = overloadPurchases[ purchaseIndex ];
+	return ( entry.team == TEAM_NONE || entry.team == team ) &&
+	       EntryIsAvailable( team, entry ) &&
+	       RemainingSpendCapacity( entry, purchaseIndex, team ) > 0;
+}
+
+static bool OverloadEntryIsBPBundle( team_t team, int purchaseIndex )
+{
+	if ( !G_IsPlayableTeam( team ) )
+	{
+		return false;
+	}
+
+	if ( purchaseIndex < 0 || purchaseIndex >= static_cast<int>( overloadPurchases.size() ) )
+	{
+		return false;
+	}
+
+	const overloadPurchaseDef_t& entry = overloadPurchases[ purchaseIndex ];
+	return ( entry.team == TEAM_NONE || entry.team == team ) && entry.kind == overloadPurchaseKind_t::BP_BUNDLE;
+}
+
+static bool OverloadEntryIsUnlock( team_t team, int purchaseIndex )
+{
+	if ( !G_IsPlayableTeam( team ) )
+	{
+		return false;
+	}
+
+	if ( purchaseIndex < 0 || purchaseIndex >= static_cast<int>( overloadPurchases.size() ) )
+	{
+		return false;
+	}
+
+	const overloadPurchaseDef_t& entry = overloadPurchases[ purchaseIndex ];
+	return ( entry.team == TEAM_NONE || entry.team == team ) && entry.kind == overloadPurchaseKind_t::UNLOCK;
+}
+
+static bool OverloadEntryIsUpgrade( team_t team, int purchaseIndex )
+{
+	if ( !G_IsPlayableTeam( team ) )
+	{
+		return false;
+	}
+
+	if ( purchaseIndex < 0 || purchaseIndex >= static_cast<int>( overloadPurchases.size() ) )
+	{
+		return false;
+	}
+
+	const overloadPurchaseDef_t& entry = overloadPurchases[ purchaseIndex ];
+	return ( entry.team == TEAM_NONE || entry.team == team ) && entry.kind == overloadPurchaseKind_t::UPGRADE;
+}
+
+static int OverloadEntryRemainingSpendCapacity( team_t team, int purchaseIndex )
+{
+	if ( !G_IsPlayableTeam( team ) )
+	{
+		return 0;
+	}
+
+	if ( purchaseIndex < 0 || purchaseIndex >= static_cast<int>( overloadPurchases.size() ) )
+	{
+		return 0;
+	}
+
+	const overloadPurchaseDef_t& entry = overloadPurchases[ purchaseIndex ];
+	if ( entry.team != TEAM_NONE && entry.team != team )
+	{
+		return 0;
+	}
+
+	return RemainingSpendCapacity( entry, purchaseIndex, team );
 }
 
 static int FindBotPartialPurchase( team_t team )
@@ -48,9 +157,9 @@ static int FindBotPartialPurchase( team_t team )
 
 	for ( int i = 0; i < G_OverloadPurchaseCount(); ++i )
 	{
-		if ( G_OverloadEntryIsPartial( team, i ) )
+		if ( OverloadEntryIsPartial( team, i ) )
 		{
-			const int remaining = G_OverloadEntryRemainingSpendCapacity( team, i );
+			const int remaining = OverloadEntryRemainingSpendCapacity( team, i );
 			if ( remaining > 0 && remaining < bestRemaining )
 			{
 				bestPurchaseIndex = i;
@@ -62,7 +171,20 @@ static int FindBotPartialPurchase( team_t team )
 	return bestPurchaseIndex;
 }
 
-static bool BotStructureRecentlyDestroyed( team_t team )
+static int FindBotBPPurchase( team_t team )
+{
+	for ( int i = 0; i < G_OverloadPurchaseCount(); ++i )
+	{
+		if ( OverloadEntryCanBotStart( team, i ) && OverloadEntryIsBPBundle( team, i ) )
+		{
+			return i;
+		}
+	}
+
+	return -1;
+}
+
+static bool BotBuildablesRecentlyKilled( team_t team )
 {
 	for ( int i = 0; i < level.numBuildLogs; ++i )
 	{
@@ -81,9 +203,9 @@ static bool BotStructureRecentlyDestroyed( team_t team )
 		{
 			case BF_DESTROY:
 			case BF_TEAMKILL:
-			case BF_AUTO:
 				return true;
 
+			case BF_AUTO:
 			case BF_CONSTRUCT:
 			case BF_DECONSTRUCT:
 			case BF_REPLACE:
@@ -101,23 +223,23 @@ static int FindBotFreshPurchase( team_t team )
 
 	for ( int i = 0; i < G_OverloadPurchaseCount(); ++i )
 	{
-		if ( !G_OverloadEntryCanBotStart( team, i ) )
+		if ( !OverloadEntryCanBotStart( team, i ) )
 		{
 			continue;
 		}
 
-		if ( G_OverloadEntryIsUnlock( team, i ) )
+		if ( OverloadEntryIsUnlock( team, i ) )
 		{
 			return i;
 		}
 
-		if ( bpPurchaseIndex < 0 && G_OverloadEntryIsBPBundle( team, i ) )
+		if ( bpPurchaseIndex < 0 && OverloadEntryIsBPBundle( team, i ) )
 		{
 			bpPurchaseIndex = i;
 			continue;
 		}
 
-		if ( upgradePurchaseIndex < 0 && G_OverloadEntryIsUpgrade( team, i ) )
+		if ( upgradePurchaseIndex < 0 && OverloadEntryIsUpgrade( team, i ) )
 		{
 			upgradePurchaseIndex = i;
 		}
@@ -125,7 +247,7 @@ static int FindBotFreshPurchase( team_t team )
 
 	if ( bpPurchaseIndex >= 0 &&
 	     G_GetFreeBudget( team ) < OVERLOAD_BOT_BP_PRESSURE_THRESHOLD &&
-	     BotStructureRecentlyDestroyed( team ) )
+	     BotBuildablesRecentlyKilled( team ) )
 	{
 		return bpPurchaseIndex;
 	}
@@ -157,18 +279,28 @@ void G_BotOverloadThink( gentity_t *ent )
 		return;
 	}
 
-	int purchaseIndex = FindBotPartialPurchase( team );
-	if ( purchaseIndex >= 0 )
+	int purchaseIndex = -1;
+	if ( G_GetFreeBudget( team ) < OVERLOAD_BOT_BP_PRESSURE_THRESHOLD &&
+	     BotBuildablesRecentlyKilled( team ) )
 	{
-		ent->botMind->overloadTargetPurchase = purchaseIndex;
+		purchaseIndex = FindBotBPPurchase( team );
 	}
-	else
+
+	if ( purchaseIndex < 0 )
 	{
-		purchaseIndex = ent->botMind->overloadTargetPurchase;
-		if ( G_OverloadEntryRemainingSpendCapacity( team, purchaseIndex ) <= 0 )
+		purchaseIndex = FindBotPartialPurchase( team );
+		if ( purchaseIndex >= 0 )
 		{
-			purchaseIndex = FindBotFreshPurchase( team );
 			ent->botMind->overloadTargetPurchase = purchaseIndex;
+		}
+		else
+		{
+			purchaseIndex = ent->botMind->overloadTargetPurchase;
+			if ( OverloadEntryRemainingSpendCapacity( team, purchaseIndex ) <= 0 )
+			{
+				purchaseIndex = FindBotFreshPurchase( team );
+				ent->botMind->overloadTargetPurchase = purchaseIndex;
+			}
 		}
 	}
 
@@ -178,7 +310,7 @@ void G_BotOverloadThink( gentity_t *ent )
 		return;
 	}
 
-	const int remaining = G_OverloadEntryRemainingSpendCapacity( team, purchaseIndex );
+	const int remaining = OverloadEntryRemainingSpendCapacity( team, purchaseIndex );
 	if ( remaining <= 0 )
 	{
 		ent->botMind->overloadTargetPurchase = -1;
@@ -214,7 +346,7 @@ void G_BotOverloadThink( gentity_t *ent )
 	{
 		ent->botMind->overloadTargetPurchase = nextPartialPurchase;
 	}
-	else if ( G_OverloadEntryRemainingSpendCapacity( team, purchaseIndex ) > 0 )
+	else if ( OverloadEntryRemainingSpendCapacity( team, purchaseIndex ) > 0 )
 	{
 		ent->botMind->overloadTargetPurchase = purchaseIndex;
 	}
