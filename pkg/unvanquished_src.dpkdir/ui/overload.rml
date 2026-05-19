@@ -30,20 +30,24 @@
 		#workspace {
 			display: flex;
 			align-items: stretch;
-			gap: 1em;
+			gap: 0.75em;
 			height: 100%;
 		}
 		#mainColumn {
-			display: inline-block;
-			width: 80%;
+			display: block;
+			flex-grow: 3;
+			flex-shrink: 1;
+			flex-basis: 0%;
+			min-width: 0;
 			height: 100%;
-			vertical-align: top;
 		}
 		#sideColumn {
-			display: inline-block;
-			width: 20%;
+			display: block;
+			flex-grow: 1;
+			flex-shrink: 1;
+			flex-basis: 0%;
+			min-width: 0;
 			height: 100%;
-			vertical-align: top;
 		}
 
 		/* Header and filters */
@@ -101,10 +105,11 @@
 
 		/* Sidebar detail panel */
 		#detailPanel {
-			padding: 0.9em;
+			padding: 0.75em;
 			background: #0d2429f2;
 			border-width: 1px;
 			border-color: #24535a;
+			box-sizing: border-box;
 			height: 100%;
 			overflow-y: auto;
 		}
@@ -165,20 +170,27 @@
 			margin: 0 0 0.15em 0;
 			font-size: 1.25em;
 			color: #ffffff;
+			white-space: normal;
+			word-break: break-word;
 		}
 		.detail-category {
 			margin: 0 0 0.3em 0;
 			color: #85d5dc;
+			white-space: normal;
+			word-break: break-word;
 		}
 		.detail-description {
 			margin: 0 0 0.55em 0;
 			color: #b6e6ea;
 			white-space: pre-wrap;
+			word-break: break-word;
 		}
 		.detail-meta {
 			display: block;
 			margin-bottom: 0.15em;
 			color: #a4d8dc;
+			white-space: normal;
+			word-break: break-word;
 		}
 		.detail-actions {
 			margin-top: 0.7em;
@@ -207,6 +219,8 @@
 			margin: 0 0 0.22em 0;
 			color: #d9ffff;
 			font-size: 0.92em;
+			white-space: normal;
+			word-break: break-word;
 		}
 
 		/* Scrollable content column */
@@ -377,7 +391,6 @@
 			if OverloadFilter == "all" then return true end
 			if OverloadFilter == "available" then return status == "available" or status == "expensive" or status == "partial" end
 			if OverloadFilter == "progress" then return status == "partial" end
-			if OverloadFilter == "future" then return status == "locked" end
 			if OverloadFilter == "done" then return status == "owned" or status == "maxed" end
 			return true
 		end
@@ -734,10 +747,10 @@
 				'<div class="detail-actions">%s</div>' ..
 				'</div>',
 				Rocket_QuakeToRML(UpgradeDetailTitle(row)),
-				Rocket_QuakeToRML(row.progress or ""),
-				Rocket_QuakeToRML(row.cost),
-				Rocket_QuakeToRML(row.currencyLabel),
-				Rocket_QuakeToRML(row.description or ""),
+				row.progress or "",
+				row.cost,
+				row.currencyLabel,
+				row.description or "",
 				SpendButtons(row))
 		end
 
@@ -759,9 +772,9 @@
 					'<div class="detail-meta">Next cost: %s %s</div>' ..
 					'<div class="detail-meta">Progress: %s</div>' ..
 					'<div class="detail-actions">%s</div>',
-					Rocket_QuakeToRML(row.cost),
-					Rocket_QuakeToRML(row.currencyLabel),
-					Rocket_QuakeToRML(row.progress),
+					row.cost,
+					row.currencyLabel,
+					row.progress,
 					SpendButtons(row))
 			elseif group.unlock ~= nil and group.unlock.status ~= "owned" and group.unlock.status ~= "maxed" then
 				local unlock = group.unlock
@@ -778,9 +791,9 @@
 					'<div class="detail-meta">%s to unlock</div>' ..
 					'%s' ..
 					'<div class="detail-actions">%s</div>',
-					Rocket_QuakeToRML(unlock.cost),
-					Rocket_QuakeToRML(unlock.currencyLabel),
-					Rocket_QuakeToRML(unlock.progress),
+					unlock.cost,
+					unlock.currencyLabel,
+					unlock.progress,
 					progression,
 					SpendButtons(unlock))
 			else
@@ -809,9 +822,9 @@
 				row.kind == "bp" and KindLabel(row.kind) or (group.unlock ~= nil and group.unlock.status ~= "owned" and group.unlock.status ~= "maxed" and "Unlock" or "Upgrades"),
 				StatusBadgeClass(GroupStatus(group)),
 				GroupStatusText(group),
-				Rocket_QuakeToRML(DisplayLabel(row)),
+				DisplayLabel(row),
 				detailCategory,
-				Rocket_QuakeToRML(row.description or ""),
+				row.description or "",
 				detailBody)
 		end
 
@@ -826,7 +839,6 @@
 			SetFilterButtonState(document, "filterAll", OverloadFilter == "all")
 			SetFilterButtonState(document, "filterAvailable", OverloadFilter == "available")
 			SetFilterButtonState(document, "filterProgress", OverloadFilter == "progress")
-			SetFilterButtonState(document, "filterFuture", OverloadFilter == "future")
 			SetFilterButtonState(document, "filterDone", OverloadFilter == "done")
 		end
 
@@ -877,7 +889,6 @@
 								<span class="filter-label"><translate>Show</translate></span>
 								<button id="filterAvailable" onclick="OverloadSetFilter('available', document)"><translate>Available</translate></button>
 								<button id="filterProgress" onclick="OverloadSetFilter('progress', document)"><translate>In Progress</translate></button>
-								<button id="filterFuture" onclick="OverloadSetFilter('future', document)"><translate>Future</translate></button>
 								<button id="filterDone" onclick="OverloadSetFilter('done', document)"><translate>Completed</translate></button>
 								<button id="filterAll" onclick="OverloadSetFilter('all', document)"><translate>All</translate></button>
 							</div>
