@@ -207,7 +207,7 @@ Cvar::Cvar<float> g_overloadCostPerPlayer("g_overloadCostPerPlayer",
 	Cvar::NONE, 1.0f);
 Cvar::Cvar<float> g_overloadUnlockCostSlope("g_overloadUnlockCostSlope",
 	"multiplier applied to authored unlock values when deriving overload unlock costs",
-	Cvar::NONE, 24.42f);
+	Cvar::NONE, 17.213f);
 Cvar::Cvar<float> g_overloadUnlockCostOffset("g_overloadUnlockCostOffset",
 	"flat amount added after scaling authored unlock values when deriving overload unlock costs",
 	Cvar::NONE, 0.0f);
