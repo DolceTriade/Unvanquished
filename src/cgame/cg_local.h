@@ -1268,7 +1268,6 @@ struct cg_t
 
 	float                   painBlendValue;
 	float                   painBlendTarget;
-	int                     lastHealth;
 	bool                wasDeadLastFrame;
 
 	int                     lastPredictedCommand;
