@@ -137,10 +137,10 @@ int cg_buildableRangeMarkerMask;
 Cvar::Range<Cvar::Cvar<float>> cg_binaryShaderScreenScale("cg_binaryShaderScreenScale", "fraction of screen to draw buildable range marker outlines on", Cvar::NONE, 1.0, 0, 1);
 
 Cvar::Cvar<float> cg_painBlendUpRate("cg_painBlendUpRate", "how fast the pain indicator will appear", Cvar::NONE, 10.0);
-Cvar::Cvar<float> cg_painBlendDownRate("cg_painBlendDownRate", "how fast the pain indicator will disappear", Cvar::NONE, 0.5);
+Cvar::Cvar<float> cg_painBlendDownRate("cg_painBlendDownRate", "how fast the pain indicator will disappear", Cvar::NONE, 0.125);
 Cvar::Cvar<float> cg_painBlendMax("cg_painBlendMax", "upper bound on how opaque the pain indicator will be", Cvar::NONE, 0.7);
-Cvar::Cvar<float> cg_painBlendScale("cg_painBlendScale", "how amplified the damage will be for the blood indicator (1->damage is barely visible, 20->damage reaches cg_painBlendMax almost instantly", Cvar::NONE, 7.0);
-Cvar::Cvar<float> cg_painBlendZoom("cg_painBlendZoom", "size scale factor for the the pain indicator", Cvar::NONE, 0.65);
+Cvar::Cvar<float> cg_painBlendScale("cg_painBlendScale", "how amplified the low-health warning will be for the blood indicator", Cvar::NONE, 12.0);
+Cvar::Cvar<float> cg_painBlendZoom("cg_painBlendZoom", "maximum size scale factor for the pain indicator at critical health", Cvar::NONE, 0.7);
 
 Cvar::Range<Cvar::Cvar<int>> cg_stickySpec("cg_stickySpec", "if 0, cycle followed player upon death", Cvar::USERINFO, 1, 0, 1);
 Cvar::Range<Cvar::Cvar<int>> cg_sprintToggle("cg_sprintToggle", "toggle instead of hold to sprint", Cvar::USERINFO, 0, 0, 1);

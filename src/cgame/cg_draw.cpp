@@ -410,17 +410,17 @@ static void CG_Draw2D()
 CG_ScalePainBlendTCs
 ===============
 */
-static void CG_ScalePainBlendTCs( float *s1, float *t1, float *s2, float *t2 )
+static void CG_ScalePainBlendTCs( float *s1, float *t1, float *s2, float *t2, float zoom )
 {
 	*s1 -= 0.5f;
 	*t1 -= 0.5f;
 	*s2 -= 0.5f;
 	*t2 -= 0.5f;
 
-	*s1 *= cg_painBlendZoom.Get();
-	*t1 *= cg_painBlendZoom.Get();
-	*s2 *= cg_painBlendZoom.Get();
-	*t2 *= cg_painBlendZoom.Get();
+	*s1 *= zoom;
+	*t1 *= zoom;
+	*s2 *= zoom;
+	*t2 *= zoom;
 
 	*s1 += 0.5f;
 	*t1 += 0.5f;
@@ -437,8 +437,9 @@ CG_PainBlend
 */
 static void CG_PainBlend()
 {
-	int       damage;
-	float     damageAsFracOfMax;
+	float     healthFrac;
+	float     missingHealthFrac;
+	float     painBlendZoom;
 	qhandle_t shader = cgs.media.viewBloodShader;
 	float     x, y, w, h;
 	float     s1, t1, s2, t2;
@@ -448,24 +449,16 @@ static void CG_PainBlend()
 		return;
 	}
 
-	damage = cg.lastHealth - cg.snap->ps.stats[ STAT_HEALTH ];
+	healthFrac = static_cast<float>( cg.snap->ps.stats[ STAT_HEALTH ] ) /
+	             BG_Class( cg.snap->ps.stats[ STAT_CLASS ] )->health;
+	healthFrac = Math::Clamp( healthFrac, 0.0f, 1.0f );
+	missingHealthFrac = 1.0f - healthFrac;
 
-	if ( damage < 0 )
-	{
-		damage = 0;
-	}
-	damageAsFracOfMax = static_cast<float>( damage ) / BG_Class( cg.snap->ps.stats[ STAT_CLASS ] )->health;
-	cg.lastHealth = cg.snap->ps.stats[ STAT_HEALTH ];
-
-	cg.painBlendValue += damageAsFracOfMax * cg_painBlendScale.Get();
-
-	if ( cg.painBlendValue > 0.0f )
-	{
-		cg.painBlendValue -= ( cg.frametime / 1000.0f ) *
-		                     cg_painBlendDownRate.Get();
-	}
-
+	// Bias the warning toward low-health situations instead of recent damage spikes.
+	cg.painBlendValue = missingHealthFrac * missingHealthFrac *
+	                    ( cg_painBlendScale.Get() / 7.0f );
 	cg.painBlendValue = Math::Clamp( cg.painBlendValue, 0.0f, 1.0f );
+	painBlendZoom = missingHealthFrac * cg_painBlendZoom.Get();
 
 	// no work to do
 	if ( cg.painBlendValue == 0.0f )
@@ -512,7 +505,7 @@ static void CG_PainBlend()
 	t1 = 0.0f;
 	s2 = PAINBLEND_BORDER;
 	t2 = 1.0f;
-	CG_ScalePainBlendTCs( &s1, &t1, &s2, &t2 );
+	CG_ScalePainBlendTCs( &s1, &t1, &s2, &t2, painBlendZoom );
 	trap_R_DrawStretchPic( x, y, w, h, s1, t1, s2, t2, shader );
 
 	//right
@@ -525,7 +518,7 @@ static void CG_PainBlend()
 	t1 = 0.0f;
 	s2 = 1.0f;
 	t2 = 1.0f;
-	CG_ScalePainBlendTCs( &s1, &t1, &s2, &t2 );
+	CG_ScalePainBlendTCs( &s1, &t1, &s2, &t2, painBlendZoom );
 	trap_R_DrawStretchPic( x, y, w, h, s1, t1, s2, t2, shader );
 
 	//top
@@ -538,7 +531,7 @@ static void CG_PainBlend()
 	t1 = 0.0f;
 	s2 = 1.0f - PAINBLEND_BORDER;
 	t2 = PAINBLEND_BORDER;
-	CG_ScalePainBlendTCs( &s1, &t1, &s2, &t2 );
+	CG_ScalePainBlendTCs( &s1, &t1, &s2, &t2, painBlendZoom );
 	trap_R_DrawStretchPic( x, y, w, h, s1, t1, s2, t2, shader );
 
 	//bottom
@@ -551,7 +544,7 @@ static void CG_PainBlend()
 	t1 = 1.0f - PAINBLEND_BORDER;
 	s2 = 1.0f - PAINBLEND_BORDER;
 	t2 = 1.0f;
-	CG_ScalePainBlendTCs( &s1, &t1, &s2, &t2 );
+	CG_ScalePainBlendTCs( &s1, &t1, &s2, &t2, painBlendZoom );
 	trap_R_DrawStretchPic( x, y, w, h, s1, t1, s2, t2, shader );
 
 	trap_R_ClearColor();
@@ -566,7 +559,6 @@ void CG_ResetPainBlend()
 {
 	cg.painBlendValue = 0.0f;
 	cg.painBlendTarget = 0.0f;
-	cg.lastHealth = cg.snap->ps.stats[ STAT_HEALTH ];
 }
 
 /*
