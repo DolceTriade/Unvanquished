@@ -526,14 +526,14 @@ static overloadEffect_t PercentAttributeEffect( bgAttributeFamily_t family, cons
 	return effect;
 }
 
-static int DefaultUpgradeBaseCost( int requiredCompletedCount )
+static int DefaultUpgradeBaseCost( int stage )
 {
-	if ( requiredCompletedCount >= OVERLOAD_STAGE3_COUNT )
+	if ( stage >= OVERLOAD_STAGE3_COUNT )
 	{
 		return OVERLOAD_UPGRADE_BASE_COST_STAGE3;
 	}
 
-	if ( requiredCompletedCount >= OVERLOAD_STAGE2_COUNT )
+	if ( stage >= OVERLOAD_STAGE2_COUNT )
 	{
 		return OVERLOAD_UPGRADE_BASE_COST_STAGE2;
 	}
@@ -541,14 +541,14 @@ static int DefaultUpgradeBaseCost( int requiredCompletedCount )
 	return OVERLOAD_UPGRADE_BASE_COST_STAGE1;
 }
 
-static int DefaultUpgradeStepCost( int requiredCompletedCount )
+static int DefaultUpgradeStepCost( int stage )
 {
-	if ( requiredCompletedCount >= OVERLOAD_STAGE3_COUNT )
+	if ( stage >= OVERLOAD_STAGE3_COUNT )
 	{
 		return OVERLOAD_UPGRADE_STEP_COST_STAGE3;
 	}
 
-	if ( requiredCompletedCount >= OVERLOAD_STAGE2_COUNT )
+	if ( stage >= OVERLOAD_STAGE2_COUNT )
 	{
 		return OVERLOAD_UPGRADE_STEP_COST_STAGE2;
 	}
@@ -627,17 +627,16 @@ static void AddUnlockWithCost( team_t team, unlockableType_t unlockableType, int
 	SetUnlockPurchaseIndex( team, unlockableType, itemNum, static_cast<int>( overloadPurchases.size() ) - 1 );
 }
 
-static void AddUnlock( team_t team, int requiredCompletedCount, unlockableType_t unlockableType, int itemNum,
+static void AddUnlock( team_t team, unlockableType_t unlockableType, int itemNum,
                        bgAttributeFamily_t family, int objectIndex, int unlockField,
                        const char* thing, const char* thingLabel, const char* displayName, const char* uiDescription )
 {
-	(void) requiredCompletedCount;
 	AddUnlockWithCost( team, unlockableType, itemNum, family, objectIndex, unlockField,
 	                   UnlockCost( unlockableType, itemNum ),
 	                   thing, thingLabel, displayName, uiDescription );
 }
 
-static void AddWeaponUnlock( team_t team, int requiredCompletedCount, weapon_t weapon )
+static void AddWeaponUnlock( team_t team, weapon_t weapon )
 {
 	const int unlockField = FindUnlockThresholdField( BG_ATTR_WEAPON );
 	const int objectIndex = BG_FindAttributeObject( BG_ATTR_WEAPON, BG_Weapon( weapon )->name );
@@ -648,11 +647,11 @@ static void AddWeaponUnlock( team_t team, int requiredCompletedCount, weapon_t w
 
 	std::string displayName = UnlockableDisplayName( UNLT_WEAPON, weapon );
 	std::string uiDescription = UnlockableDescription( UNLT_WEAPON, weapon );
-	AddUnlock( team, requiredCompletedCount, UNLT_WEAPON, weapon, BG_ATTR_WEAPON, objectIndex, unlockField,
+	AddUnlock( team, UNLT_WEAPON, weapon, BG_ATTR_WEAPON, objectIndex, unlockField,
 	           OverloadThingName( UNLT_WEAPON, weapon ), displayName.c_str(), displayName.c_str(), uiDescription.c_str() );
 }
 
-static void AddUpgradeUnlock( team_t team, int requiredCompletedCount, upgrade_t upgrade )
+static void AddUpgradeUnlock( team_t team, upgrade_t upgrade )
 {
 	const int unlockField = FindUnlockThresholdField( BG_ATTR_UPGRADE );
 	const int objectIndex = BG_FindAttributeObject( BG_ATTR_UPGRADE, BG_Upgrade( upgrade )->name );
@@ -663,11 +662,11 @@ static void AddUpgradeUnlock( team_t team, int requiredCompletedCount, upgrade_t
 
 	std::string displayName = UnlockableDisplayName( UNLT_UPGRADE, upgrade );
 	std::string uiDescription = UnlockableDescription( UNLT_UPGRADE, upgrade );
-	AddUnlock( team, requiredCompletedCount, UNLT_UPGRADE, upgrade, BG_ATTR_UPGRADE, objectIndex, unlockField,
+	AddUnlock( team, UNLT_UPGRADE, upgrade, BG_ATTR_UPGRADE, objectIndex, unlockField,
 	           OverloadThingName( UNLT_UPGRADE, upgrade ), displayName.c_str(), displayName.c_str(), uiDescription.c_str() );
 }
 
-static void AddBuildableUnlock( team_t team, int requiredCompletedCount, buildable_t buildable )
+static void AddBuildableUnlock( team_t team, buildable_t buildable )
 {
 	const int unlockField = FindUnlockThresholdField( BG_ATTR_BUILDABLE );
 	const int objectIndex = BG_FindAttributeObject( BG_ATTR_BUILDABLE, BG_Buildable( buildable )->name );
@@ -678,11 +677,11 @@ static void AddBuildableUnlock( team_t team, int requiredCompletedCount, buildab
 
 	std::string displayName = UnlockableDisplayName( UNLT_BUILDABLE, buildable );
 	std::string uiDescription = UnlockableDescription( UNLT_BUILDABLE, buildable );
-	AddUnlock( team, requiredCompletedCount, UNLT_BUILDABLE, buildable, BG_ATTR_BUILDABLE, objectIndex, unlockField,
+	AddUnlock( team, UNLT_BUILDABLE, buildable, BG_ATTR_BUILDABLE, objectIndex, unlockField,
 	           OverloadThingName( UNLT_BUILDABLE, buildable ), displayName.c_str(), displayName.c_str(), uiDescription.c_str() );
 }
 
-static void AddClassUnlock( team_t team, int requiredCompletedCount, class_t classNum )
+static void AddClassUnlock( team_t team, class_t classNum )
 {
 	const int unlockField = FindUnlockThresholdField( BG_ATTR_CLASS );
 	const int objectIndex = BG_FindAttributeObject( BG_ATTR_CLASS, BG_Class( classNum )->name );
@@ -693,7 +692,7 @@ static void AddClassUnlock( team_t team, int requiredCompletedCount, class_t cla
 
 	std::string displayName = UnlockableDisplayName( UNLT_CLASS, classNum );
 	std::string uiDescription = UnlockableDescription( UNLT_CLASS, classNum );
-	AddUnlock( team, requiredCompletedCount, UNLT_CLASS, classNum, BG_ATTR_CLASS, objectIndex, unlockField,
+	AddUnlock( team, UNLT_CLASS, classNum, BG_ATTR_CLASS, objectIndex, unlockField,
 	           OverloadThingName( UNLT_CLASS, classNum ), displayName.c_str(), displayName.c_str(), uiDescription.c_str() );
 }
 
@@ -823,32 +822,32 @@ static void BuildOverloadCatalog()
 	bpBundle.unlockField = -1;
 	overloadPurchases.push_back( bpBundle );
 
-	AddWeaponUnlock( TEAM_HUMANS, 0, WP_PAIN_SAW );
-	AddWeaponUnlock( TEAM_HUMANS, 0, WP_SHOTGUN );
-	AddWeaponUnlock( TEAM_HUMANS, 0, WP_MASS_DRIVER );
-	AddWeaponUnlock( TEAM_HUMANS, 0, WP_CHAINGUN );
-	AddWeaponUnlock( TEAM_HUMANS, OVERLOAD_STAGE2_COUNT, WP_FLAMER );
-	AddWeaponUnlock( TEAM_HUMANS, OVERLOAD_STAGE2_COUNT, WP_PULSE_RIFLE );
-	AddWeaponUnlock( TEAM_HUMANS, OVERLOAD_STAGE3_COUNT, WP_LUCIFER_CANNON );
-	AddUpgradeUnlock( TEAM_HUMANS, OVERLOAD_STAGE2_COUNT, UP_MEDIUMARMOUR );
-	AddUpgradeUnlock( TEAM_HUMANS, OVERLOAD_STAGE2_COUNT, UP_RADAR );
-	AddUpgradeUnlock( TEAM_HUMANS, OVERLOAD_STAGE2_COUNT, UP_JETPACK );
-	AddUpgradeUnlock( TEAM_HUMANS, OVERLOAD_STAGE2_COUNT, UP_BIOKIT );
-	AddUpgradeUnlock( TEAM_HUMANS, OVERLOAD_STAGE3_COUNT, UP_BATTLESUIT );
-	AddUpgradeUnlock( TEAM_HUMANS, OVERLOAD_STAGE3_COUNT, UP_GRENADE );
-	AddUpgradeUnlock( TEAM_HUMANS, OVERLOAD_STAGE3_COUNT, UP_FIREBOMB );
-	AddBuildableUnlock( TEAM_HUMANS, OVERLOAD_STAGE2_COUNT, BA_H_ROCKETPOD );
+	AddWeaponUnlock( TEAM_HUMANS, WP_PAIN_SAW );
+	AddWeaponUnlock( TEAM_HUMANS, WP_SHOTGUN );
+	AddWeaponUnlock( TEAM_HUMANS, WP_MASS_DRIVER );
+	AddWeaponUnlock( TEAM_HUMANS, WP_CHAINGUN );
+	AddWeaponUnlock( TEAM_HUMANS, WP_FLAMER );
+	AddWeaponUnlock( TEAM_HUMANS, WP_PULSE_RIFLE );
+	AddWeaponUnlock( TEAM_HUMANS, WP_LUCIFER_CANNON );
+	AddUpgradeUnlock( TEAM_HUMANS, UP_MEDIUMARMOUR );
+	AddUpgradeUnlock( TEAM_HUMANS, UP_RADAR );
+	AddUpgradeUnlock( TEAM_HUMANS, UP_JETPACK );
+	AddUpgradeUnlock( TEAM_HUMANS, UP_BIOKIT );
+	AddUpgradeUnlock( TEAM_HUMANS, UP_BATTLESUIT );
+	AddUpgradeUnlock( TEAM_HUMANS, UP_GRENADE );
+	AddUpgradeUnlock( TEAM_HUMANS, UP_FIREBOMB );
+	AddBuildableUnlock( TEAM_HUMANS, BA_H_ROCKETPOD );
 
-	AddBuildableUnlock( TEAM_ALIENS, 0, BA_A_BOOSTER );
-	AddBuildableUnlock( TEAM_ALIENS, 0, BA_A_SPIKER );
-	AddBuildableUnlock( TEAM_ALIENS, OVERLOAD_STAGE2_COUNT, BA_A_TRAPPER );
-	AddBuildableUnlock( TEAM_ALIENS, OVERLOAD_STAGE2_COUNT, BA_A_HIVE );
-	AddClassUnlock( TEAM_ALIENS, 0, PCL_ALIEN_LEVEL2 );
-	AddClassUnlock( TEAM_ALIENS, 0, PCL_ALIEN_BUILDER0_UPG );
-	AddClassUnlock( TEAM_ALIENS, OVERLOAD_STAGE2_COUNT, PCL_ALIEN_LEVEL2_UPG );
-	AddClassUnlock( TEAM_ALIENS, OVERLOAD_STAGE2_COUNT, PCL_ALIEN_LEVEL3 );
-	AddClassUnlock( TEAM_ALIENS, OVERLOAD_STAGE3_COUNT, PCL_ALIEN_LEVEL3_UPG );
-	AddClassUnlock( TEAM_ALIENS, OVERLOAD_STAGE3_COUNT, PCL_ALIEN_LEVEL4 );
+	AddBuildableUnlock( TEAM_ALIENS, BA_A_BOOSTER );
+	AddBuildableUnlock( TEAM_ALIENS, BA_A_SPIKER );
+	AddBuildableUnlock( TEAM_ALIENS, BA_A_TRAPPER );
+	AddBuildableUnlock( TEAM_ALIENS, BA_A_HIVE );
+	AddClassUnlock( TEAM_ALIENS, PCL_ALIEN_LEVEL2 );
+	AddClassUnlock( TEAM_ALIENS, PCL_ALIEN_BUILDER0_UPG );
+	AddClassUnlock( TEAM_ALIENS, PCL_ALIEN_LEVEL2_UPG );
+	AddClassUnlock( TEAM_ALIENS, PCL_ALIEN_LEVEL3 );
+	AddClassUnlock( TEAM_ALIENS, PCL_ALIEN_LEVEL3_UPG );
+	AddClassUnlock( TEAM_ALIENS, PCL_ALIEN_LEVEL4 );
 
 	// Human weapon upgrades.
 	// Covered weapons: blaster, rifle, psaw, shotgun, lasgun, mdriver, chaingun, flamer, prifle, lcannon.
