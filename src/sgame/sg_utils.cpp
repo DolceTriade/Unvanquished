@@ -32,7 +32,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "CBSE.h"
 #include "sg_cm_world.h"
 
+#include <algorithm>
 #include <glm/geometric.hpp>
+#include <vector>
 
 struct shaderRemap_t
 {
@@ -806,14 +808,7 @@ void G_ClientnumToMask( int clientNum, int *loMask, int *hiMask )
 	}
 }
 
-/*
-===============
-G_TeamToClientmask
-
-Calculates loMask/hiMask as used by SVF_CLIENTMASK type events to match all clients in a team.
-===============
-*/
-void G_TeamToClientmask( team_t team, int *loMask, int *hiMask )
+void G_TeamsToClientmask( const std::vector<team_t>& teams, int *loMask, int *hiMask )
 {
 	int       clientNum;
 	gclient_t *client;
@@ -824,18 +819,37 @@ void G_TeamToClientmask( team_t team, int *loMask, int *hiMask )
 	{
 		client = &g_clients[ clientNum ];
 
-		if ( client->pers.team == team )
+		if ( client->pers.connected != CON_CONNECTED )
 		{
-			if ( clientNum < 32 )
-			{
-				*loMask |= BIT( clientNum );
-			}
-			else
-			{
-				*hiMask |= BIT( clientNum - 32 );
-			}
+			continue;
+		}
+
+		if ( std::find( teams.begin(), teams.end(), client->pers.team ) == teams.end() )
+		{
+			continue;
+		}
+
+		if ( clientNum < 32 )
+		{
+			*loMask |= BIT( clientNum );
+		}
+		else
+		{
+			*hiMask |= BIT( clientNum - 32 );
 		}
 	}
+}
+
+/*
+===============
+G_TeamToClientmask
+
+Calculates loMask/hiMask as used by SVF_CLIENTMASK type events to match all clients in a team.
+===============
+*/
+void G_TeamToClientmask( team_t team, int *loMask, int *hiMask )
+{
+	G_TeamsToClientmask( { team }, loMask, hiMask );
 }
 
 bool G_LineOfSight( const gentity_t *from, const gentity_t *to, int mask, bool useTrajBase )
