@@ -2312,6 +2312,11 @@ std::string BG_TacticBehaviorsToString( Str::StringRef sep )
 	return result;
 }
 
+std::vector<std::string> BG_GetAllowedTactics()
+{
+	return std::vector<std::string>( bg_tacticBehaviors.begin(), bg_tacticBehaviors.end() );
+}
+
 /*
 ============
 BG_SetForbiddenEquipment
