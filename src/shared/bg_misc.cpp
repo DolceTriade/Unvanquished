@@ -1305,6 +1305,7 @@ static constexpr const char *const eventnames[] =
   "EV_DEATH2",
   "EV_DEATH3",
   "EV_OBITUARY",
+  "EV_BUILDABLE_OBITUARY",
 
   "EV_GIB_PLAYER",
 

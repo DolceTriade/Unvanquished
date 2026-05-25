@@ -809,6 +809,7 @@ enum entity_event_t
   EV_DEATH2,
   EV_DEATH3,
   EV_OBITUARY,
+  EV_BUILDABLE_OBITUARY,
 
   EV_GIB_PLAYER,
 

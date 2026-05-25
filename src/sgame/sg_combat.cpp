@@ -139,6 +139,22 @@ static void LookAtKiller( gentity_t *self, gentity_t *inflictor, gentity_t *atta
 	}
 }
 
+static void G_BuildableObituary( gentity_t *self, gentity_t *actor, int mod )
+{
+	if ( !actor || !actor->client )
+	{
+		return;
+	}
+
+	gentity_t *ent = G_NewTempEntity( VEC2GLM( self->r.currentOrigin ), EV_BUILDABLE_OBITUARY );
+	ent->s.eventParm = mod;
+	ent->s.otherEntityNum = actor->num();
+	ent->s.otherEntityNum2 = self->s.modelindex;
+	ent->s.generic1 = G_Team( self );
+	G_TeamsToClientmask( { G_Team( actor ), TEAM_NONE }, &ent->r.loMask, &ent->r.hiMask );
+	ent->r.svFlags = SVF_BROADCAST | SVF_CLIENTMASK;
+}
+
 /**
  * @brief Function to find who assisted most (and, in case of a tie, most recently) with a kill
  * @param self
@@ -1011,12 +1027,5 @@ void G_LogDestruction( gentity_t *self, gentity_t *actor, int mod )
 	             mod == MOD_DECONSTRUCT ? "deconstructed" : "destroyed",
 	             actor->client ? actor->client->pers.netname : "<world>" );
 
-	if ( actor->client && G_OnSameTeam( self, actor ) )
-	{
-		G_TeamCommand( G_Team( actor ),
-		               va( "print_tr %s %s %s", mod == MOD_DECONSTRUCT ? QQ( N_("$1$ ^3DECONSTRUCTED^* by $2$") ) :
-						   QQ( N_("$1$ ^3DESTROYED^* by $2$") ),
-		                   Quote( BG_Buildable( self->s.modelindex )->humanName ),
-		                   Quote( actor->client->pers.netname ) ) );
-	}
+	G_BuildableObituary( self, actor, mod );
 }
