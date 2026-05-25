@@ -106,6 +106,59 @@ static const struct {
 };
 
 static Cvar::Cvar<bool> cg_showObituaries( "cg_showObituaries", "show obituaries in chat", Cvar::NONE, true );
+
+static void CG_BuildableObituary( entityState_t *ent )
+{
+	if ( !cg_showObituaries.Get() )
+	{
+		return;
+	}
+
+	int attacker = ent->otherEntityNum;
+
+	if ( attacker < 0 || attacker >= MAX_CLIENTS || !cgs.clientinfo[ attacker ].infoValid )
+	{
+		return;
+	}
+
+	int buildable = ent->otherEntityNum2;
+
+	if ( buildable <= BA_NONE || buildable >= BA_NUM_BUILDABLES )
+	{
+		return;
+	}
+
+	team_t buildableTeam = (team_t)( ent->generic1 & 0xFF );
+
+	if ( buildableTeam < TEAM_NONE || buildableTeam >= NUM_TEAMS )
+	{
+		buildableTeam = TEAM_NONE;
+	}
+
+	const char *attackerInfo = CG_ConfigString( CS_PLAYERS + attacker );
+
+	if ( !attackerInfo )
+	{
+		return;
+	}
+
+	char attackerName[ MAX_NAME_LENGTH ];
+	Q_strncpyz( attackerName, Info_ValueForKey( attackerInfo, "n" ), sizeof( attackerName ) );
+	team_t attackerTeam = cgs.clientinfo[ attacker ].team;
+
+	if ( attackerTeam < TEAM_NONE || attackerTeam >= NUM_TEAMS )
+	{
+		attackerTeam = TEAM_NONE;
+	}
+
+	const char *verb = ent->eventParm == MOD_DECONSTRUCT ? _("deconstructed") : _("destroyed");
+
+	Log::Notice( "%s%s^* %s %s%s",
+	             teamTag[ attackerTeam ], attackerName,
+	             verb,
+	             teamTag[ buildableTeam ], _( BG_Buildable( (buildable_t) buildable )->humanName ) );
+}
+
 static void CG_Obituary( entityState_t *ent )
 {
 	if ( !cg_showObituaries.Get() )
@@ -1163,6 +1216,10 @@ void CG_EntityEvent( centity_t *cent, vec3_t position )
 
 		case EV_OBITUARY:
 			CG_Obituary( es );
+			break;
+
+		case EV_BUILDABLE_OBITUARY:
+			CG_BuildableObituary( es );
 			break;
 
 		case EV_GIB_PLAYER:
