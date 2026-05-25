@@ -36,6 +36,7 @@ Maryland 20850 USA.
 #include "cg_local.h"
 #include "shared/parse.h"
 
+#include <cctype>
 #include <limits>
 
 static std::string OverloadCommandForEntry( const cgOverloadCatalogEntry_t& entry )
@@ -1825,6 +1826,37 @@ static void CG_Rocket_BuildBotTacticList( const char *table )
 	{
 		Rocket_DSClearTable( "botTacticList", "default" );
 
+		struct tacticInfo_t
+		{
+			const char* num;
+			const char* name;
+			const char* title;
+			const char* desc;
+			const char* icon;
+		};
+
+		auto formatTacticTitle = []( const std::string& name )
+		{
+			std::string title;
+			title.reserve( name.size() );
+
+			bool capitalize = true;
+			for ( unsigned char c : name )
+			{
+				if ( c == '_' || c == '-' )
+				{
+					title.push_back( ' ' );
+					capitalize = true;
+					continue;
+				}
+
+				title.push_back( capitalize ? std::toupper( c ) : c );
+				capitalize = false;
+			}
+
+			return title;
+		};
+
 		auto setCommand = [&]( std::string num, std::string name, std::string title, std::string desc, std::string icon )
 		{
 			buf[ 0 ] = '\0';
@@ -1838,11 +1870,43 @@ static void CG_Rocket_BuildBotTacticList( const char *table )
 			Rocket_DSAddRow( "botTacticList", "default", buf );
 		};
 
-		setCommand( "0", "default", N_( "Default" ), N_( "The default behavior. This is what bots do when the game starts." ), "gfx/feedback/bottactic/default" );
-		setCommand( "1", "defend", N_( "Defend" ), N_( "The bots stay in the base." ), "gfx/feedback/bottactic/defend" );
-		setCommand( "2", "attack", N_( "Attack" ), N_( "The bots attack the enemy base." ), "gfx/feedback/bottactic/attack" );
-		setCommand( "3", "stay_here", N_( "Stay Here" ), N_( "The bots stay where you are currently." ), "gfx/feedback/bottactic/stay_here" );
-		setCommand( "4", "follow", N_( "Follow" ), N_( "The bots follow you wherever you go." ), "gfx/feedback/bottactic/follow" );
+		static const tacticInfo_t defaultTactics[] =
+		{
+			{ "0", "default",   N_( "Default" ),   N_( "Balanced behavior. This is what bots do when the match starts." ), "gfx/feedback/bottactic/default"   },
+			{ "1", "defend",    N_( "Defend" ),    N_( "Keep bots near your base so they protect key structures and allies." ), "gfx/feedback/bottactic/defend"    },
+			{ "2", "attack",    N_( "Attack" ),    N_( "Send bots toward the enemy base to pressure defenses and frontline positions." ), "gfx/feedback/bottactic/attack"    },
+			{ "3", "stay_here", N_( "Stay Here" ), N_( "Hold bots at your current location until you give them another order." ), "gfx/feedback/bottactic/stay_here" },
+			{ "4", "follow",    N_( "Follow" ),    N_( "Have bots stay with you and move with your squad." ), "gfx/feedback/bottactic/follow"    },
+		};
+
+		for ( const tacticInfo_t& tactic : defaultTactics )
+		{
+			setCommand( tactic.num, tactic.name, tactic.title, tactic.desc, tactic.icon );
+		}
+
+		int nextNum = ARRAY_LEN( defaultTactics );
+		std::vector<std::string> allowedTactics = BG_GetAllowedTactics();
+		for ( const std::string& tactic : allowedTactics )
+		{
+			bool alreadyListed = false;
+			for ( const tacticInfo_t& defaultTactic : defaultTactics )
+			{
+				if ( !Q_stricmp( tactic.c_str(), defaultTactic.name ) )
+				{
+					alreadyListed = true;
+					break;
+				}
+			}
+
+			if ( alreadyListed )
+			{
+				continue;
+			}
+
+			setCommand( Str::Format( "%d", nextNum++ ), tactic, formatTacticTitle( tactic ),
+			            Str::Format( "Use the %s bot behavior when that tactic fits the current fight.", formatTacticTitle( tactic ) ),
+			            "gfx/feedback/bottactic/default" );
+		}
 	}
 }
 

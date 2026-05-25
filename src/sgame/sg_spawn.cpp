@@ -1053,7 +1053,7 @@ static void InitTacticBehaviorsCvar()
 	static Cvar::Callback<Cvar::Cvar<std::string>> g_tacticBehaviors(
 	   "g_tacticBehaviors",
 		"Allowed behaviors for the tactic command, example: " QQ("default, camper, reckless"),
-		Cvar::NONE,
+		Cvar::SERVERINFO,
 		defaultTacticBehaviors.c_str(),
 		BG_SetTacticBehaviors
 		);
