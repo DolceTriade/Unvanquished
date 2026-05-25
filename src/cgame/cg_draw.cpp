@@ -439,6 +439,7 @@ static void CG_PainBlend()
 {
 	float     healthFrac;
 	float     missingHealthFrac;
+	float     criticalHealthFrac;
 	float     painBlendZoom;
 	qhandle_t shader = cgs.media.viewBloodShader;
 	float     x, y, w, h;
@@ -452,7 +453,9 @@ static void CG_PainBlend()
 	healthFrac = static_cast<float>( cg.snap->ps.stats[ STAT_HEALTH ] ) /
 	             BG_Class( cg.snap->ps.stats[ STAT_CLASS ] )->health;
 	healthFrac = Math::Clamp( healthFrac, 0.0f, 1.0f );
-	missingHealthFrac = 1.0f - healthFrac;
+	criticalHealthFrac = ( 1.0f - healthFrac ) / 0.75f;
+	criticalHealthFrac = Math::Clamp( criticalHealthFrac, 0.0f, 1.0f );
+	missingHealthFrac = criticalHealthFrac;
 
 	// Bias the warning toward low-health situations instead of recent damage spikes.
 	cg.painBlendValue = missingHealthFrac * missingHealthFrac *
