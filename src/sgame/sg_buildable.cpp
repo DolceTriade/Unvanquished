@@ -1048,19 +1048,24 @@ static itemBuildError_t PrepareBuildableReplacement( buildable_t buildable, vec3
 	// sort the list
 	qsort( list, listLen, sizeof( gentity_t* ), CompareBuildablesForRemoval );
 
-	// Always consume eligible marked buildables before falling back to free BP.
+	// Consume marked buildables first, but only as many as are needed to cover
+	// this build. Any remaining cost falls back to the free BP pool.
 	for ( entNum = 0; entNum < listLen; entNum++ )
 	{
+		if ( cost <= 0 )
+		{
+			break;
+		}
+
 		ent = list[ entNum ];
 
 		level.markedBuildables[ level.numBuildablesForRemoval++ ] = ent;
 
 		cost -= G_BuildableDeconValue( ent );
-
 	}
 
-	// check if we can now afford the new buildable with the marked replacements applied
-	if ( G_GetFreeBudget( attr->team ) >= cost )
+	// Check if the remaining cost can be paid from the free BP pool.
+	if ( cost <= 0 || G_GetFreeBudget( attr->team ) >= cost )
 	{
 		return IBE_NONE;
 	}
