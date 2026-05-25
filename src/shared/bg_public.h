@@ -1823,6 +1823,7 @@ weapon_t BG_PrimaryWeapon( int const stats[] );
 void BG_SetTacticBehaviors( Str::StringRef tacticCsv );
 bool BG_TacticBehaviorAllowed( Str::StringRef behavior );
 std::string BG_TacticBehaviorsToString( Str::StringRef sep );
+std::vector<std::string> BG_GetAllowedTactics();
 
 // bg_voice.c
 #define MAX_VOICES             8

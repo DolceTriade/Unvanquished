@@ -317,6 +317,15 @@ static void CG_CompleteVote()
 	}
 }
 
+static void CG_CompleteTactic()
+{
+	std::vector<std::string> tactics = BG_GetAllowedTactics();
+	for ( const auto& t: tactics )
+	{
+		trap_CompleteCallback( t.c_str() );
+	}
+}
+
 static void CG_CompleteItem()
 {
 	int i = 0;
@@ -534,6 +543,7 @@ static const struct cg_cmd_t
 	{ "sizedown",         CG_SizeDown_f,           0                },
 	{ "sizeup",           CG_SizeUp_f,             0                },
 	{ "spawnloc",         0,                       0                },
+	{ "tactic",           0,                       CG_CompleteTactic },
 	{ "team",             0,                       0                },
 	{ "teamvote",         0,                       0                },
 	{ "testcgrade",       CG_TestCGrade_f,         0                },

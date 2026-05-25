@@ -378,6 +378,13 @@ void CG_SetMapNameFromServerinfo()
 	Q_strncpyz( cgs.mapname, Info_ValueForKey( info, "mapname" ), sizeof(cgs.mapname) );
 }
 
+void CG_SetAllowedTacticsFromServerInfo()
+{
+	const char *info = CG_ConfigString( CS_SERVERINFO );
+	const char *tactics = Info_ValueForKey( info, "g_tacticBehaviors" );
+	BG_SetTacticBehaviors( tactics );
+}
+
 static void CG_ParseGameplayCvars()
 {
 	const char *info = CG_ConfigString( CS_GAMEPLAY_CVARS );
@@ -465,6 +472,7 @@ void CG_ConfigStringModified( int num )
 	if ( num == CS_SERVERINFO )
 	{
 		CG_SetMapNameFromServerinfo();
+		CG_SetAllowedTacticsFromServerInfo();
 	}
 	else if ( num == CS_GAMEPLAY_CVARS )
 	{
