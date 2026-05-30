@@ -219,7 +219,7 @@ static bool BotBuildablesRecentlyKilled( team_t team )
 static int FindBotFreshPurchase( team_t team )
 {
 	int bpPurchaseIndex = -1;
-	int upgradePurchaseIndex = -1;
+	std::vector<int> upgradePurchaseIndices;
 
 	for ( int i = 0; i < G_OverloadPurchaseCount(); ++i )
 	{
@@ -239,9 +239,9 @@ static int FindBotFreshPurchase( team_t team )
 			continue;
 		}
 
-		if ( upgradePurchaseIndex < 0 && OverloadEntryIsUpgrade( team, i ) )
+		if ( OverloadEntryIsUpgrade( team, i ) )
 		{
-			upgradePurchaseIndex = i;
+			upgradePurchaseIndices.push_back( i );
 		}
 	}
 
@@ -252,7 +252,13 @@ static int FindBotFreshPurchase( team_t team )
 		return bpPurchaseIndex;
 	}
 
-	return upgradePurchaseIndex;
+	if ( upgradePurchaseIndices.empty() )
+	{
+		return -1;
+	}
+
+	const int randomIndex = static_cast<int>( BG_random() * upgradePurchaseIndices.size() );
+	return upgradePurchaseIndices[ std::min( randomIndex, static_cast<int>( upgradePurchaseIndices.size() ) - 1 ) ];
 }
 
 void G_BotOverloadThink( gentity_t *ent )
