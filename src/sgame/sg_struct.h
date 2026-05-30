@@ -554,6 +554,9 @@ struct level_locals_t
 
 	fileHandle_t     logFile;
 	fileHandle_t     logGameplayFile;
+	int              teamCreditNet[ NUM_TEAMS ];
+	int              teamCreditSpent[ NUM_TEAMS ];
+	char             matchId[ 128 ];
 
 	// store latched cvars here that we want to get at often
 	int      maxclients;

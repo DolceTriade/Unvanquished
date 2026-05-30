@@ -322,6 +322,7 @@ static Cvar::Cvar<std::string> gamedate("gamedate", "date the sgame was compiled
 
 void               CheckExitRules();
 static void        G_LogGameplayStats( int state );
+static void        G_WriteGameplayLogLine( Str::StringRef line );
 
 // state field of G_LogGameplayStats
 enum
@@ -502,6 +503,7 @@ void G_InitGame( int levelTime, int randomSeed, bool inClient )
 		{
 			char    serverinfo[ MAX_INFO_STRING ];
 			qtime_t qt;
+			std::string mapname = Cvar::GetValue( "mapname" );
 
 			trap_GetServerinfo( serverinfo, sizeof( serverinfo ) );
 
@@ -509,9 +511,16 @@ void G_InitGame( int levelTime, int randomSeed, bool inClient )
 			G_LogPrintf( "InitGame: %s", serverinfo );
 
 			Com_GMTime( &qt );
+			Q_strncpyz( level.matchId,
+			            Str::Format( "%04i%02i%02i_%02i%02i%02i_%s",
+			                         1900 + qt.tm_year, qt.tm_mon + 1, qt.tm_mday,
+			                         qt.tm_hour, qt.tm_min, qt.tm_sec,
+			                         mapname ).c_str(),
+			            sizeof( level.matchId ) );
 			G_LogPrintf( "RealTime: %04i-%02i-%02i %02i:%02i:%02i Z",
 			             1900 + qt.tm_year, qt.tm_mon + 1, qt.tm_mday,
 			             qt.tm_hour, qt.tm_min, qt.tm_sec );
+			G_LogPrintf( "MatchId: %s", level.matchId );
 		}
 	}
 	else
@@ -519,23 +528,35 @@ void G_InitGame( int levelTime, int randomSeed, bool inClient )
 		Log::Notice( "Not logging to disk" );
 	}
 
+	if ( !level.matchId[ 0 ] )
+	{
+		qtime_t qt;
+		std::string mapname = Cvar::GetValue( "mapname" );
+
+		Com_GMTime( &qt );
+
+		Q_strncpyz( level.matchId,
+		            Str::Format( "%04i%02i%02i_%02i%02i%02i_%s",
+		                         1900 + qt.tm_year, qt.tm_mon + 1, qt.tm_mday,
+		                         qt.tm_hour, qt.tm_min, qt.tm_sec,
+		                         mapname ).c_str(),
+		            sizeof( level.matchId ) );
+	}
+
 	// gameplay statistics logging
 	// TODO: Move this in a seperate function
 	if ( g_logGameplayStatsFrequency.Get() > 0 )
 	{
-		char    logfile[ 128 ], mapname[ 64 ];
 		qtime_t qt;
+		std::string mapname = Cvar::GetValue( "mapname" );
 
 		Com_GMTime( &qt );
-		trap_Cvar_VariableStringBuffer( "mapname", mapname, sizeof( mapname ) );
+		std::string logfile = Str::Format( "stats/gameplay/%04i%02i%02i_%02i%02i%02i_%s.log",
+		                                   1900 + qt.tm_year, qt.tm_mon + 1, qt.tm_mday,
+		                                   qt.tm_hour, qt.tm_min, qt.tm_sec,
+		                                   mapname );
 
-		Com_sprintf( logfile, sizeof( logfile ),
-		             "stats/gameplay/%04i%02i%02i_%02i%02i%02i_%s.log",
-		             1900 + qt.tm_year, qt.tm_mon + 1, qt.tm_mday,
-		             qt.tm_hour, qt.tm_min, qt.tm_sec,
-		             mapname );
-
-		trap_FS_FOpenFile( logfile, &level.logGameplayFile, fsMode_t::FS_WRITE );
+		trap_FS_FOpenFile( logfile.c_str(), &level.logGameplayFile, fsMode_t::FS_WRITE );
 
 		if ( !level.logGameplayFile )
 		{
@@ -1620,57 +1641,57 @@ void PRINTF_LIKE(1) G_LogPrintf( const char *fmt, ... )
 
 /*
 =================
-GetAverageCredits
-
-Calculates the average amount of spare credits as well as the value of each teams' players.
-=================
-*/
-static void GetAverageCredits( int teamCredits[], int teamValue[] )
-{
-	int       teamCnt[ NUM_TEAMS ];
-	int       playerNum;
-	gclient_t *client;
-	int       team;
-
-	for ( team = TEAM_ALIENS ; team < NUM_TEAMS ; ++team)
-	{
-		teamCnt[ team ] = 0;
-		teamCredits[ team ] = 0;
-		teamValue[ team ] = 0;
-	}
-
-	for ( playerNum = 0; playerNum < level.maxclients; playerNum++ )
-	{
-		client = &g_clients[ playerNum ];
-
-		if ( !client->ent()->inuse ) continue;
-
-		team = client->pers.team;
-
-		teamCredits[ team ] += client->pers.credit;
-		teamValue[ team ] += BG_GetPlayerValue( client->ps );
-		teamCnt[ team ]++;
-	}
-
-	for ( team = TEAM_ALIENS ; team < NUM_TEAMS ; ++team)
-	{
-		teamCredits[ team ] = ( teamCnt[ team ] == 0 ) ? 0 : ( teamCredits[ team ] / teamCnt[ team ] );
-		teamValue[ team ] = ( teamCnt[ team ] == 0 ) ? 0 : ( teamValue[ team ] / teamCnt[ team ] );
-	}
-}
-
-/*
-=================
 G_LogGameplayStats
 =================
 */
 // Increment this if you add/change columns or otherwise change the log format
-#define LOG_GAMEPLAY_STATS_VERSION 2
+#define LOG_GAMEPLAY_STATS_VERSION 3
+
+static void G_WriteGameplayLogLine( Str::StringRef line )
+{
+	if ( !level.logGameplayFile )
+	{
+		return;
+	}
+
+	trap_FS_Write( line.data(), line.size(), level.logGameplayFile );
+}
+
+void G_LogCreditDelta( team_t team, int delta )
+{
+	if ( !G_IsPlayableTeam( team ) || !delta )
+	{
+		return;
+	}
+
+	level.teamCreditNet[ team ] += delta;
+
+	if ( delta < 0 )
+	{
+		level.teamCreditSpent[ team ] -= delta;
+	}
+}
+
+void G_LogCreditSpendEvent( team_t team, int clientNum, const char* kind, const char* item, int cost )
+{
+	if ( !G_IsPlayableTeam( team ) || cost <= 0 || !kind || !*kind || !item || !*item )
+	{
+		return;
+	}
+
+	G_WriteGameplayLogLine( Str::Format( "EVT %4i %-6s %2i %-15s %-24s %4i\n",
+	                                     level.matchTime / 1000,
+	                                     BG_TeamName( team ),
+	                                     clientNum,
+	                                     kind,
+	                                     item,
+	                                     cost ) );
+}
 
 static void G_LogGameplayStats( int state )
 {
-	char       mapname[ 128 ];
-	char       logline[ sizeof( Q3_VERSION ) + sizeof( mapname ) + 1024 ];
+	std::string mapname = Cvar::GetValue( "mapname" );
+	std::string logline;
 
 	static int nextCalculation = 0;
 
@@ -1685,28 +1706,31 @@ static void G_LogGameplayStats( int state )
 		{
 			qtime_t t;
 
-			trap_Cvar_VariableStringBuffer( "mapname", mapname, sizeof( mapname ) );
 			Com_GMTime( &t );
 
-			Com_sprintf( logline, sizeof( logline ),
+			logline = Str::Format(
 			             "# +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n"
 			             "#\n"
 			             "# Version: %s\n"
 			             "# Map:     %s\n"
 			             "# Date:    %04i-%02i-%02i\n"
 			             "# Time:    %02i:%02i:%02i\n"
+			             "# MatchId: %s\n"
 			             "# Format:  %i\n"
 			             "#\n"
 			             "# overloadInitialProgress:   %4i\n"
 			             "# g_initialBuildPoints:      %4i\n"
 			             "#\n"
-			             "#  1  2  3    4    5    6    7    8    9   10   11   12   13   14   15   16\n"
-			             "#  T #A #H AOvr HOvr ---- ATBP HTBP AUBP HUBP ABRV HBRV ACre HCre AVal HVal\n"
+			             "# Sample rows:\n"
+			             "#   T #A #H ANet HNet ASpent HSpent\n"
+			             "# Event rows:\n"
+			             "#   EVT T Team Client Kind Item Cost\n"
 			             "# -------------------------------------------------------------------------\n",
 			             Q3_VERSION,
 			             mapname,
 			             t.tm_year + 1900, t.tm_mon + 1, t.tm_mday,
 			             t.tm_hour, t.tm_min, t.tm_sec,
+			             level.matchId,
 			             LOG_GAMEPLAY_STATS_VERSION,
 			             0,
 			             g_buildPointInitialBudget.Get() );
@@ -1715,67 +1739,35 @@ static void G_LogGameplayStats( int state )
 		}
 		case LOG_GAMEPLAY_STATS_BODY:
 		{
-			int    time;
-			int    XXX;
-			int    team;
-			int    num[ NUM_TEAMS ];
-				int    Ovr[ NUM_TEAMS ];
-			int    TBP[ NUM_TEAMS ];
-			int    UBP[ NUM_TEAMS ];
-			int    BRV[ NUM_TEAMS ];
-			int    Cre[ NUM_TEAMS ];
-			int    Val[ NUM_TEAMS ];
-
 			if ( level.time < nextCalculation )
 			{
 				return;
 			}
 
-			time = level.matchTime / 1000;
-			XXX  = 0;
-
-			for( team = TEAM_NONE + 1; team < NUM_TEAMS; team++ )
+			int num[ NUM_TEAMS ] = {};
+			for( int team = TEAM_NONE + 1; team < NUM_TEAMS; team++ )
 			{
 				num[ team ] = level.team[ team ].numClients;
-					Ovr[ team ] = ( int )level.team[ team ].overloadProgress;
-				TBP[ team ] = ( int )level.team[ team ].totalBudget;
-				UBP[ team ] = ( int )G_GetFreeBudget( ( team_t )team );
 			}
 
-			G_GetTotalBuildableValues( BRV );
-			GetAverageCredits( Cre, Val );
-
-			Com_sprintf( logline, sizeof( logline ),
-			             "%4i %2i %2i %4i %4i %4i %4i %4i %4i %4i %4i %4i %4i %4i %4i %4i\n",
-				             time, num[ TEAM_ALIENS ], num[ TEAM_HUMANS ], Ovr[ TEAM_ALIENS ], Ovr[ TEAM_HUMANS ],
-			             XXX, TBP[ TEAM_ALIENS ], TBP[ TEAM_HUMANS ], UBP[ TEAM_ALIENS ], UBP[ TEAM_HUMANS ],
-			             BRV[ TEAM_ALIENS ], BRV[ TEAM_HUMANS ], Cre[ TEAM_ALIENS ], Cre[ TEAM_HUMANS ],
-			             Val[ TEAM_ALIENS ], Val[ TEAM_HUMANS ] );
+			int time = level.matchTime / 1000;
+			logline = Str::Format( "%4i %2i %2i %4i %4i %6i %6i\n",
+			                       time,
+			                       num[ TEAM_ALIENS ],
+			                       num[ TEAM_HUMANS ],
+			                       level.teamCreditNet[ TEAM_ALIENS ],
+			                       level.teamCreditNet[ TEAM_HUMANS ],
+			                       level.teamCreditSpent[ TEAM_ALIENS ],
+			                       level.teamCreditSpent[ TEAM_HUMANS ] );
 			break;
 		}
 		case LOG_GAMEPLAY_STATS_FOOTER:
 		{
-			const char *winner;
-			int        min, sec;
+			const char* winner = G_IsPlayableTeam( level.lastWin ) ? BG_TeamName( level.lastWin ) : "-";
+			int min = level.matchTime / 60000;
+			int sec = ( level.matchTime / 1000 ) % 60;
 
-			switch ( level.lastWin )
-			{
-				case TEAM_ALIENS:
-					winner = "Aliens";
-					break;
-
-				case TEAM_HUMANS:
-					winner = "Humans";
-					break;
-
-				default:
-					winner = "-";
-			}
-
-			min = level.matchTime / 60000;
-			sec = ( level.matchTime / 1000 ) % 60;
-
-			Com_sprintf( logline, sizeof( logline ),
+			logline = Str::Format(
 			             "# -------------------------------------------------------------------------\n"
 			             "#\n"
 			             "# Match duration:  %i:%02i\n"
@@ -1789,14 +1781,14 @@ static void G_LogGameplayStats( int state )
 			             level.team[ TEAM_ALIENS ].averageNumPlayers + level.team[ TEAM_HUMANS ].averageNumPlayers,
 			             level.team[ TEAM_ALIENS ].averageNumBots    + level.team[ TEAM_HUMANS ].averageNumBots,
 			             level.team[ TEAM_ALIENS ].averageNumPlayers, level.team[ TEAM_ALIENS ].averageNumBots,
-			             level.team[ TEAM_HUMANS ].averageNumPlayers, level.team[ TEAM_HUMANS ].averageNumBots);
+			             level.team[ TEAM_HUMANS ].averageNumPlayers, level.team[ TEAM_HUMANS ].averageNumBots );
 			break;
 		}
 		default:
 			return;
 	}
 
-	trap_FS_Write( logline, strlen( logline ), level.logGameplayFile );
+	G_WriteGameplayLogLine( logline );
 
 	if ( state == LOG_GAMEPLAY_STATS_BODY )
 	{

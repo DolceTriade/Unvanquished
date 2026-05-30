@@ -1870,6 +1870,7 @@ static void G_AlienEvolve_evolve( gentity_t *ent, class_t newClass, const vec3_t
 	{
 		// remove credit
 		G_AddCreditToClient( ent->client, -cost, true );
+		G_LogCreditSpendEvent( TEAM_ALIENS, ent->num(), "evolve", BG_Class( newClass )->name, cost );
 	}
 	ent->client->pers.classSelection = newClass;
 	ClientUserinfoChanged( ent->client->ps.clientNum, false );
@@ -2905,6 +2906,7 @@ static bool Cmd_Buy_internal( gentity_t *ent, const char *s, bool sellConflictin
 
 		//subtract from funds
 		G_AddCreditToClient( ent->client, - ( short ) BG_Weapon( weapon )->price, false );
+		G_LogCreditSpendEvent( TEAM_HUMANS, ent->num(), "buy_weapon", BG_Weapon( weapon )->name, BG_Weapon( weapon )->price );
 
 		return true;
 	}
@@ -3014,6 +3016,7 @@ static bool Cmd_Buy_internal( gentity_t *ent, const char *s, bool sellConflictin
 
 		//subtract from funds
 		G_AddCreditToClient( ent->client, - ( short ) BG_Upgrade( upgrade )->price, false );
+		G_LogCreditSpendEvent( TEAM_HUMANS, ent->num(), "buy_upgrade", BG_Upgrade( upgrade )->name, BG_Upgrade( upgrade )->price );
 
 		return true;
 	}
