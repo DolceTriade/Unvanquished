@@ -2002,7 +2002,7 @@ static void CG_PlayerUpgrades( centity_t *cent, refEntity_t *torso, const uint16
 		AxisCopy( axisDefault, radar.axis );
 
 		//FIXME: change to tag_back when it exists
-		CG_PositionRotatedEntityOnTag( &radar, upgradeAttachmentEntityID, "tag_head" );
+		CG_PositionRotatedEntityOnTag( &radar, upgradeAttachmentEntityID, "tag_gear" );
 
 		ents.push_back( radar );
 	}
