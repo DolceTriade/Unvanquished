@@ -70,6 +70,8 @@ struct overloadPurchaseDef_t
 	team_t                 team;
 	std::string            thing;
 	std::string            thingLabel;
+	std::string            groupLabel;
+	int                    sortIndex;
 	std::string            stat;
 	std::string            statLabel;
 	std::string            displayName;

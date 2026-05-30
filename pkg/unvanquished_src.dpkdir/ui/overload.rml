@@ -4,7 +4,6 @@
 	<link type="text/rcss" href="/ui/shared/infobox.rcss" />
 	<script src="lua/util.lua" />
 	<style>
-		/* Fullscreen shell */
 		body {
 			width: 100%;
 			height: 100%;
@@ -26,7 +25,6 @@
 			border-color: #1a4d53;
 		}
 
-		/* Two-column workspace */
 		#workspace {
 			display: flex;
 			align-items: stretch;
@@ -34,15 +32,15 @@
 			height: 100%;
 		}
 		#mainColumn {
-			display: block;
 			flex-grow: 3;
 			flex-shrink: 1;
 			flex-basis: 0%;
 			min-width: 0;
 			height: 100%;
+			padding-right: 0.45em;
+			box-sizing: border-box;
 		}
 		#sideColumn {
-			display: block;
 			flex-grow: 1;
 			flex-shrink: 1;
 			flex-basis: 0%;
@@ -50,7 +48,6 @@
 			height: 100%;
 		}
 
-		/* Header and filters */
 		.headerbar {
 			margin-bottom: 0.5em;
 		}
@@ -59,7 +56,6 @@
 			text-align: left;
 			font-size: 1.55em;
 			color: #9efcff;
-			border-bottom-width: 0px;
 		}
 		.subtitle {
 			margin: 0 0 0.45em 0;
@@ -70,12 +66,20 @@
 			color: #7ba8ac;
 			font-size: 0.9em;
 		}
+
 		.controls {
 			margin-bottom: 0.8em;
 			padding: 0.7em 0.8em;
 			background: #0c2428cc;
 			border-width: 1px;
 			border-color: #184147;
+		}
+		.control-header {
+			display: flex;
+			align-items: center;
+			justify-content: space-between;
+			gap: 0.8em;
+			margin-bottom: 0.45em;
 		}
 		.filter-row {
 			margin-bottom: 0.45em;
@@ -102,8 +106,24 @@
 			border-width: 1px;
 			border-color: #235359;
 		}
+		.currency-panel {
+			display: inline-block;
+			padding: 0.32em 0.65em;
+			background: #10343a;
+			border-width: 1px;
+			border-color: #2c6b72;
+			color: #ebffff;
+		}
+		.currency-panel credits {
+			margin-right: 0.25em;
+			color: #ffffff;
+		}
+		.currency-label {
+			color: #9fd6da;
+			text-transform: uppercase;
+			font-size: 0.82em;
+		}
 
-		/* Sidebar detail panel */
 		#detailPanel {
 			padding: 0.75em;
 			background: #0d2429f2;
@@ -119,7 +139,6 @@
 			color: #8abdc2;
 		}
 		.detail-layout {
-			display: block;
 		}
 		.detail-icon {
 			width: 4.2em;
@@ -135,7 +154,6 @@
 			height: 100%;
 		}
 		.detail-info {
-			display: block;
 			width: 100%;
 		}
 		.detail-badges {
@@ -144,6 +162,7 @@
 		.badge {
 			display: inline-block;
 			margin-right: 0.45em;
+			margin-bottom: 0.25em;
 			padding: 0.12em 0.45em;
 			background: #21474d;
 			color: #d9ffff;
@@ -223,11 +242,10 @@
 			word-break: break-word;
 		}
 
-		/* Scrollable content column */
 		#content {
 			height: 74%;
 			overflow-y: auto;
-			padding-right: 0.5em;
+			padding-right: 1.2em;
 		}
 		.section {
 			margin-bottom: 0.8em;
@@ -245,16 +263,48 @@
 			color: #9efcff;
 		}
 
-		/* Progression cards */
-		.progress-card {
+		.group-section {
+			margin-bottom: 0.95em;
+		}
+		.group-header {
+			display: flex;
+			align-items: center;
+			justify-content: space-between;
+			gap: 0.6em;
+			margin-bottom: 0.55em;
+			padding-bottom: 0.25em;
+			border-bottom-width: 1px;
+			border-bottom-color: #234a50;
+		}
+		.group-chip {
 			display: inline-block;
-			width: 14.3em;
-			margin: 0 0.55em 0.55em 0;
+			padding: 0.14em 0.52em;
+			background: #1a4c53;
+			border-width: 1px;
+			color: #ecffff;
+			font-size: 0.82em;
+			text-transform: uppercase;
+		}
+		.group-count {
+			color: #7fb8bd;
+			font-size: 0.75em;
+		}
+
+		.progress-grid {
+			display: flex;
+			flex-wrap: wrap;
+			gap: 0.5em;
+		}
+		.progress-card {
+			width: 14.6em;
 			padding: 0.55em;
 			background: #0d2429;
 			border-width: 1px;
 			border-color: #1f5058;
-			vertical-align: top;
+			text-align: left;
+		}
+		.progress-card.selected {
+			background: #12343a;
 		}
 		.progress-card.available {
 			border-color: #2f7a84;
@@ -275,33 +325,32 @@
 		.progress-header {
 			display: flex;
 			align-items: center;
-			margin-bottom: 0.4em;
+			margin-bottom: 0.48em;
 		}
-		.progress-main {
-			width: 2.9em;
-			height: 2.9em;
+		.progress-icon {
+			width: 3em;
+			height: 3em;
 			padding: 0.2em;
-			margin-right: 0.9em;
+			margin-right: 1em;
 			background: #102f35;
 			border-width: 1px;
 			border-color: #2e6970;
 		}
-		.progress-main img {
+		.progress-icon img {
 			width: 100%;
 			height: 100%;
 		}
-		.progress-main.selected {
-			border-color: #bafcff;
-		}
 		.progress-summary {
 			display: inline-block;
-			width: 9.6em;
+			width: 9.45em;
 			vertical-align: top;
 		}
 		.progress-name {
-			margin: 0 0 0.2em 0;
+			margin: 0 0 0.18em 0;
 			color: #ffffff;
 			font-size: 0.92em;
+			white-space: normal;
+			word-break: break-word;
 		}
 		.progress-status {
 			color: #9ad8de;
@@ -311,23 +360,45 @@
 			margin-top: 0.22em;
 			color: #7fb8bd;
 			font-size: 0.72em;
+			white-space: normal;
+			word-break: break-word;
 		}
-		.progress-lines {
-			margin-top: 0.42em;
+		.progress-rings {
+			display: flex;
+			flex-wrap: wrap;
+			gap: 0.45em;
+			margin-top: 0.45em;
+		}
+		.progress-ring {
+			width: 3.1em;
+			text-align: center;
+		}
+		donutprogress.mini-donut {
+			display: block;
+			width: 2.6em;
+			height: 2.6em;
+			margin-left: auto;
+			margin-right: auto;
+			innerRadius: 0.72em;
+			outerRadius: 1.02em;
+			color: #8fd4db;
+		}
+		.progress-ring-label {
+			margin-top: 0.16em;
+			color: #b7e6ea;
+			font-size: 0.66em;
+			white-space: normal;
+			word-break: break-word;
 		}
 		.progress-line {
 			display: block;
-			margin-top: 0.2em;
+			margin-top: 0.24em;
 			color: #9ed2d7;
 			font-size: 0.72em;
+			white-space: normal;
+			word-break: break-word;
 		}
 
-		/* Shared grid / empty states */
-		.progress-grid {
-			display: flex;
-			flex-wrap: wrap;
-			gap: 0.5em;
-		}
 		.tile-icon-fallback {
 			display: inline-block;
 			width: 2.3em;
@@ -335,9 +406,104 @@
 			padding-top: 0.45em;
 			background: #21474d;
 			color: #d9ffff;
+			text-align: center;
 		}
 		.empty-state {
 			color: #8abdc2;
+		}
+
+		.group-build-points .group-chip,
+		.badge.group-build-points {
+			background: #2c6140;
+			border-color: #5ca36e;
+			color: #edfff1;
+		}
+		.group-weapons .group-chip,
+		.badge.group-weapons {
+			background: #29576c;
+			border-color: #69bfd6;
+			color: #ecfbff;
+		}
+		.group-equipment .group-chip,
+		.badge.group-equipment {
+			background: #5a4b21;
+			border-color: #c5a54b;
+			color: #fff8e1;
+		}
+		.group-structures .group-chip,
+		.badge.group-structures {
+			background: #5b3327;
+			border-color: #d08a64;
+			color: #fff0e5;
+		}
+		.group-team .group-chip,
+		.badge.group-team {
+			background: #503b67;
+			border-color: #a989df;
+			color: #f5ebff;
+		}
+		.group-lifeforms .group-chip,
+		.badge.group-lifeforms {
+			background: #47306b;
+			border-color: #b286f4;
+			color: #f3eaff;
+		}
+		.group-other .group-chip,
+		.badge.group-other {
+			background: #2d474d;
+			border-color: #79a8b0;
+			color: #edffff;
+		}
+
+		.progress-card.group-build-points,
+		.group-header.group-build-points {
+			border-color: #5ca36e;
+		}
+		.progress-card.group-weapons,
+		.group-header.group-weapons {
+			border-color: #69bfd6;
+		}
+		.progress-card.group-equipment,
+		.group-header.group-equipment {
+			border-color: #c5a54b;
+		}
+		.progress-card.group-structures,
+		.group-header.group-structures {
+			border-color: #d08a64;
+		}
+		.progress-card.group-team,
+		.group-header.group-team {
+			border-color: #a989df;
+		}
+		.progress-card.group-lifeforms,
+		.group-header.group-lifeforms {
+			border-color: #b286f4;
+		}
+		.progress-card.group-other,
+		.group-header.group-other {
+			border-color: #79a8b0;
+		}
+
+		donutprogress.group-build-points {
+			color: #71c486;
+		}
+		donutprogress.group-weapons {
+			color: #7ad8f0;
+		}
+		donutprogress.group-equipment {
+			color: #e3bd55;
+		}
+		donutprogress.group-structures {
+			color: #f2a177;
+		}
+		donutprogress.group-team {
+			color: #c09aff;
+		}
+		donutprogress.group-lifeforms {
+			color: #ca97ff;
+		}
+		donutprogress.group-other {
+			color: #93c4ce;
 		}
 	</style>
 	<script>
@@ -441,10 +607,9 @@
 			Cmd.exec("teambuy " .. command .. " " .. spend)
 		end
 
-		-- Read and normalize the overload datasource once per redraw.
 		function ReadRows()
 			CDataSource.Build("overloadList", "default")
-			local raw = CDataSource.Read("overloadList", "default", "index,name,description,command,cost,progress,status,kind,thing,remaining,currencyLabel,quickBuySmallLabel,quickBuyLargeLabel,requiredCompletedCount,completedPurchases,remainingCompletedCount,rank,maxRanks,icon,thingLabel,statLabel")
+			local raw = CDataSource.Read("overloadList", "default", "index,name,description,command,cost,progress,status,kind,thing,sortIndex,remaining,investedAmount,nextCostAmount,currencyLabel,quickBuySmallLabel,quickBuyLargeLabel,requiredCompletedCount,completedPurchases,remainingCompletedCount,rank,maxRanks,icon,thingLabel,statLabel,group")
 			local rows = {}
 			for i = 1, #raw do
 				rows[#rows + 1] = {
@@ -457,27 +622,47 @@
 					status = raw[i][7],
 					kind = raw[i][8],
 					thing = raw[i][9],
-					remaining = raw[i][10],
-					currencyLabel = raw[i][11],
-					quickBuySmallLabel = raw[i][12],
-					quickBuyLargeLabel = raw[i][13],
-					requiredCompletedCount = tonumber(raw[i][14]) or 0,
-					completedPurchases = tonumber(raw[i][15]) or 0,
-					remainingCompletedCount = tonumber(raw[i][16]) or 0,
-					rank = tonumber(raw[i][17]) or 0,
-					maxRanks = tonumber(raw[i][18]) or 0,
-					icon = raw[i][19],
-					thingLabel = raw[i][20],
-					statLabel = raw[i][21],
+					sortIndex = tonumber(raw[i][10]) or 999,
+					remaining = raw[i][11],
+					investedAmount = tonumber(raw[i][12]) or 0,
+					nextCostAmount = tonumber(raw[i][13]) or 0,
+					currencyLabel = raw[i][14],
+					quickBuySmallLabel = raw[i][15],
+					quickBuyLargeLabel = raw[i][16],
+					requiredCompletedCount = tonumber(raw[i][17]) or 0,
+					completedPurchases = tonumber(raw[i][18]) or 0,
+					remainingCompletedCount = tonumber(raw[i][19]) or 0,
+					rank = tonumber(raw[i][20]) or 0,
+					maxRanks = tonumber(raw[i][21]) or 0,
+					icon = raw[i][22],
+					thingLabel = raw[i][23],
+					statLabel = raw[i][24],
+					group = raw[i][25] or "Other",
 				}
 			end
 			table.sort(rows, function(a, b)
-				if (a.thingLabel or "") ~= (b.thingLabel or "") then return (a.thingLabel or "") < (b.thingLabel or "") end
-				if a.kind ~= b.kind then return a.kind < b.kind end
-				if a.status ~= b.status then return StatusPriority(a.status) < StatusPriority(b.status) end
-				return a.name < b.name
+				if a.index ~= b.index then return a.index < b.index end
+				return (a.name or "") < (b.name or "")
 			end)
 			return rows
+		end
+
+		function GroupToken(label)
+			local token = string.lower(label or "other")
+			token = string.gsub(token, "%s+", "-")
+			token = string.gsub(token, "[^%w%-]", "")
+			if token == "" then return "group-other" end
+			return "group-" .. token
+		end
+
+		function GroupOrder(groupLabel)
+			if groupLabel == "Build Points" then return 1 end
+			if groupLabel == "Weapons" then return 2 end
+			if groupLabel == "Equipment" then return 3 end
+			if groupLabel == "Lifeforms" then return 4 end
+			if groupLabel == "Structures" then return 5 end
+			if groupLabel == "Team" then return 6 end
+			return 99
 		end
 
 		function GenericThingLabel(row)
@@ -513,52 +698,64 @@
 			return row.name or ""
 		end
 
-		function RowRemainingCost(row)
-			return tonumber(row.remaining) or 0
-		end
-
-		-- Merge unlocks, upgrades, and BP into one progression card per thing.
 		function VisibleProgressionGroups(rows)
 			local groups = {}
 			for i = 1, #rows do
 				local row = rows[i]
-				if RowVisible(row) then
-					local key = row.thing or row.thingLabel or row.name
-					local group = groups[key]
-					if group == nil then
-						group = {
-							key = key,
-							unlock = nil,
-							upgrades = {},
-							mainRow = row,
-						}
-						groups[key] = group
-					end
+				local key = row.thing or row.thingLabel or row.name
+				local group = groups[key]
+				if group == nil then
+					group = {
+						key = key,
+						groupLabel = row.group or "Other",
+						groupToken = GroupToken(row.group or "Other"),
+						unlock = nil,
+						upgrades = {},
+						mainRow = row,
+						firstIndex = row.index,
+						sortIndex = row.sortIndex,
+						hasVisibleRows = false,
+					}
+					groups[key] = group
+				end
 
-					if row.kind == "unlock" then
-						group.unlock = row
+				if row.index < group.firstIndex then
+					group.firstIndex = row.index
+				end
+				if row.sortIndex < group.sortIndex then
+					group.sortIndex = row.sortIndex
+				end
+
+				if row.kind == "unlock" then
+					group.unlock = row
+					group.mainRow = row
+				else
+					group.upgrades[#group.upgrades + 1] = row
+					if group.unlock == nil and #group.upgrades == 1 then
 						group.mainRow = row
-					else
-						group.upgrades[#group.upgrades + 1] = row
-						if group.unlock == nil and #group.upgrades == 1 then
-							group.mainRow = row
-						end
 					end
+				end
+
+				if RowVisible(row) then
+					group.hasVisibleRows = true
 				end
 			end
 
 			local order = {}
 			for key, _ in pairs(groups) do
-				order[#order + 1] = key
+				if groups[key].hasVisibleRows then
+					order[#order + 1] = key
+				end
 			end
 
 			table.sort(order, function(a, b)
 				local groupA = groups[a]
 				local groupB = groups[b]
-				local costA = GroupSortCost(groupA)
-				local costB = GroupSortCost(groupB)
-				if costA ~= costB then return costA < costB end
-				return string.lower(DisplayLabel(groupA.mainRow)) < string.lower(DisplayLabel(groupB.mainRow))
+				local orderA = GroupOrder(groupA.groupLabel)
+				local orderB = GroupOrder(groupB.groupLabel)
+				if orderA ~= orderB then return orderA < orderB end
+				if groupA.sortIndex ~= groupB.sortIndex then return groupA.sortIndex < groupB.sortIndex end
+				return groupA.firstIndex < groupB.firstIndex
 			end)
 
 			return groups, order
@@ -576,27 +773,6 @@
 
 			OverloadSelectedThing = ""
 			return nil
-		end
-
-		function GroupSortCost(group)
-			if group.mainRow ~= nil and group.mainRow.kind == "bp" then
-				return RowRemainingCost(group.mainRow)
-			end
-
-			if group.unlock ~= nil and group.unlock.status ~= "owned" and group.unlock.status ~= "maxed" then
-				return RowRemainingCost(group.unlock)
-			end
-
-			local best = nil
-			for i = 1, #group.upgrades do
-				local row = group.upgrades[i]
-				local cost = RowRemainingCost(row)
-				if best == nil or cost < best then
-					best = cost
-				end
-			end
-
-			return best or 0
 		end
 
 		function GroupStatus(group)
@@ -624,7 +800,7 @@
 			end
 
 			if group.unlock ~= nil and group.unlock.status ~= "owned" and group.unlock.status ~= "maxed" then
-				return "LOCKED"
+				return "Locked"
 			end
 
 			if #group.upgrades == 0 then
@@ -688,53 +864,159 @@
 			return string.format('%s +%d', row.statLabel or "upgrade", nextRank)
 		end
 
-		function GroupBodyHtml(group)
-			if #group.upgrades == 0 then
-				return '<div class="empty-state">No upgrades yet.</div>'
-			end
-
-			local html = ""
-			for i = 1, #group.upgrades do
-				local row = group.upgrades[i]
-				html = html .. string.format(
-					'<div class="progress-line">%s</div>',
-					Rocket_QuakeToRML(UpgradeLineText(row)))
-			end
-			return '<div class="progress-lines">' .. html .. '</div>'
+		function RingProgressValue(row)
+			if row.status == "owned" or row.status == "maxed" then return 1 end
+			if row.nextCostAmount <= 0 then return 0 end
+			local value = row.investedAmount / row.nextCostAmount
+			if value < 0 then value = 0 end
+			if value > 1 then value = 1 end
+			return value
 		end
 
-		-- Render the main browsing surface.
-		function RenderProgression(groups, order)
+		function RingLabel(row)
+			if row.kind == "bp" then return "BP" end
+			if row.kind == "unlock" then return "Unlock" end
+
+			local label = row.statLabel or "upgrade"
+			if label == "damage" then return "Damage" end
+			if label == "ammo" then return "Ammo" end
+			if label == "fuel" then return "Fuel" end
+			if label == "stamina" then return "Stamina" end
+			if label == "vitality" then return "Vitality" end
+			if label == "heal rate" then return "Heal" end
+			if label == "healing rate" then return "Heal" end
+			if label == "pounce damage" then return "Pounce" end
+			if label == "barb refresh" then return "Refresh" end
+			if label == "barb damage" then return "Barb" end
+			if label == "trample damage" then return "Trample" end
+			if label == "armor integrity" then return "Armour" end
+			if label == "max health" then return "Health" end
+			return label
+		end
+
+		function RenderRing(row, groupToken)
+			return string.format(
+				'<div class="progress-ring">' ..
+				'<donutprogress class="mini-donut %s" value="%.4f" />' ..
+				'<div class="progress-ring-label">%s</div>' ..
+				'</div>',
+				groupToken,
+				RingProgressValue(row),
+				Rocket_QuakeToRML(RingLabel(row)))
+		end
+
+		function GroupRingsHtml(group)
+			local html = ""
+
+			if group.mainRow.kind == "bp" then
+				return '<div class="progress-rings">' .. RenderRing(group.mainRow, group.groupToken) .. '</div>'
+			end
+
+			if group.unlock ~= nil and group.unlock.status ~= "owned" and group.unlock.status ~= "maxed" then
+				return '<div class="progress-rings">' .. RenderRing(group.unlock, group.groupToken) .. '</div>'
+			end
+
+			if #group.upgrades == 0 then
+				return '<div class="progress-line">No upgrades yet.</div>'
+			end
+
+			for i = 1, #group.upgrades do
+				html = html .. RenderRing(group.upgrades[i], group.groupToken)
+			end
+			return '<div class="progress-rings">' .. html .. '</div>'
+		end
+
+		function GroupBodyHtml(group)
+			local body = GroupRingsHtml(group)
+			if group.unlock ~= nil and group.unlock.status ~= "owned" and group.unlock.status ~= "maxed" then
+				body = body .. string.format('<div class="progress-line">%s</div>', Rocket_QuakeToRML(group.unlock.progress or ""))
+				return body
+			end
+
+			for i = 1, #group.upgrades do
+				body = body .. string.format(
+					'<div class="progress-line">%s</div>',
+					Rocket_QuakeToRML(UpgradeLineText(group.upgrades[i])))
+			end
+			return body
+		end
+
+		function RenderGroupSection(groups, order, groupLabel)
 			local html = ""
 			local count = 0
+			local token = ""
+
 			for i = 1, #order do
 				local group = groups[order[i]]
-				local main = group.mainRow
-				local status = GroupStatus(group)
-				html = html .. string.format(
-					'<div class="progress-card %s">' ..
-					'<div class="progress-header">' ..
-					'<button class="progress-main %s" onclick="OverloadSelectThing(\'%s\', document)">%s</button>' ..
-					'<div class="progress-summary"><div class="progress-name">%s</div><div class="progress-status">%s</div><div class="progress-meta">%s</div></div>' ..
-					'</div>' ..
-					'%s' ..
-					'</div>',
-					status,
-					group.key == OverloadSelectedThing and "selected" or "",
-					group.key,
-					TileIconHtml(main),
-					Rocket_QuakeToRML(DisplayLabel(main)),
-					Rocket_QuakeToRML(GroupStatusText(group)),
-					Rocket_QuakeToRML(GroupMetaText(group)),
-					GroupBodyHtml(group))
-				count = count + 1
+				if group.groupLabel == groupLabel then
+					local main = group.mainRow
+					local status = GroupStatus(group)
+					token = group.groupToken
+					html = html .. string.format(
+						'<button class="progress-card %s %s %s" onclick="OverloadSelectThing(\'%s\', document)">' ..
+						'<div class="progress-header">' ..
+						'<div class="progress-icon">%s</div>' ..
+						'<div class="progress-summary"><div class="progress-name">%s</div><div class="progress-status">%s</div><div class="progress-meta">%s</div></div>' ..
+						'</div>' ..
+						'%s' ..
+						'</button>',
+						status,
+						token,
+						group.key == OverloadSelectedThing and "selected" or "",
+						group.key,
+						TileIconHtml(main),
+						Rocket_QuakeToRML(DisplayLabel(main)),
+						Rocket_QuakeToRML(GroupStatusText(group)),
+						Rocket_QuakeToRML(GroupMetaText(group)),
+						GroupBodyHtml(group))
+					count = count + 1
+				end
 			end
 
 			if count == 0 then
+				return ""
+			end
+
+			return string.format(
+				'<div class="group-section">' ..
+				'<div class="group-header %s"><span class="group-chip">%s</span><span class="group-count">%d items</span></div>' ..
+				'<div class="progress-grid">%s</div>' ..
+				'</div>',
+				token,
+				Rocket_QuakeToRML(groupLabel),
+				count,
+				html)
+		end
+
+		function RenderProgression(groups, order)
+			local labels = {}
+			local seen = {}
+			local html = ""
+
+			for i = 1, #order do
+				local label = groups[order[i]].groupLabel
+				if not seen[label] then
+					seen[label] = true
+					labels[#labels + 1] = label
+				end
+			end
+
+			table.sort(labels, function(a, b)
+				local orderA = GroupOrder(a)
+				local orderB = GroupOrder(b)
+				if orderA ~= orderB then return orderA < orderB end
+				return a < b
+			end)
+
+			for i = 1, #labels do
+				html = html .. RenderGroupSection(groups, order, labels[i])
+			end
+
+			if html == "" then
 				return '<div class="empty-state">No matching entries.</div>'
 			end
 
-			return '<div class="progress-grid">' .. html .. '</div>'
+			return html
 		end
 
 		function RenderUpgradeDetail(row)
@@ -754,7 +1036,6 @@
 				SpendButtons(row))
 		end
 
-		-- Render the right-hand inspector for the selected thing.
 		function RenderDetail(group)
 			if group == nil then
 				return '<div class="detail-empty">No matching entries.</div>'
@@ -811,7 +1092,7 @@
 				'<div class="detail-layout">' ..
 				'<div class="detail-icon">%s</div>' ..
 				'<div class="detail-info">' ..
-				'<div class="detail-badges"><span class="badge">%s</span><span class="badge %s">%s</span></div>' ..
+				'<div class="detail-badges"><span class="badge %s">%s</span><span class="badge">%s</span><span class="badge %s">%s</span></div>' ..
 				'<div class="detail-name">%s</div>' ..
 				'%s' ..
 				'<div class="detail-description">%s</div>' ..
@@ -819,6 +1100,8 @@
 				'</div>' ..
 				'</div>',
 				TileIconHtml(row),
+				group.groupToken,
+				Rocket_QuakeToRML(group.groupLabel),
 				row.kind == "bp" and KindLabel(row.kind) or (group.unlock ~= nil and group.unlock.status ~= "owned" and group.unlock.status ~= "maxed" and "Unlock" or "Upgrades"),
 				StatusBadgeClass(GroupStatus(group)),
 				GroupStatusText(group),
@@ -842,12 +1125,29 @@
 			SetFilterButtonState(document, "filterDone", OverloadFilter == "done")
 		end
 
+		function CurrencyLabel(rows)
+			if #rows > 0 and rows[1].currencyLabel ~= nil and rows[1].currencyLabel ~= "" then
+				return rows[1].currencyLabel
+			end
+			return "credits"
+		end
+
+		function CurrencyValueHtml(rows)
+			local label = CurrencyLabel(rows)
+			if label == "morph points" then
+				return "<evos/>"
+			end
+			return "<credits/>"
+		end
+
 		function BuildOverloadMenu(document)
 			local rows = ReadRows()
 			local groups, order = VisibleProgressionGroups(rows)
 			local selected = EnsureSelectedGroup(groups, order)
 			document:GetElementById("detailPanel").inner_rml = RenderDetail(selected)
 			document:GetElementById("progressionRows").inner_rml = RenderProgression(groups, order)
+			document:GetElementById("currencyValue").inner_rml = CurrencyValueHtml(rows)
+			document:GetElementById("currencyLabel").inner_rml = Rocket_QuakeToRML(CurrencyLabel(rows))
 			RefreshFilterButtons(document)
 		end
 
@@ -885,6 +1185,9 @@
 							<p class="hint"><translate>Press ESC or right click to close.</translate></p>
 						</div>
 						<div class="controls">
+							<div class="control-header">
+								<div class="currency-panel"><span id="currencyValue"><credits/></span>&nbsp;<span class="currency-label" id="currencyLabel">credits</span></div>
+							</div>
 							<div class="filter-row">
 								<span class="filter-label"><translate>Show</translate></span>
 								<button id="filterAvailable" onclick="OverloadSetFilter('available', document)"><translate>Available</translate></button>
@@ -898,10 +1201,10 @@
 							</div>
 						</div>
 						<div id="content">
-						<div class="section">
-							<div class="section-title"><translate>Progression</translate></div>
-							<div id="progressionRows"></div>
-						</div>
+							<div class="section">
+								<div class="section-title"><translate>Progression</translate></div>
+								<div id="progressionRows"></div>
+							</div>
 						</div>
 					</div>
 					<div id="sideColumn">
