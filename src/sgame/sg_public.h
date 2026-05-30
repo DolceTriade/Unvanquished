@@ -137,6 +137,8 @@ void              G_BotOverloadThink( gentity_t *ent );
 
 // sg_client.c
 void              G_AddCreditToClient( gclient_t *client, short credit, bool cap );
+void              G_LogCreditDelta( team_t team, int delta );
+void              G_LogCreditSpendEvent( team_t team, int clientNum, const char* kind, const char* item, int cost );
 void              G_SetClientViewAngle( gentity_t *ent, const vec3_t angle );
 gentity_t         *G_SelectUnvanquishedSpawnPoint( team_t team, vec3_t preference, vec3_t origin, vec3_t angles, int skip = 0 );
 gentity_t         *G_SelectRandomFurthestSpawnPoint( const vec3_t avoidPoint, vec3_t origin, vec3_t angles );

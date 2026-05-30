@@ -46,11 +46,14 @@ G_AddCreditToClient
 void G_AddCreditToClient( gclient_t *client, short credit, bool cap )
 {
 	int capAmount;
+	int oldCredit;
 
 	if ( !client || client->pers.connected != CON_CONNECTED )
 	{
 		return;
 	}
+
+	oldCredit = client->pers.credit;
 
 	if ( cap && credit > 0 )
 	{
@@ -79,6 +82,8 @@ void G_AddCreditToClient( gclient_t *client, short credit, bool cap )
 
 	// Copy to ps so the client can access it
 	client->ps.persistant[ PERS_CREDIT ] = client->pers.credit;
+
+	G_LogCreditDelta( static_cast<team_t>( client->pers.team ), client->pers.credit - oldCredit );
 
 	client->pers.infoChangeTime = level.time;
 }
