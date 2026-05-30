@@ -36,6 +36,225 @@ bool overloadCatalogReady = false;
 
 static void BuildOverloadCatalog();
 static int FindUnlockThresholdField( bgAttributeFamily_t family );
+static int OverloadNextCost( const overloadPurchaseDef_t& entry, int entryIndex, team_t team );
+
+
+static bool OverloadEntryMatchesTeam( team_t team, int purchaseIndex )
+{
+	if ( !G_IsPlayableTeam( team ) )
+	{
+		return false;
+	}
+
+	if ( purchaseIndex < 0 || purchaseIndex >= static_cast<int>( overloadPurchases.size() ) )
+	{
+		return false;
+	}
+
+	const overloadPurchaseDef_t& entry = overloadPurchases[ purchaseIndex ];
+	return entry.team == TEAM_NONE || entry.team == team;
+}
+
+static bool OverloadEntryCanAutoDonate( team_t team, int purchaseIndex )
+{
+	if ( !OverloadEntryMatchesTeam( team, purchaseIndex ) )
+	{
+		return false;
+	}
+
+	const overloadPurchaseDef_t& entry = overloadPurchases[ purchaseIndex ];
+	return EntryIsAvailable( team, entry ) && RemainingSpendCapacity( entry, purchaseIndex, team ) > 0;
+}
+
+static bool OverloadEntryIsPartial( team_t team, int purchaseIndex )
+{
+	if ( !OverloadEntryCanAutoDonate( team, purchaseIndex ) )
+	{
+		return false;
+	}
+
+	return TeamEconomy( team ).investedCredits[ purchaseIndex ] > 0;
+}
+
+static bool OverloadEntryIsUnlock( team_t team, int purchaseIndex )
+{
+	return OverloadEntryMatchesTeam( team, purchaseIndex ) &&
+	       overloadPurchases[ purchaseIndex ].kind == overloadPurchaseKind_t::UNLOCK;
+}
+
+static bool OverloadEntryIsBPBundle( team_t team, int purchaseIndex )
+{
+	return OverloadEntryMatchesTeam( team, purchaseIndex ) &&
+	       overloadPurchases[ purchaseIndex ].kind == overloadPurchaseKind_t::BP_BUNDLE;
+}
+
+static bool OverloadEntryIsUpgrade( team_t team, int purchaseIndex )
+{
+	return OverloadEntryMatchesTeam( team, purchaseIndex ) &&
+	       overloadPurchases[ purchaseIndex ].kind == overloadPurchaseKind_t::UPGRADE;
+}
+
+static int FindAutoDonatePartialPurchase( team_t team )
+{
+	int bestPurchaseIndex = -1;
+	int bestRemaining = std::numeric_limits<int>::max();
+
+	for ( int i = 0; i < G_OverloadPurchaseCount(); ++i )
+	{
+		if ( !OverloadEntryIsPartial( team, i ) )
+		{
+			continue;
+		}
+
+		const int remaining = RemainingSpendCapacity( overloadPurchases[ i ], i, team );
+		if ( remaining > 0 && remaining < bestRemaining )
+		{
+			bestPurchaseIndex = i;
+			bestRemaining = remaining;
+		}
+	}
+
+	return bestPurchaseIndex;
+}
+
+static bool AutoDonateBuildablesRecentlyKilled( team_t team )
+{
+	static constexpr int OVERLOAD_AUTODONATE_BP_AFTER_DESTRUCTION_WINDOW = 30000;
+
+	for ( int i = 0; i < level.numBuildLogs; ++i )
+	{
+		const buildLog_t& log = level.buildLog[ ( level.buildId - i - 1 ) % MAX_BUILDLOG ];
+		if ( level.time - log.time > OVERLOAD_AUTODONATE_BP_AFTER_DESTRUCTION_WINDOW )
+		{
+			return false;
+		}
+
+		if ( log.buildableTeam != team )
+		{
+			continue;
+		}
+
+		switch ( log.fate )
+		{
+			case BF_DESTROY:
+			case BF_TEAMKILL:
+				return true;
+
+			case BF_AUTO:
+			case BF_CONSTRUCT:
+			case BF_DECONSTRUCT:
+			case BF_REPLACE:
+				break;
+		}
+	}
+
+	return false;
+}
+
+static int FindAutoDonateBPPurchase( team_t team )
+{
+	static constexpr int OVERLOAD_AUTODONATE_BP_PRESSURE_THRESHOLD = 20;
+
+	if ( G_GetFreeBudget( team ) >= OVERLOAD_AUTODONATE_BP_PRESSURE_THRESHOLD ||
+	     !AutoDonateBuildablesRecentlyKilled( team ) )
+	{
+		return -1;
+	}
+
+	for ( int i = 0; i < G_OverloadPurchaseCount(); ++i )
+	{
+		if ( OverloadEntryCanAutoDonate( team, i ) && OverloadEntryIsBPBundle( team, i ) )
+		{
+			return i;
+		}
+	}
+
+	return -1;
+}
+
+static int FindAutoDonateUnlockPurchase( team_t team )
+{
+	int bestPurchaseIndex = -1;
+	int bestRemaining = std::numeric_limits<int>::max();
+
+	for ( int i = 0; i < G_OverloadPurchaseCount(); ++i )
+	{
+		if ( !OverloadEntryCanAutoDonate( team, i ) || !OverloadEntryIsUnlock( team, i ) )
+		{
+			continue;
+		}
+
+		const int remaining = RemainingSpendCapacity( overloadPurchases[ i ], i, team );
+		if ( remaining > 0 && remaining < bestRemaining )
+		{
+			bestPurchaseIndex = i;
+			bestRemaining = remaining;
+		}
+	}
+
+	return bestPurchaseIndex;
+}
+
+static int FindAutoDonateUpgradePurchase( team_t team )
+{
+	std::vector<int> upgradePurchaseIndices;
+
+	for ( int i = 0; i < G_OverloadPurchaseCount(); ++i )
+	{
+		if ( OverloadEntryCanAutoDonate( team, i ) && OverloadEntryIsUpgrade( team, i ) )
+		{
+			upgradePurchaseIndices.push_back( i );
+		}
+	}
+
+	if ( upgradePurchaseIndices.empty() )
+	{
+		return -1;
+	}
+
+	const int randomIndex = static_cast<int>( BG_random() * upgradePurchaseIndices.size() );
+	return upgradePurchaseIndices[ std::min( randomIndex, static_cast<int>( upgradePurchaseIndices.size() ) - 1 ) ];
+}
+
+static int FindAutoDonatePurchase( team_t team )
+{
+	const int partialPurchase = FindAutoDonatePartialPurchase( team );
+	if ( partialPurchase >= 0 )
+	{
+		return partialPurchase;
+	}
+
+	const int bpPurchase = FindAutoDonateBPPurchase( team );
+	if ( bpPurchase >= 0 )
+	{
+		return bpPurchase;
+	}
+
+	const int unlockPurchase = FindAutoDonateUnlockPurchase( team );
+	if ( unlockPurchase >= 0 )
+	{
+		return unlockPurchase;
+	}
+
+	return FindAutoDonateUpgradePurchase( team );
+}
+
+static int AutoDonateSpendCapacity( team_t team, int purchaseIndex )
+{
+	if ( !OverloadEntryMatchesTeam( team, purchaseIndex ) )
+	{
+		return 0;
+	}
+
+	const overloadPurchaseDef_t& entry = overloadPurchases[ purchaseIndex ];
+	if ( entry.kind == overloadPurchaseKind_t::BP_BUNDLE )
+	{
+		const int invested = TeamEconomy( team ).investedCredits[ purchaseIndex ];
+		return std::max( 0, OverloadNextCost( entry, purchaseIndex, team ) - invested );
+	}
+
+	return RemainingSpendCapacity( entry, purchaseIndex, team );
+}
 
 static int weaponUnlockPurchaseIndex[ NUM_TEAMS ][ WP_NUM_WEAPONS ];
 static int upgradeUnlockPurchaseIndex[ NUM_TEAMS ][ UP_NUM_UPGRADES ];
@@ -1721,6 +1940,93 @@ bool G_OverloadPurchaseByIndex( gentity_t *ent, int purchaseIndex, int spend, st
 	}
 
 	return G_OverloadPurchase( ent, Cmd::Args( Str::Format( "teambuy upgrade %s %s %d", entry.thing, entry.stat, spend ) ), message );
+}
+
+bool G_OverloadAutoDonate( gentity_t *ent, int spend, std::string* message )
+{
+	if ( !ent || !ent->client )
+	{
+		if ( message ) *message = "invalid purchaser";
+		return false;
+	}
+
+	team_t team = static_cast<team_t>( ent->client->pers.team );
+	if ( !G_IsPlayableTeam( team ) )
+	{
+		if ( message ) *message = "you are not on a playable team";
+		return false;
+	}
+
+	int remainingBudget = std::min( spend, ent->client->pers.credit );
+	if ( remainingBudget <= 0 )
+	{
+		if ( message ) *message = "not enough resources";
+		return false;
+	}
+
+	std::vector<std::string> purchaseMessages;
+	int totalSpent = 0;
+
+	while ( remainingBudget > 0 )
+	{
+		const int purchaseIndex = FindAutoDonatePurchase( team );
+		if ( purchaseIndex < 0 )
+		{
+			break;
+		}
+
+		const int spendCapacity = AutoDonateSpendCapacity( team, purchaseIndex );
+		const int spendThisPurchase = std::min( remainingBudget, spendCapacity );
+		if ( spendThisPurchase <= 0 )
+		{
+			break;
+		}
+
+		std::string purchaseMessage;
+		if ( !G_OverloadPurchaseByIndex( ent, purchaseIndex, spendThisPurchase, &purchaseMessage ) )
+		{
+			if ( totalSpent <= 0 )
+			{
+				if ( message ) *message = purchaseMessage.empty() ? "autodonate failed" : purchaseMessage;
+				return false;
+			}
+			break;
+		}
+
+		totalSpent += spendThisPurchase;
+		remainingBudget -= spendThisPurchase;
+		if ( !purchaseMessage.empty() )
+		{
+			purchaseMessages.push_back( purchaseMessage );
+		}
+	}
+
+	if ( totalSpent <= 0 )
+	{
+		if ( message ) *message = "no eligible overload purchase found";
+		return false;
+	}
+
+	if ( message )
+	{
+		std::ostringstream stream;
+		stream << "spent " << FormatOverloadCurrency( totalSpent, team );
+		if ( !purchaseMessages.empty() )
+		{
+			stream << ": ";
+			for ( size_t i = 0; i < purchaseMessages.size(); ++i )
+			{
+				if ( i > 0 )
+				{
+					stream << "; ";
+				}
+				stream << purchaseMessages[ i ];
+			}
+		}
+		*message = stream.str();
+	}
+
+	return true;
 }
 
 void G_UpdateOverloadCostScaling()
