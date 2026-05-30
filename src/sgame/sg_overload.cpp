@@ -289,6 +289,121 @@ static std::string UnlockableDescription( unlockableType_t type, int itemNum )
 	Sys::Error( "UnlockableDescription: unknown unlockable type" );
 }
 
+static const char* OverloadGroupForThing( team_t team, const char* thing )
+{
+	if ( !thing || !*thing )
+	{
+		return "Other";
+	}
+
+	if ( team == TEAM_HUMANS )
+	{
+		if ( !Q_stricmp( thing, "humans" ) )
+		{
+			return "Team";
+		}
+
+		if ( !Q_stricmp( thing, "medistat" ) ||
+		     !Q_stricmp( thing, "mgturret" ) ||
+		     !Q_stricmp( thing, "rocketpod" ) )
+		{
+			return "Structures";
+		}
+
+		if ( !Q_stricmp( thing, "rifle" ) ||
+		     !Q_stricmp( thing, "psaw" ) ||
+		     !Q_stricmp( thing, "shotgun" ) ||
+		     !Q_stricmp( thing, "lgun" ) ||
+		     !Q_stricmp( thing, "mdriver" ) ||
+		     !Q_stricmp( thing, "chaingun" ) ||
+		     !Q_stricmp( thing, "flamer" ) ||
+		     !Q_stricmp( thing, "prifle" ) ||
+		     !Q_stricmp( thing, "lcannon" ) )
+		{
+			return "Weapons";
+		}
+
+		return "Equipment";
+	}
+
+	if ( team == TEAM_ALIENS )
+	{
+		if ( !Q_stricmp( thing, "aliens" ) )
+		{
+			return "Team";
+		}
+
+		if ( !Q_stricmp( thing, "acid_tube" ) ||
+		     !Q_stricmp( thing, "booster" ) ||
+		     !Q_stricmp( thing, "spiker" ) ||
+		     !Q_stricmp( thing, "trapper" ) ||
+		     !Q_stricmp( thing, "hive" ) )
+		{
+			return "Structures";
+		}
+
+		return "Lifeforms";
+	}
+
+	return "Other";
+}
+
+static int OverloadSortIndexForThing( team_t team, const char* thing )
+{
+	if ( !thing || !*thing )
+	{
+		return 999;
+	}
+
+	if ( team == TEAM_HUMANS )
+	{
+		if ( !Q_stricmp( thing, "bp" ) ) return 0;
+		if ( !Q_stricmp( thing, "psaw" ) ) return 10;
+		if ( !Q_stricmp( thing, "shotgun" ) ) return 11;
+		if ( !Q_stricmp( thing, "mdriver" ) ) return 12;
+		if ( !Q_stricmp( thing, "chaingun" ) ) return 13;
+		if ( !Q_stricmp( thing, "flamer" ) ) return 14;
+		if ( !Q_stricmp( thing, "prifle" ) ) return 15;
+		if ( !Q_stricmp( thing, "lcannon" ) ) return 16;
+		if ( !Q_stricmp( thing, "armor" ) ) return 20;
+		if ( !Q_stricmp( thing, "radar" ) ) return 21;
+		if ( !Q_stricmp( thing, "jetpack" ) ) return 22;
+		if ( !Q_stricmp( thing, "biokit" ) ) return 23;
+		if ( !Q_stricmp( thing, "battlesuit" ) ) return 24;
+		if ( !Q_stricmp( thing, "grenade" ) ) return 25;
+		if ( !Q_stricmp( thing, "firebomb" ) ) return 26;
+		if ( !Q_stricmp( thing, "rifle" ) ) return 30;
+		if ( !Q_stricmp( thing, "lgun" ) ) return 31;
+		if ( !Q_stricmp( thing, "humans" ) ) return 40;
+		if ( !Q_stricmp( thing, "medistat" ) ) return 50;
+		if ( !Q_stricmp( thing, "mgturret" ) ) return 51;
+		if ( !Q_stricmp( thing, "rocketpod" ) ) return 52;
+		return 199;
+	}
+
+	if ( team == TEAM_ALIENS )
+	{
+		if ( !Q_stricmp( thing, "bp" ) ) return 0;
+		if ( !Q_stricmp( thing, "builderupg" ) ) return 10;
+		if ( !Q_stricmp( thing, "level0" ) ) return 11;
+		if ( !Q_stricmp( thing, "level1" ) ) return 12;
+		if ( !Q_stricmp( thing, "level2" ) ) return 13;
+		if ( !Q_stricmp( thing, "level2upg" ) ) return 14;
+		if ( !Q_stricmp( thing, "level3" ) ) return 15;
+		if ( !Q_stricmp( thing, "level3upg" ) ) return 16;
+		if ( !Q_stricmp( thing, "level4" ) ) return 17;
+		if ( !Q_stricmp( thing, "acid_tube" ) ) return 30;
+		if ( !Q_stricmp( thing, "trapper" ) ) return 31;
+		if ( !Q_stricmp( thing, "spiker" ) ) return 32;
+		if ( !Q_stricmp( thing, "booster" ) ) return 33;
+		if ( !Q_stricmp( thing, "hive" ) ) return 34;
+		if ( !Q_stricmp( thing, "aliens" ) ) return 40;
+		return 199;
+	}
+
+	return 999;
+}
+
 static void PublishOverloadCatalog()
 {
 	for ( int i = 0; i < MAX_OVERLOAD_PURCHASES; ++i )
@@ -303,6 +418,8 @@ static void PublishOverloadCatalog()
 			Info_SetValueForKey( config, "t", va( "%d", entry.team ), false );
 			Info_SetValueForKey( config, "thing", entry.thing.c_str(), false );
 			Info_SetValueForKey( config, "tl", entry.thingLabel.c_str(), false );
+			Info_SetValueForKey( config, "grp", entry.groupLabel.c_str(), false );
+			Info_SetValueForKey( config, "ord", va( "%d", entry.sortIndex ), false );
 			Info_SetValueForKey( config, "stat", entry.stat.c_str(), false );
 			Info_SetValueForKey( config, "sl", entry.statLabel.c_str(), false );
 			Info_SetValueForKey( config, "name", entry.displayName.c_str(), false );
@@ -588,6 +705,8 @@ static void AddUpgrade( team_t team, int baseCost, int costStep, int maxRanks,
 	entry.team = team;
 	entry.thing = thing;
 	entry.thingLabel = thingLabel;
+	entry.groupLabel = OverloadGroupForThing( team, thing );
+	entry.sortIndex = OverloadSortIndexForThing( team, thing );
 	entry.stat = stat;
 	entry.statLabel = statLabel;
 	entry.displayName = displayName;
@@ -613,6 +732,8 @@ static void AddUnlockWithCost( team_t team, unlockableType_t unlockableType, int
 	entry.team = team;
 	entry.thing = thing;
 	entry.thingLabel = thingLabel;
+	entry.groupLabel = OverloadGroupForThing( team, thing );
+	entry.sortIndex = OverloadSortIndexForThing( team, thing );
 	entry.displayName = displayName;
 	entry.uiDescription = uiDescription;
 	entry.requiredCompletedCount = 0;
@@ -810,6 +931,8 @@ static void BuildOverloadCatalog()
 	bpBundle.team = TEAM_NONE;
 	bpBundle.thing = "bp";
 	bpBundle.thingLabel = "Build Points";
+	bpBundle.groupLabel = "Build Points";
+	bpBundle.sortIndex = 0;
 	bpBundle.displayName = "BP +50";
 	bpBundle.uiDescription = "Add 50 team BP. Each bundle costs more than the last.";
 	bpBundle.requiredCompletedCount = 0;
@@ -838,12 +961,21 @@ static void BuildOverloadCatalog()
 	AddUpgradeUnlock( TEAM_HUMANS, UP_FIREBOMB );
 	AddBuildableUnlock( TEAM_HUMANS, BA_H_ROCKETPOD );
 
-	AddBuildableUnlock( TEAM_ALIENS, BA_A_BOOSTER );
-	AddBuildableUnlock( TEAM_ALIENS, BA_A_SPIKER );
+	// Alien structures: acid tube, trapper, spiker, booster, hive.
+	AddUpgrade( TEAM_ALIENS, DefaultUpgradeBaseCost( 0 ), DefaultUpgradeStepCost( 0 ), OVERLOAD_UNCAPPED_RANKS, "acid_tube", "Acid Tube", "damage", "damage", "Acid Tube Damage", "Increase acid tube damage per second.",
+	            { GameplayEffect( "ACIDTUBE_DAMAGE", 2.0, 1.0 ) } );
 	AddBuildableUnlock( TEAM_ALIENS, BA_A_TRAPPER );
+	AddBuildableUnlock( TEAM_ALIENS, BA_A_SPIKER );
+	AddBuildableUnlock( TEAM_ALIENS, BA_A_BOOSTER );
 	AddBuildableUnlock( TEAM_ALIENS, BA_A_HIVE );
-	AddClassUnlock( TEAM_ALIENS, PCL_ALIEN_LEVEL2 );
+
+	// Alien lifeforms: advanced granger, dretch, mantis, marauder, advanced marauder, dragoon, advanced dragoon, tyrant.
 	AddClassUnlock( TEAM_ALIENS, PCL_ALIEN_BUILDER0_UPG );
+	AddUpgrade( TEAM_ALIENS, DefaultUpgradeBaseCost( 0 ), DefaultUpgradeStepCost( 0 ), OVERLOAD_UNCAPPED_RANKS, "level0", "Dretch", "damage", "damage", "Dretch Damage", "Increase dretch bite damage.",
+	            { GameplayEffect( "LEVEL0_BITE_DMG", 3.0 ) } );
+	AddUpgrade( TEAM_ALIENS, DefaultUpgradeBaseCost( 0 ), DefaultUpgradeStepCost( 0 ), OVERLOAD_UNCAPPED_RANKS, "level1", "Mantis", "damage", "damage", "Mantis Damage", "Increase mantis claw damage.",
+	            { GameplayEffect( "LEVEL1_CLAW_DMG", 4.0 ) } );
+	AddClassUnlock( TEAM_ALIENS, PCL_ALIEN_LEVEL2 );
 	AddClassUnlock( TEAM_ALIENS, PCL_ALIEN_LEVEL2_UPG );
 	AddClassUnlock( TEAM_ALIENS, PCL_ALIEN_LEVEL3 );
 	AddClassUnlock( TEAM_ALIENS, PCL_ALIEN_LEVEL3_UPG );
@@ -929,13 +1061,11 @@ static void BuildOverloadCatalog()
 	              AttributeEffect( BG_ATTR_MISSILE, "rocket", "splash_damage", 8.0, 0.0 ) } );
 
 	// Alien buildable upgrades.
-	// Covered buildables: acid_tube, hive, trapper.
-	AddUpgrade( TEAM_ALIENS, DefaultUpgradeBaseCost( 0 ), DefaultUpgradeStepCost( 0 ), OVERLOAD_UNCAPPED_RANKS, "acid_tube", "Acid Tube", "damage", "damage", "Acid Tube Damage", "Increase acid tube damage per second.",
-	            { GameplayEffect( "ACIDTUBE_DAMAGE", 2.0, 1.0 ) } );
-	AddUpgrade( TEAM_ALIENS, DefaultUpgradeBaseCost( OVERLOAD_STAGE3_COUNT ), DefaultUpgradeStepCost( OVERLOAD_STAGE3_COUNT ), OVERLOAD_UNCAPPED_RANKS, "hive", "Hive", "damage", "damage", "Hive Damage", "Increase hive missile damage.",
-	            { AttributeEffect( BG_ATTR_MISSILE, "hive", "damage", 8.0, 1.0 ) } );
+	// Covered buildables: acid_tube, trapper, hive.
 	AddUpgrade( TEAM_ALIENS, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), DefaultUpgradeStepCost( OVERLOAD_STAGE2_COUNT ), OVERLOAD_UNCAPPED_RANKS, "trapper", "Trapper", "health", "max health", "Trapper Health", "Increase trapper durability.",
 	            { AttributeEffect( BG_ATTR_BUILDABLE, "trapper", "health", 15.0, 1.0 ) } );
+	AddUpgrade( TEAM_ALIENS, DefaultUpgradeBaseCost( OVERLOAD_STAGE3_COUNT ), DefaultUpgradeStepCost( OVERLOAD_STAGE3_COUNT ), OVERLOAD_UNCAPPED_RANKS, "hive", "Hive", "damage", "damage", "Hive Damage", "Increase hive missile damage.",
+	            { AttributeEffect( BG_ATTR_MISSILE, "hive", "damage", 8.0, 1.0 ) } );
 
 	// Alien class upgrades.
 	// Covered classes: dretch, level1 scout, marauder, advanced marauder, dragoon, advanced dragoon, tyrant.
@@ -960,10 +1090,6 @@ static void BuildOverloadCatalog()
 	              PercentAttributeEffect( BG_ATTR_CLASS, "level3", "regen_rate", 0.1, 0.001 ),
 	              PercentAttributeEffect( BG_ATTR_CLASS, "level3upg", "regen_rate", 0.1, 0.001 ),
 	              PercentAttributeEffect( BG_ATTR_CLASS, "level4", "regen_rate", 0.1, 0.001 ) } );
-	AddUpgrade( TEAM_ALIENS, DefaultUpgradeBaseCost( 0 ), DefaultUpgradeStepCost( 0 ), OVERLOAD_UNCAPPED_RANKS, "level0", "Dretch", "damage", "damage", "Dretch Damage", "Increase dretch bite damage.",
-	            { GameplayEffect( "LEVEL0_BITE_DMG", 3.0 ) } );
-	AddUpgrade( TEAM_ALIENS, DefaultUpgradeBaseCost( 0 ), DefaultUpgradeStepCost( 0 ), OVERLOAD_UNCAPPED_RANKS, "level1", "Mantis", "damage", "damage", "Mantis Damage", "Increase mantis claw damage.",
-	            { GameplayEffect( "LEVEL1_CLAW_DMG", 4.0 ) } );
 	AddUpgrade( TEAM_ALIENS, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), DefaultUpgradeStepCost( OVERLOAD_STAGE2_COUNT ), OVERLOAD_UNCAPPED_RANKS, "level2upg", "Advanced Marauder", "damage", "damage", "Advanced Marauder Zap Damage", "Increase advanced marauder zap damage.",
 	            { GameplayEffect( "LEVEL2_AREAZAP_DMG", 4.0 ) } );
 	AddUpgrade( TEAM_ALIENS, DefaultUpgradeBaseCost( 0 ), DefaultUpgradeStepCost( 0 ), OVERLOAD_UNCAPPED_RANKS, "level2", "Marauder", "damage", "damage", "Marauder Damage", "Increase marauder claw damage.",
