@@ -206,8 +206,10 @@ void CG_ParseOverloadCatalogConfig( int index, const char* config )
 	entry.bundleAmount = atoi( Info_ValueForKey( config, "ba" ) );
 	entry.requiredCompletedCount = atoi( Info_ValueForKey( config, "req" ) );
 	entry.maxRanks = atoi( Info_ValueForKey( config, "mr" ) );
+	entry.sortIndex = atoi( Info_ValueForKey( config, "ord" ) );
 	Q_strncpyz( entry.thing, Info_ValueForKey( config, "thing" ), sizeof( entry.thing ) );
 	Q_strncpyz( entry.thingLabel, Info_ValueForKey( config, "tl" ), sizeof( entry.thingLabel ) );
+	Q_strncpyz( entry.groupLabel, Info_ValueForKey( config, "grp" ), sizeof( entry.groupLabel ) );
 	Q_strncpyz( entry.stat, Info_ValueForKey( config, "stat" ), sizeof( entry.stat ) );
 	Q_strncpyz( entry.statLabel, Info_ValueForKey( config, "sl" ), sizeof( entry.statLabel ) );
 	Q_strncpyz( entry.displayName, Info_ValueForKey( config, "name" ), sizeof( entry.displayName ) );
