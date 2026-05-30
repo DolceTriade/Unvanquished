@@ -133,6 +133,7 @@ void              G_PublishOverloadState( team_t team );
 bool              G_OverloadPurchase( gentity_t *ent, const Cmd::Args& args, std::string* message = nullptr );
 int               G_OverloadPurchaseCount();
 bool              G_OverloadPurchaseByIndex( gentity_t *ent, int purchaseIndex, int spend, std::string* message = nullptr );
+bool              G_OverloadAutoDonate( gentity_t *ent, int spend, std::string* message = nullptr );
 void              G_BotOverloadThink( gentity_t *ent );
 
 // sg_client.c

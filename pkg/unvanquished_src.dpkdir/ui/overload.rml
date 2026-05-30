@@ -100,6 +100,28 @@
 			background: #1b5d67;
 			color: #ffffff;
 		}
+		.autodonate-panel {
+			margin-top: 0.75em;
+			padding: 0.75em 0.8em 0.7em 0.8em;
+			background: #10303699;
+			border-top-width: 1px;
+			border-top-color: #184147;
+			border-width: 1px;
+			border-color: #1d4a50;
+		}
+		.autodonate-title {
+			margin-bottom: 0.42em;
+			color: #9efcff;
+			font-size: 0.92em;
+		}
+		.autodonate-actions {
+			margin-bottom: 0.18em;
+		}
+		.autodonate-hint {
+			margin-top: 0.28em;
+			color: #7ba8ac;
+			font-size: 0.82em;
+		}
 		#searchFilter {
 			display: inline-block;
 			width: 18em;
@@ -1140,6 +1162,28 @@
 			return "<credits/>"
 		end
 
+		function RenderAutoDonatePanel(rows)
+			local morphPoints = CurrencyLabel(rows) == "morph points"
+			local smallAmount = morphPoints and "1.0" or "100"
+			local mediumAmount = morphPoints and "5.0" or "500"
+			local maxAmount = morphPoints and "20.0" or "2000"
+
+			return string.format(
+				'<div class="autodonate-title"><translate>Auto Donate</translate></div>' ..
+				'<div class="autodonate-actions">' ..
+				'<button onclick="Cmd.exec(\'autodonate %s\')">%s</button>' ..
+				'<button onclick="Cmd.exec(\'autodonate %s\')">%s</button>' ..
+				'<button onclick="Cmd.exec(\'autodonate %s\')">%s</button>' ..
+				'</div>' ..
+				'<div class="autodonate-hint"><translate>Finishes partial purchases first, buys BP bundles when your team is under BP pressure after losses, then the cheapest unlock, then a random upgrade.</translate></div>',
+				smallAmount,
+				morphPoints and "+1.0" or "+100",
+				mediumAmount,
+				morphPoints and "+5.0" or "+500",
+				maxAmount,
+				morphPoints and "Cap (20.0)" or "Cap (2000)")
+		end
+
 		function BuildOverloadMenu(document)
 			local rows = ReadRows()
 			local groups, order = VisibleProgressionGroups(rows)
@@ -1148,6 +1192,7 @@
 			document:GetElementById("progressionRows").inner_rml = RenderProgression(groups, order)
 			document:GetElementById("currencyValue").inner_rml = CurrencyValueHtml(rows)
 			document:GetElementById("currencyLabel").inner_rml = Rocket_QuakeToRML(CurrencyLabel(rows))
+			document:GetElementById("autoDonatePanel").inner_rml = RenderAutoDonatePanel(rows)
 			RefreshFilterButtons(document)
 		end
 
@@ -1199,6 +1244,7 @@
 								<span class="filter-label"><translate>Search</translate></span>
 								<input id="searchFilter" type="text" class="text" value="" onkeyup="OverloadSetSearchFilter(event.target_element, document)" placeholder="Filter upgrades, unlocks, or items"/>
 							</div>
+							<div class="autodonate-panel" id="autoDonatePanel"></div>
 						</div>
 						<div id="content">
 							<div class="section">

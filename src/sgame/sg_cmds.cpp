@@ -2341,6 +2341,59 @@ static void Cmd_TeamBuy_f( gentity_t *ent )
 	                            Quote( message.c_str() ) ) );
 }
 
+static void Cmd_AutoDonate_f( gentity_t *ent )
+{
+	std::string message;
+
+	if ( !G_NearOverloadTerminal( ent ) )
+	{
+		trap_SendServerCommand( ent->num(),
+		                        va( "print_tr %s",
+		                            QQ( N_("You must be near your team's main structure to donate to Overload.") ) ) );
+		return;
+	}
+
+	if ( trap_Argc() < 2 )
+	{
+		trap_SendServerCommand( ent->num(),
+		                        va( "print_tr %s",
+		                            QQ( N_("usage: /autodonate <credits-or-morph-points>") ) ) );
+		return;
+	}
+
+	team_t team = static_cast<team_t>( ent->client->pers.team );
+	const float inputAmount = atof( ConcatArgs( 1 ) );
+	int requestedCredits = static_cast<int>( inputAmount * ( team == TEAM_ALIENS ? CREDITS_PER_EVO : 1.0f ) );
+	if ( requestedCredits < 0 )
+	{
+		requestedCredits = 0;
+	}
+
+	const int spend = std::min( ent->client->pers.credit, requestedCredits );
+
+	if ( spend <= 0 )
+	{
+		trap_SendServerCommand( ent->num(),
+		                        va( "print_tr %s",
+		                            QQ( N_("Auto-donate amount must be greater than zero.") ) ) );
+		return;
+	}
+
+	if ( !G_OverloadAutoDonate( ent, spend, &message ) )
+	{
+		trap_SendServerCommand( ent->num(),
+		                        va( "print_tr %s %s",
+		                            QQ( N_("Auto-donate failed: $1$") ),
+		                            Quote( message.c_str() ) ) );
+		return;
+	}
+
+	trap_SendServerCommand( ent->num(),
+	                        va( "print_tr %s %s",
+	                            QQ( N_("Auto-donate completed: $1$") ),
+	                            Quote( message.c_str() ) ) );
+}
+
 static void Cmd_Deconstruct_f( gentity_t *ent )
 {
 	// Check for valid build weapon.
@@ -4378,6 +4431,7 @@ static const commands_t cmds[] =
 {
 	{ "a",               CMD_MESSAGE | CMD_INTERMISSION,      Cmd_AdminMessage_f     },
 	{ "asay",            CMD_MESSAGE | CMD_INTERMISSION,      Cmd_Say_f              },
+	{ "autodonate",      CMD_TEAM | CMD_ALIVE,                Cmd_AutoDonate_f       },
 	{ "beacon",          CMD_TEAM | CMD_ALIVE,                Cmd_Beacon_f           },
 	{ "build",           CMD_TEAM | CMD_ALIVE,                Cmd_Build_f            },
 	{ "buy",             CMD_HUMAN | CMD_ALIVE,               Cmd_Buy_f              },
