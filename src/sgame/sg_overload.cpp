@@ -1510,6 +1510,19 @@ bool G_OverloadPurchase( gentity_t *ent, const Cmd::Args& args, std::string* mes
 
 	const int oldCompletedPurchases = economy.completedPurchases;
 	G_AddCreditToClient( ent->client, -actualSpend, false );
+	if ( entry->kind == overloadPurchaseKind_t::BP_BUNDLE )
+	{
+		G_LogCreditSpendEvent( team, ent->num(), "teambuy_bp", entry->thing.c_str(), actualSpend );
+	}
+	else if ( entry->kind == overloadPurchaseKind_t::UNLOCK )
+	{
+		G_LogCreditSpendEvent( team, ent->num(), "teambuy_unlock", entry->thing.c_str(), actualSpend );
+	}
+	else
+	{
+		std::string item = entry->thing + "/" + entry->stat;
+		G_LogCreditSpendEvent( team, ent->num(), "teambuy_upgrade", item.c_str(), actualSpend );
+	}
 	economy.investedCredits[ purchaseIndex ] += actualSpend;
 
 	int invested = economy.investedCredits[ purchaseIndex ];

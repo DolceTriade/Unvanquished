@@ -1,0 +1,714 @@
+#! /usr/bin/env python3
+
+import argparse
+import html
+import json
+import sys
+from collections import Counter
+from pathlib import Path
+
+
+WIDTH = 1280
+HEIGHT = 760
+MARGIN_LEFT = 72
+MARGIN_RIGHT = 24
+MARGIN_TOP = 36
+MARGIN_BOTTOM = 56
+PLOT_WIDTH = WIDTH - MARGIN_LEFT - MARGIN_RIGHT
+PLOT_HEIGHT = HEIGHT - MARGIN_TOP - MARGIN_BOTTOM
+EVENT_KIND_STYLES = {
+    "buy_weapon": {"label": "Buy weapon", "shape": "circle"},
+    "buy_upgrade": {"label": "Buy upgrade", "shape": "square"},
+    "evolve": {"label": "Evolve", "shape": "triangle"},
+    "teambuy_bp": {"label": "Team buy BP", "shape": "diamond"},
+    "teambuy_unlock": {"label": "Team unlock", "shape": "triangle-down"},
+    "teambuy_upgrade": {"label": "Team upgrade", "shape": "hex"},
+}
+
+
+def parse_args():
+    parser = argparse.ArgumentParser(
+        description="Render a self-contained interactive HTML graph for a Format 3 gameplay stats log."
+    )
+    parser.add_argument("stats_file", nargs="?", help="Path to a gameplay stats log.")
+    parser.add_argument(
+        "-o", "--output",
+        help="Output HTML path. Defaults to <stats-file>.html"
+    )
+    return parser.parse_args()
+
+
+def find_default_stats_file(repo_root: Path) -> Path:
+    stats_dir = repo_root / "stats" / "gameplay"
+    if not stats_dir.is_dir():
+        raise FileNotFoundError(f"stats directory not found: {stats_dir}")
+    files = sorted(stats_dir.glob("*.log"))
+    if not files:
+        raise FileNotFoundError(f"no gameplay logs found in {stats_dir}")
+    return files[-1]
+
+
+def parse_stats_file(path: Path):
+    samples = []
+    raw_events = []
+    match_id = ""
+
+    with path.open("r", encoding="utf-8") as handle:
+        for raw_line in handle:
+            line = raw_line.strip()
+            if not line:
+                continue
+
+            if line.startswith("# MatchId:"):
+                match_id = line.split(":", 1)[1].strip()
+                continue
+
+            if line.startswith("#"):
+                continue
+
+            if line.startswith("EVT "):
+                _, t, team, client, kind, rest = line.split(maxsplit=5)
+                item, cost = rest.rsplit(" ", 1)
+                raw_events.append({
+                    "t": int(t),
+                    "team": team,
+                    "client": int(client),
+                    "kind": kind,
+                    "item": item,
+                    "cost": int(cost),
+                })
+                continue
+
+            parts = line.split()
+            if len(parts) != 7:
+                raise ValueError(f"unexpected sample row: {line}")
+
+            t, aliens_players, humans_players, aliens_net, humans_net, aliens_spent, humans_spent = map(int, parts)
+            samples.append({
+                "t": t,
+                "aliens_players": aliens_players,
+                "humans_players": humans_players,
+                "aliens_net": aliens_net,
+                "humans_net": humans_net,
+                "aliens_spent": aliens_spent,
+                "humans_spent": humans_spent,
+            })
+
+    if not samples:
+        raise ValueError(f"no sample rows found in {path}")
+
+    cumulative = {"aliens": 0, "humans": 0}
+    events = []
+    for event in raw_events:
+        if event["team"] in cumulative:
+            cumulative[event["team"]] += event["cost"]
+            event = dict(event)
+            event["cumulative_spent"] = cumulative[event["team"]]
+            events.append(event)
+
+    return samples, events, match_id
+
+
+def summarize_match(samples, events):
+    last = samples[-1]
+    kind_counts = Counter(event["kind"] for event in events)
+    team_counts = Counter(event["team"] for event in events)
+    return {
+        "duration": last["t"],
+        "final": {
+            "aliens_net": last["aliens_net"],
+            "humans_net": last["humans_net"],
+            "aliens_spent": last["aliens_spent"],
+            "humans_spent": last["humans_spent"],
+            "aliens_players": last["aliens_players"],
+            "humans_players": last["humans_players"],
+        },
+        "events_total": len(events),
+        "events_by_kind": dict(sorted(kind_counts.items())),
+        "events_by_team": dict(sorted(team_counts.items())),
+    }
+
+
+def axis_ticks(lower, upper, count=6):
+    if upper <= lower:
+        return [lower]
+    return [lower + (upper - lower) * i / count for i in range(count + 1)]
+
+
+def build_svg(samples, events):
+    times = [sample["t"] for sample in samples]
+    values = []
+    for sample in samples:
+        values.extend([
+            sample["aliens_net"],
+            sample["humans_net"],
+            sample["aliens_spent"],
+            sample["humans_spent"],
+        ])
+
+    if events:
+        values.extend(event["cumulative_spent"] for event in events)
+
+    x_min = min(times)
+    x_max = max(times)
+    if x_max == x_min:
+        x_max = x_min + 1
+
+    y_min = min(values)
+    y_max = max(values)
+    if y_max == y_min:
+        y_max = y_min + 1
+
+    y_pad = max(10, (y_max - y_min) * 0.08)
+    y_min -= y_pad
+    y_max += y_pad
+
+    def x_px(t):
+        return MARGIN_LEFT + (t - x_min) / (x_max - x_min) * PLOT_WIDTH
+
+    def y_px(v):
+        return MARGIN_TOP + (y_max - v) / (y_max - y_min) * PLOT_HEIGHT
+
+    def path_for(key):
+        return " ".join(
+            f"{'M' if i == 0 else 'L'} {x_px(sample['t']):.2f} {y_px(sample[key]):.2f}"
+            for i, sample in enumerate(samples)
+        )
+
+    def event_symbol(shape, px, py, size):
+        if shape == "square":
+            return f'<rect x="{px - size:.2f}" y="{py - size:.2f}" width="{2 * size:.2f}" height="{2 * size:.2f}"'
+        if shape == "triangle":
+            pts = [
+                (px, py - size * 1.15),
+                (px - size, py + size * 0.9),
+                (px + size, py + size * 0.9),
+            ]
+            point_text = " ".join(f"{x:.2f},{y:.2f}" for x, y in pts)
+            return f'<polygon points="{point_text}"'
+        if shape == "triangle-down":
+            pts = [
+                (px - size, py - size * 0.9),
+                (px + size, py - size * 0.9),
+                (px, py + size * 1.15),
+            ]
+            point_text = " ".join(f"{x:.2f},{y:.2f}" for x, y in pts)
+            return f'<polygon points="{point_text}"'
+        if shape == "diamond":
+            pts = [
+                (px, py - size * 1.2),
+                (px - size, py),
+                (px, py + size * 1.2),
+                (px + size, py),
+            ]
+            point_text = " ".join(f"{x:.2f},{y:.2f}" for x, y in pts)
+            return f'<polygon points="{point_text}"'
+        if shape == "hex":
+            pts = [
+                (px - size * 0.9, py - size * 0.55),
+                (px, py - size * 1.05),
+                (px + size * 0.9, py - size * 0.55),
+                (px + size * 0.9, py + size * 0.55),
+                (px, py + size * 1.05),
+                (px - size * 0.9, py + size * 0.55),
+            ]
+            point_text = " ".join(f"{x:.2f},{y:.2f}" for x, y in pts)
+            return f'<polygon points="{point_text}"'
+        return f'<circle cx="{px:.2f}" cy="{py:.2f}" r="{size:.2f}"'
+
+    x_ticks = axis_ticks(x_min, x_max)
+    y_ticks = axis_ticks(y_min, y_max)
+
+    parts = []
+    parts.append(
+        f'<svg id="chart" viewBox="0 0 {WIDTH} {HEIGHT}" xmlns="http://www.w3.org/2000/svg" '
+        f'role="img" aria-label="Gameplay economy graph">'
+    )
+    parts.append(
+        f'<rect x="0" y="0" width="{WIDTH}" height="{HEIGHT}" fill="#fffdf8" />'
+    )
+
+    for tick in x_ticks:
+        px = x_px(tick)
+        parts.append(
+            f'<line x1="{px:.2f}" y1="{MARGIN_TOP}" x2="{px:.2f}" y2="{MARGIN_TOP + PLOT_HEIGHT}" '
+            f'class="grid" />'
+        )
+        parts.append(
+            f'<text x="{px:.2f}" y="{HEIGHT - 18}" class="tick" text-anchor="middle">{int(round(tick))}</text>'
+        )
+
+    for tick in y_ticks:
+        py = y_px(tick)
+        parts.append(
+            f'<line x1="{MARGIN_LEFT}" y1="{py:.2f}" x2="{MARGIN_LEFT + PLOT_WIDTH}" y2="{py:.2f}" '
+            f'class="grid" />'
+        )
+        parts.append(
+            f'<text x="{MARGIN_LEFT - 10}" y="{py + 4:.2f}" class="tick" text-anchor="end">{int(round(tick))}</text>'
+        )
+
+    parts.append(
+        f'<line x1="{MARGIN_LEFT}" y1="{MARGIN_TOP}" x2="{MARGIN_LEFT}" y2="{MARGIN_TOP + PLOT_HEIGHT}" class="axis" />'
+    )
+    parts.append(
+        f'<line x1="{MARGIN_LEFT}" y1="{MARGIN_TOP + PLOT_HEIGHT}" x2="{MARGIN_LEFT + PLOT_WIDTH}" y2="{MARGIN_TOP + PLOT_HEIGHT}" class="axis" />'
+    )
+    parts.append(
+        f'<text x="{MARGIN_LEFT + PLOT_WIDTH / 2:.2f}" y="{HEIGHT - 8}" class="axis-label" text-anchor="middle">Match time (s)</text>'
+    )
+    parts.append(
+        f'<text x="20" y="{MARGIN_TOP + PLOT_HEIGHT / 2:.2f}" class="axis-label" text-anchor="middle" '
+        f'transform="rotate(-90 20 {MARGIN_TOP + PLOT_HEIGHT / 2:.2f})">Credits</text>'
+    )
+
+    series = [
+        ("aliens_net", "#2e8b57", "", "Aliens net"),
+        ("humans_net", "#1f77b4", "", "Humans net"),
+        ("aliens_spent", "#2e8b57", "8 6", "Aliens spent"),
+        ("humans_spent", "#1f77b4", "8 6", "Humans spent"),
+    ]
+
+    for key, color, dash, label in series:
+        dash_attr = f' stroke-dasharray="{dash}"' if dash else ""
+        parts.append(
+            f'<path d="{path_for(key)}" class="series series-{key}" fill="none" '
+            f'stroke="{color}" stroke-width="2.5"{dash_attr} data-label="{html.escape(label)}" />'
+        )
+
+    parts.append(
+        f'<rect id="hover-target" x="{MARGIN_LEFT}" y="{MARGIN_TOP}" width="{PLOT_WIDTH}" height="{PLOT_HEIGHT}" fill="transparent" />'
+    )
+    parts.append(
+        f'<line id="hover-line" x1="{MARGIN_LEFT}" y1="{MARGIN_TOP}" x2="{MARGIN_LEFT}" y2="{MARGIN_TOP + PLOT_HEIGHT}" visibility="hidden" class="hover-line" />'
+    )
+
+    for event in events:
+        px = x_px(event["t"])
+        py = y_px(event["cumulative_spent"])
+        color = "#2e8b57" if event["team"] == "aliens" else "#1f77b4"
+        kind_style = EVENT_KIND_STYLES.get(event["kind"], {"label": event["kind"], "shape": "circle"})
+        tooltip = (
+            f"Team: {event['team']}\n"
+            f"Time: {event['t']}s\n"
+            f"Event: {kind_style['label']}\n"
+            f"Item: {event['item']}\n"
+            f"Cost: {event['cost']}\n"
+            f"Client: {event['client']}"
+        )
+        event_class = "alien-events" if event["team"] == "aliens" else "human-events"
+        kind_class = f"kind-{event['kind']}"
+        symbol = event_symbol(kind_style["shape"], px, py, 5)
+        parts.append(
+            f'{symbol} class="event-point {event_class} {kind_class}" '
+            f'fill="{color}" stroke="#fffdf8" stroke-width="1.2" '
+            f'data-tooltip="{html.escape(tooltip)}"><title>{html.escape(tooltip)}</title></{"rect" if kind_style["shape"] == "square" else "polygon" if kind_style["shape"] in {"triangle", "triangle-down", "diamond", "hex"} else "circle"}>'
+        )
+    parts.append("</svg>")
+
+    chart_data = {
+        "samples": samples,
+        "layout": {
+            "width": WIDTH,
+            "height": HEIGHT,
+            "marginLeft": MARGIN_LEFT,
+            "marginTop": MARGIN_TOP,
+            "plotWidth": PLOT_WIDTH,
+            "plotHeight": PLOT_HEIGHT,
+            "xMin": x_min,
+            "xMax": x_max,
+        }
+    }
+
+    return "\n".join(parts), chart_data
+
+
+def build_html(stats_file: Path, output_file: Path, samples, events, match_id):
+    svg_markup, chart_data = build_svg(samples, events)
+    summary = summarize_match(samples, events)
+    title = stats_file.name
+    if match_id:
+        title = f"{title} ({match_id})"
+
+    legend_items = []
+    toggle_items = []
+    for kind in sorted({event["kind"] for event in events}):
+        style = EVENT_KIND_STYLES.get(kind, {"label": kind, "shape": "circle"})
+        legend_items.append(
+            f'<span class="legend-item"><span class="legend-shape shape-{style["shape"]}"></span>{html.escape(style["label"])}</span>'
+        )
+        toggle_items.append(
+            f'<label><input type="checkbox" data-target="kind-{html.escape(kind)}" checked> {html.escape(style["label"])}</label>'
+        )
+
+    summary_kinds = "".join(
+        f'<li><span>{html.escape(EVENT_KIND_STYLES.get(kind, {"label": kind})["label"])}</span><strong>{count}</strong></li>'
+        for kind, count in summary["events_by_kind"].items()
+    ) or '<li><span>No events</span><strong>0</strong></li>'
+
+    return f"""<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{html.escape(title)}</title>
+  <style>
+    :root {{
+      color-scheme: light;
+      --bg: #f4efe6;
+      --panel: #fffdf8;
+      --ink: #1e1d1a;
+      --muted: #6e6657;
+      --grid: #ded7ca;
+      --axis: #6b6254;
+      --accent: #b85c38;
+    }}
+    * {{ box-sizing: border-box; }}
+    body {{
+      margin: 0;
+      font-family: "Iosevka Aile", "IBM Plex Sans", "Segoe UI", sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at top left, #fff7ea, transparent 30%),
+        linear-gradient(180deg, #efe8dc 0%, #f7f2ea 100%);
+    }}
+    main {{
+      max-width: 1360px;
+      margin: 0 auto;
+      padding: 24px;
+    }}
+    h1 {{
+      margin: 0 0 10px 0;
+      font-size: 28px;
+    }}
+    .meta {{
+      color: var(--muted);
+      margin-bottom: 18px;
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+    }}
+    .controls {{
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+      margin-bottom: 16px;
+      padding: 12px 14px;
+      background: rgba(255, 253, 248, 0.88);
+      border: 1px solid #dfd8cb;
+      border-radius: 12px;
+      backdrop-filter: blur(4px);
+    }}
+    .controls label {{
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 14px;
+    }}
+    .summary-grid {{
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 14px;
+      margin-bottom: 16px;
+    }}
+    .summary-card {{
+      padding: 14px 16px;
+      background: rgba(255, 253, 248, 0.9);
+      border: 1px solid #dfd8cb;
+      border-radius: 14px;
+    }}
+    .summary-card h2 {{
+      margin: 0 0 10px 0;
+      font-size: 16px;
+    }}
+    .summary-stat {{
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      font-size: 14px;
+      padding: 4px 0;
+    }}
+    .summary-stat strong {{
+      font-variant-numeric: tabular-nums;
+    }}
+    .summary-list {{
+      list-style: none;
+      margin: 0;
+      padding: 0;
+    }}
+    .summary-list li {{
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 4px 0;
+      font-size: 14px;
+    }}
+    .legend {{
+      display: flex;
+      gap: 14px;
+      flex-wrap: wrap;
+      margin-bottom: 16px;
+      padding: 12px 14px;
+      background: rgba(255, 253, 248, 0.88);
+      border: 1px solid #dfd8cb;
+      border-radius: 12px;
+    }}
+    .legend-item {{
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 14px;
+    }}
+    .legend-shape {{
+      width: 12px;
+      height: 12px;
+      display: inline-block;
+      background: var(--accent);
+    }}
+    .shape-circle {{
+      border-radius: 999px;
+    }}
+    .shape-square {{
+      border-radius: 2px;
+    }}
+    .shape-triangle {{
+      clip-path: polygon(50% 0%, 0% 100%, 100% 100%);
+    }}
+    .shape-triangle-down {{
+      clip-path: polygon(0% 0%, 100% 0%, 50% 100%);
+    }}
+    .shape-diamond {{
+      clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
+    }}
+    .shape-hex {{
+      clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%);
+    }}
+    .chart-shell {{
+      position: relative;
+      background: rgba(255, 253, 248, 0.94);
+      border: 1px solid #dfd8cb;
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 10px 30px rgba(73, 60, 38, 0.08);
+    }}
+    svg {{
+      display: block;
+      width: 100%;
+      height: auto;
+    }}
+    .grid {{
+      stroke: var(--grid);
+      stroke-width: 1;
+    }}
+    .axis {{
+      stroke: var(--axis);
+      stroke-width: 1.5;
+    }}
+    .axis-label {{
+      fill: var(--axis);
+      font-size: 15px;
+      font-weight: 600;
+    }}
+    .tick {{
+      fill: var(--muted);
+      font-size: 13px;
+    }}
+    .hover-line {{
+      stroke: var(--accent);
+      stroke-width: 1.5;
+      stroke-dasharray: 6 4;
+    }}
+    .tooltip {{
+      position: absolute;
+      min-width: 220px;
+      max-width: 320px;
+      padding: 10px 12px;
+      border-radius: 12px;
+      background: rgba(24, 22, 18, 0.92);
+      color: #fff;
+      pointer-events: none;
+      font-size: 13px;
+      line-height: 1.45;
+      box-shadow: 0 12px 24px rgba(0, 0, 0, 0.2);
+      visibility: hidden;
+      white-space: pre-line;
+      z-index: 10;
+    }}
+    .footer {{
+      margin-top: 10px;
+      color: var(--muted);
+      font-size: 13px;
+    }}
+  </style>
+</head>
+<body>
+  <main>
+    <h1>{html.escape(title)}</h1>
+    <div class="meta">
+      <span>Source: {html.escape(str(stats_file))}</span>
+      <span>Output: {html.escape(str(output_file))}</span>
+      <span>Samples: {len(samples)}</span>
+      <span>Events: {len(events)}</span>
+    </div>
+    <div class="summary-grid">
+      <section class="summary-card">
+        <h2>Match Summary</h2>
+        <div class="summary-stat"><span>Duration</span><strong>{summary["duration"]}s</strong></div>
+        <div class="summary-stat"><span>Alien players</span><strong>{summary["final"]["aliens_players"]}</strong></div>
+        <div class="summary-stat"><span>Human players</span><strong>{summary["final"]["humans_players"]}</strong></div>
+        <div class="summary-stat"><span>Total events</span><strong>{summary["events_total"]}</strong></div>
+      </section>
+      <section class="summary-card">
+        <h2>Final Economy</h2>
+        <div class="summary-stat"><span>Aliens net</span><strong>{summary["final"]["aliens_net"]}</strong></div>
+        <div class="summary-stat"><span>Humans net</span><strong>{summary["final"]["humans_net"]}</strong></div>
+        <div class="summary-stat"><span>Aliens spent</span><strong>{summary["final"]["aliens_spent"]}</strong></div>
+        <div class="summary-stat"><span>Humans spent</span><strong>{summary["final"]["humans_spent"]}</strong></div>
+      </section>
+      <section class="summary-card">
+        <h2>Events By Kind</h2>
+        <ul class="summary-list">{summary_kinds}</ul>
+      </section>
+    </div>
+    <div class="legend">
+      <strong>Event legend:</strong>
+      {"".join(legend_items) if legend_items else '<span class="legend-item">No event kinds in this match</span>'}
+    </div>
+    <div class="controls">
+      <label><input type="checkbox" data-target="series-aliens_net" checked> Aliens net</label>
+      <label><input type="checkbox" data-target="series-humans_net" checked> Humans net</label>
+      <label><input type="checkbox" data-target="series-aliens_spent" checked> Aliens spent</label>
+      <label><input type="checkbox" data-target="series-humans_spent" checked> Humans spent</label>
+      <label><input type="checkbox" data-target="alien-events" checked> Alien purchase markers</label>
+      <label><input type="checkbox" data-target="human-events" checked> Human purchase markers</label>
+      {"".join(toggle_items)}
+    </div>
+    <div class="chart-shell" id="chart-shell">
+      {svg_markup}
+      <div class="tooltip" id="tooltip"></div>
+    </div>
+    <div class="footer">
+      Hover the plot area for sampled values. Hover purchase markers for event details.
+    </div>
+  </main>
+  <script>
+    const chartData = {json.dumps(chart_data, separators=(",", ":"))};
+    const shell = document.getElementById("chart-shell");
+    const svg = document.getElementById("chart");
+    const hoverTarget = document.getElementById("hover-target");
+    const hoverLine = document.getElementById("hover-line");
+    const tooltip = document.getElementById("tooltip");
+
+    function updateVisibility(target, visible) {{
+      for (const node of document.getElementsByClassName(target)) {{
+        node.style.display = visible ? "" : "none";
+      }}
+    }}
+
+    for (const toggle of document.querySelectorAll("input[data-target]")) {{
+      toggle.addEventListener("change", (event) => {{
+        updateVisibility(event.target.dataset.target, event.target.checked);
+      }});
+    }}
+
+    function localPoint(evt) {{
+      const pt = svg.createSVGPoint();
+      pt.x = evt.clientX;
+      pt.y = evt.clientY;
+      return pt.matrixTransform(svg.getScreenCTM().inverse());
+    }}
+
+    function nearestSample(time) {{
+      const samples = chartData.samples;
+      let best = samples[0];
+      let bestDistance = Math.abs(samples[0].t - time);
+      for (const sample of samples) {{
+        const distance = Math.abs(sample.t - time);
+        if (distance < bestDistance) {{
+          best = sample;
+          bestDistance = distance;
+        }}
+      }}
+      return best;
+    }}
+
+    function showTooltip(clientX, clientY, text) {{
+      const shellRect = shell.getBoundingClientRect();
+      tooltip.textContent = text;
+      let left = clientX - shellRect.left + 14;
+      let top = clientY - shellRect.top + 14;
+
+      const maxLeft = Math.max(8, shellRect.width - tooltip.offsetWidth - 8);
+      const maxTop = Math.max(8, shellRect.height - tooltip.offsetHeight - 8);
+      left = Math.min(Math.max(8, left), maxLeft);
+      top = Math.min(Math.max(8, top), maxTop);
+
+      tooltip.style.left = `${{left}}px`;
+      tooltip.style.top = `${{top}}px`;
+      tooltip.style.visibility = "visible";
+    }}
+
+    hoverTarget.addEventListener("mousemove", (evt) => {{
+      const p = localPoint(evt);
+      const layout = chartData.layout;
+      const x = Math.min(Math.max(p.x, layout.marginLeft), layout.marginLeft + layout.plotWidth);
+      const ratio = (x - layout.marginLeft) / layout.plotWidth;
+      const time = layout.xMin + ratio * (layout.xMax - layout.xMin);
+      const sample = nearestSample(time);
+      const sampleRatio = (sample.t - layout.xMin) / (layout.xMax - layout.xMin);
+      const lineX = layout.marginLeft + sampleRatio * layout.plotWidth;
+
+      hoverLine.setAttribute("x1", lineX);
+      hoverLine.setAttribute("x2", lineX);
+      hoverLine.setAttribute("visibility", "visible");
+
+      showTooltip(
+        evt.clientX,
+        evt.clientY,
+        `t=${{sample.t}}s\\nAliens net: ${{sample.aliens_net}}\\nHumans net: ${{sample.humans_net}}\\nAliens spent: ${{sample.aliens_spent}}\\nHumans spent: ${{sample.humans_spent}}`
+      );
+    }});
+
+    hoverTarget.addEventListener("mouseleave", () => {{
+      hoverLine.setAttribute("visibility", "hidden");
+      tooltip.style.visibility = "hidden";
+    }});
+
+    for (const point of document.querySelectorAll(".event-point")) {{
+      point.addEventListener("mousemove", (evt) => {{
+        showTooltip(evt.clientX, evt.clientY, point.dataset.tooltip);
+      }});
+      point.addEventListener("mouseleave", () => {{
+        tooltip.style.visibility = "hidden";
+      }});
+    }}
+  </script>
+</body>
+</html>
+"""
+
+
+def main():
+    args = parse_args()
+    repo_root = Path(__file__).resolve().parent.parent
+
+    stats_file = Path(args.stats_file) if args.stats_file else find_default_stats_file(repo_root)
+    stats_file = stats_file.resolve()
+    if not stats_file.is_file():
+        raise FileNotFoundError(f"stats file not found: {stats_file}")
+
+    output_file = Path(args.output).resolve() if args.output else stats_file.with_suffix(".html")
+
+    samples, events, match_id = parse_stats_file(stats_file)
+    html_text = build_html(stats_file, output_file, samples, events, match_id)
+    output_file.write_text(html_text, encoding="utf-8")
+
+    print(output_file)
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except Exception as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        sys.exit(1)
