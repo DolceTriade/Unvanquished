@@ -659,8 +659,12 @@ static bool CG_ParseWeaponFile( const char *filename, int weapon, weaponInfo_t *
 							CG_RegisterWeaponAnimation( &wi->animations[ WANIM_RELOAD ],
 							                            va( "%s_view.iqm:reload", token2 ), false, false, false );
 						}
-						CG_RegisterWeaponAnimation( &wi->animations[ WANIM_ATTACK1 ],
-													va( "%s_view.iqm:fire", token2 ), false, false, false );
+						// HACK: We'll animate the chaingun in code. Don't load the fire animation.
+						if ( weapon != WP_CHAINGUN )
+						{
+							CG_RegisterWeaponAnimation( &wi->animations[ WANIM_ATTACK1 ],
+														va( "%s_view.iqm:fire", token2 ), false, false, false );
+						}
 						break;
 
 					case WP_ALEVEL1:
@@ -1125,6 +1129,13 @@ void CG_InitWeapons()
 
 	cgs.media.level2ZapTS = CG_RegisterTrailSystem( "trails/weapons/level2upg/lightning" );
 	cgs.media.mdriverTS = CG_RegisterTrailSystem( "trails/weapons/mdriver/tail" );
+	// These are hard coded for now due to ease...
+	cgs.media.chaingunBarrelBoneIndex = trap_R_BoneIndex( cg_weapons[ WP_CHAINGUN ].weaponModel, "tag_flash" );
+	cgs.media.chaingunGearBoneIndex = trap_R_BoneIndex( cg_weapons[ WP_CHAINGUN ].weaponModel, "small_gear" );
+	if ( cgs.media.chaingunBarrelBoneIndex < 0 || cgs.media.chaingunGearBoneIndex < 0 )
+	{
+		Sys::Drop( "Failed to find chaingun bones 'tag_flash' and/or 'small_gear'" );
+	}
 }
 
 /*
@@ -1372,6 +1383,7 @@ The main player will have this called for BOTH cases, so effects like light and
 sound should only be done on the world model case.
 =============
 */
+
 void CG_AddPlayerWeapon( refEntity_t* parent, playerState_t* ps, centity_t* cent, const uint16_t weaponAttachmentEntityID,
 	std::vector<refEntity_t>& ents )
 {
@@ -1503,6 +1515,22 @@ void CG_AddPlayerWeapon( refEntity_t* parent, playerState_t* ps, centity_t* cent
 
 				gun.boundsAdd = 1;
 				VectorSet( gun.boundsRotation, weapon->rotation[0], weapon->rotation[1], weapon->rotation[2] );
+			}
+
+			// Spin the chaingun. Do it in code so we can do fancier things
+			// like controlling spin rate and "coasting".
+			if ( weaponNum == WP_CHAINGUN && ps )
+			{
+				float angle = CG_MachinegunSpinAngle( cent, firing );
+				BoneMod barrel;
+				barrel.index = cgs.media.chaingunBarrelBoneIndex;
+				QuatFromAngles( barrel.rotation, angle, 0.0f, 0.0f );
+				gun.boneMods.push_back( barrel );
+
+				BoneMod gear;
+				gear.index = cgs.media.chaingunGearBoneIndex;
+				QuatFromAngles( gear.rotation, -angle, 0.0f, 0.0f );
+				gun.boneMods.push_back( gear );
 			}
 
 			gun.scale = weapon->scale;

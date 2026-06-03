@@ -1672,6 +1672,9 @@ struct cgMedia_t
 
 	qhandle_t   damageIndicatorFont;
 	sfxHandle_t killSound;
+
+	qhandle_t chaingunBarrelBoneIndex;
+	qhandle_t chaingunGearBoneIndex;
 };
 
 struct buildStat_t
