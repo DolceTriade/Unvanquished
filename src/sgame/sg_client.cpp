@@ -1405,7 +1405,10 @@ void ClientBegin( int clientNum )
 		trap_SendServerCommand( ent->num(), va( "cpd %d %s", g_mapStartupMessageDelay.Get(), Quote( startMsg.c_str() ) ) );
 	}
 
-	G_namelog_restore( client );
+	if ( !client->pers.isBot )
+	{
+		G_namelog_restore( client );
+	}
 
 	G_LogPrintf( "ClientBegin: %i", clientNum );
 
