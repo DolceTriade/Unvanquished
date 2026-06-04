@@ -2264,20 +2264,13 @@ static void Cmd_SpawnLoc_f( gentity_t *ent )
 		return;
 	}
 
-	if ( spawnPoint->s.eType == entityType_t::ET_BUILDABLE )
-	{
-		G_SetBuildableAnim( spawnPoint, BANIM_SPAWN1, true );
-		spawnPoint->clientSpawnTime = HUMAN_SPAWN_REPEAT_TIME;
+	G_SetBuildableAnim( spawnPoint, BANIM_SPAWN1, true );
+	spawnPoint->clientSpawnTime = HUMAN_SPAWN_REPEAT_TIME;
 
-		// Respawns link directly at the validated spawn point. Live teleport runs a killbox
-		// pass first, so move slightly farther along the spawn normal to avoid telefragging
-		// the telenode itself on exact box contact.
-		VectorMA( spawn_origin, 8.0f, spawnPoint->s.origin2, teleport_origin );
-	}
-	else
-	{
-		VectorCopy( spawn_origin, teleport_origin );
-	}
+	// Respawns link directly at the validated spawn point. Live teleport runs a killbox
+	// pass first, so move slightly farther along the spawn normal to avoid telefragging
+	// the telenode itself on exact box contact.
+	VectorMA( spawn_origin, fabs( spawnPoint->r.maxs[2] - spawnPoint->r.mins[2] ), spawnPoint->s.origin2, teleport_origin );
 
 	G_TeleportPlayer( ent, VEC2GLM( teleport_origin ), VEC2GLM( spawn_angles ), 0.0f );
 }
