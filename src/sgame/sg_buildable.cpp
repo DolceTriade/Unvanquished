@@ -635,6 +635,18 @@ static int CompareBuildablesForRemoval( const void *a, const void *b )
 	// They're the same type
 	if ( buildableA->s.modelindex == buildableB->s.modelindex )
 	{
+		// First pick the one at full health so we get the full money amount.
+		bool aFull = buildableA->entity->Get<HealthComponent>()->FullHealth();
+		bool bFull = buildableB->entity->Get<HealthComponent>()->FullHealth();
+
+		if ( aFull && !bFull )
+		{
+			return -1;
+		}
+		if ( !aFull && bFull )
+		{
+			return 1;
+		}
 		// Pick the one marked earliest
 		return Math::Clamp(buildableA->entity->Get<BuildableComponent>()->GetMarkTime() -
 		                   buildableB->entity->Get<BuildableComponent>()->GetMarkTime(), -1, 1);
