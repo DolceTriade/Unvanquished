@@ -541,6 +541,12 @@ struct buildLog_t
 #define MAX_SPAWN_VARS_CHARS 4096
 #define MAX_BUILDLOG         1024
 
+struct BuilderQueue
+{
+	std::list<GentityRef> queue;
+	GentityRef current;
+};
+
 struct level_locals_t
 {
 	gclient_t *clients; // [maxclients]
@@ -689,6 +695,8 @@ struct level_locals_t
 		bool accurate;
 		bool initialized;
 	} pmoveParams;
+
+	std::array<BuilderQueue, MAX_CLIENTS> buildQueue;
 };
 
 struct commands_t

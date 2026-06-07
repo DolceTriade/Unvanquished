@@ -50,6 +50,7 @@ enum entityType_t
 	ET_ITEM,
 
 	ET_BUILDABLE,       // buildable type
+  ET_GHOST_BUILDABLE,
 
 	ET_LOCATION,
 

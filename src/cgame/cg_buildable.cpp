@@ -181,7 +181,7 @@ Called for alien buildables that are about to blow up
 */
 void CG_AlienBuildableDying( buildable_t, vec3_t origin )
 {
-	trap_S_StartSound( origin, ENTITYNUM_WORLD, soundChannel_t::CHAN_AUTO, 
+	trap_S_StartSound( origin, ENTITYNUM_WORLD, soundChannel_t::CHAN_AUTO,
 	                   ( BG_randrange( 2 ) ? cgs.media.alienBuildableDying1 : cgs.media.alienBuildableDying2));
 }
 
@@ -609,7 +609,7 @@ void CG_InitBuildables()
 
 	std::vector<std::string> suffixes;
 	suffixes.reserve(2);
-	
+
 	if ( cg_lowQualityModels.Get() )
 	{
 		suffixes.push_back( "_low" );
@@ -1193,6 +1193,104 @@ void CG_GhostBuildable( int buildableInfo )
 		// trap_R_BuildSkeleton( &ent.skeleton, cg_buildables[ buildable ].animations[ BANIM_IDLE1 ].handle, 0, 0, 0, false );
 		// CG_TransformSkeleton( &ent.skeleton, scale );
 		ent.animationHandle = cg_buildables[buildable].animations[BANIM_IDLE1].handle;
+		ent.startFrame = 0;
+		ent.endFrame = 0;
+		ent.lerp = 0;
+		ent.clearOrigin = 0;
+		ent.scale = scale;
+	}
+
+	// Apply rotation from config.
+	CG_ApplyModelRotationToAxis( VEC2GLM( bmc->modelRotation ), ent.axis );
+
+	if ( scale != 1.0f )
+	{
+		VectorScale( ent.axis[ 0 ], scale, ent.axis[ 0 ] );
+		VectorScale( ent.axis[ 1 ], scale, ent.axis[ 1 ] );
+		VectorScale( ent.axis[ 2 ], scale, ent.axis[ 2 ] );
+
+		ent.nonNormalizedAxes = true;
+	}
+	else
+	{
+		ent.nonNormalizedAxes = false;
+	}
+
+	// add to refresh list
+	trap_R_AddRefEntityToScene( &ent );
+}
+
+/*
+==================
+CG_QueuedGhostBuildable
+==================
+*/
+// draw "queued ghost" buildings, which are to be built, but not yet building.
+void CG_QueuedGhostBuildable( centity_t *cent )
+{
+	entityState_t *es = &cent->currentState;
+	vec3_t surfNormal, mins, maxs;
+	float scale;
+	buildable_t buildable = (buildable_t)es->modelindex;
+	const buildableModelConfig_t *bmc = BG_BuildableModelConfig( buildable );
+
+	refEntity_t ent{};
+	ent.renderfx = RF_FIRST_PERSON;  // Don't draw in portals
+
+	VectorCopy( es->origin2, surfNormal );
+
+	BG_BuildableBoundingBox( buildable, mins, maxs );
+
+	if ( es->pos.trType == trType_t::TR_STATIONARY )
+	{
+		// seeing as buildables rarely move, we cache the results and recalculate
+		// only if the buildable moves or changes orientation
+		if ( VectorCompare( cent->buildableCache.cachedOrigin, cent->lerpOrigin ) &&
+		     VectorCompare( cent->buildableCache.cachedAngles, cent->lerpAngles ) &&
+		     VectorCompare( cent->buildableCache.cachedNormal, surfNormal ) &&
+		     cent->buildableCache.cachedType == es->modelindex )
+		{
+			VectorCopy( cent->buildableCache.axis[ 0 ], ent.axis[ 0 ] );
+			VectorCopy( cent->buildableCache.axis[ 1 ], ent.axis[ 1 ] );
+			VectorCopy( cent->buildableCache.axis[ 2 ], ent.axis[ 2 ] );
+			VectorCopy( cent->buildableCache.origin, ent.origin );
+		}
+		else
+		{
+			CG_PositionAndOrientateBuildable( es->angles, cent->lerpOrigin, surfNormal, es->number,
+			                                  mins, maxs, ent.axis, ent.origin );
+			VectorCopy( ent.axis[ 0 ], cent->buildableCache.axis[ 0 ] );
+			VectorCopy( ent.axis[ 1 ], cent->buildableCache.axis[ 1 ] );
+			VectorCopy( ent.axis[ 2 ], cent->buildableCache.axis[ 2 ] );
+			VectorCopy( ent.origin, cent->buildableCache.origin );
+			VectorCopy( cent->lerpOrigin, cent->buildableCache.cachedOrigin );
+			VectorCopy( cent->lerpAngles, cent->buildableCache.cachedAngles );
+			VectorCopy( surfNormal, cent->buildableCache.cachedNormal );
+			cent->buildableCache.cachedType = (buildable_t)es->modelindex;
+		}
+	}
+	else
+	{
+		VectorCopy( cent->lerpOrigin, ent.origin );
+		AnglesToAxis( cent->lerpAngles, ent.axis );
+	}
+
+	// offset on the Z axis if required
+	VectorMA( ent.origin, bmc->zOffset, surfNormal, ent.origin );
+
+	VectorCopy( ent.origin, ent.oldorigin );  // don't positionally lerp at all
+
+	ent.hModel = cg_buildables[ buildable ].models[ 0 ];
+	ent.customShader = cgs.media.ghostBuildableShader;
+
+	scale = bmc->modelScale;
+	if ( !scale ) scale = 1.0f;
+
+	if ( cg_buildables[ buildable ].md5 )
+	{
+		// trap_R_BuildSkeleton( &ent.skeleton, cg_buildables[ buildable ].animations[ BANIM_IDLE1
+		// ].handle, 0, 0, 0, false ); CG_TransformSkeleton( &ent.skeleton, scale );
+		ent.animationHandle = cg_buildables[ buildable ].animations[ BANIM_IDLE1 ].handle;
 		ent.startFrame = 0;
 		ent.endFrame = 0;
 		ent.lerp = 0;

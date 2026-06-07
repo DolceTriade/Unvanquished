@@ -108,6 +108,8 @@ void              G_BuildLogAuto( gentity_t *actor, gentity_t *buildable, buildF
 void              G_BuildLogRevert( int id );
 void              G_UpdateBuildablePowerStates();
 void              G_BuildableTouchTriggers( gentity_t *ent );
+void              G_HandleClientBuildQueue( gentity_t *ent );
+void              G_ClearClientBuildQueue( gentity_t *ent );
 
 // TODO: Convert these functions to component methods.
 void ABarricade_Shrink( gentity_t *self, bool shrink );
