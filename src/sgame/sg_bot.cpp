@@ -201,6 +201,7 @@ bool G_BotSetBehavior( botMemory_t *botMind, Str::StringRef behavior )
 	G_Bot_ResetBehaviorState( *botMind );
 	botMind->blackboardTransient = 0;
 	botMind->myTimer = level.time;
+	botMind->buildCooldownUntil = 0;
 
 	botMind->behaviorTree = ReadBehaviorTree( behavior.c_str(), &treeList );
 
@@ -533,6 +534,7 @@ void G_BotSpectatorThink( gentity_t *self )
 
 	self->botMind->spawnTime = level.time;
 	self->botMind->myTimer = level.time;
+	self->botMind->buildCooldownUntil = 0;
 
 	if ( self->client->ps.pm_flags & PMF_QUEUED )
 	{
@@ -569,6 +571,7 @@ void G_BotSpectatorThink( gentity_t *self )
 	BotResetEnemyQueue( &self->botMind->enemyQueue );
 	self->botMind->enemyLastSeen = -999999;
 	self->botMind->exhausted = false;
+	self->botMind->buildCooldownUntil = 0;
 
 	//FIXME: duplicate of sg_cmds.cpp:883 function "void Cmd_Team_f( gentity_t * )"
 	if ( g_doWarmup.Get() && ( ( level.warmupTime - level.time ) / 1000 ) > 0 )

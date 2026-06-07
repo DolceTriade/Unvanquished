@@ -342,28 +342,8 @@ static AIValue_t numOurBuildings( gentity_t* self, const AIValue_t *params )
 		return AIBoxInt( 0 );
 	}
 
-	// fast track when counting spawns
-	if ( type == BA_H_SPAWN )
-	{
-		return AIBoxInt( level.team[ TEAM_HUMANS ].numSpawns );
-	}
-	else if ( type == BA_A_SPAWN )
-	{
-		return AIBoxInt( level.team[ TEAM_ALIENS ].numSpawns );
-	}
-
 	team_t team = G_Team( self );
-	int count = 0;
-	ForEntities<BuildableComponent>( [&]( Entity &ent, BuildableComponent & ) {
-		if ( ent.oldEnt->s.modelindex == type
-		     && G_Team( ent.oldEnt ) == team
-		     && Entities::IsAlive( ent ) )
-		{
-			++count;
-		}
-	});
-
-	return AIBoxInt( count );
+	return AIBoxInt( G_CountBuildablesWithGhosts( team, static_cast<buildable_t>( type ) ) );
 }
 
 static AIValue_t aliveTime( gentity_t*self, const AIValue_t* )

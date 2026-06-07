@@ -9,5 +9,5 @@ ClientComponent::ClientComponent( Entity &entity, gclient_t *clientData,
 
 void ClientComponent::HandleDie( gentity_t*, meansOfDeath_t )
 {
-	G_ClearClientBuildQueue( this->entity.oldEnt );
+	G_ClearClientBuildQueue( this->entity.oldEnt, false );
 }
