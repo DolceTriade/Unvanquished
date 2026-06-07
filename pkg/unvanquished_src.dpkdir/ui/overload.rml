@@ -1175,7 +1175,7 @@
 				'<button onclick="Cmd.exec(\'autodonate %s\')">%s</button>' ..
 				'<button onclick="Cmd.exec(\'autodonate %s\')">%s</button>' ..
 				'</div>' ..
-				'<div class="autodonate-hint"><translate>Finishes partial purchases first, buys BP bundles when your team is under BP pressure after losses, then the cheapest unlock, then a random upgrade.</translate></div>',
+				'<div class="autodonate-hint"><translate>Finishes the closest partial purchase first, buys BP when free BP is low and your base is thin, then the cheapest unlock, then a random upgrade.</translate></div>',
 				smallAmount,
 				morphPoints and "+1.0" or "+100",
 				mediumAmount,
