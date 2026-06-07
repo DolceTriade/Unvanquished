@@ -29,8 +29,7 @@ gfx/buildables/common/ghost
 {
 	{
 		map $whiteimage
-		blendfunc add
-		rgbGen const ( .2 .2 .2 )
-		alphaGen const .25
+		blendfunc blend
+		color .3, .4, .7, .2
 	}
 }

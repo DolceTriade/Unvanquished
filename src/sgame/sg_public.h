@@ -91,6 +91,7 @@ void              G_DeconstructUnprotected( gentity_t *buildable, gentity_t *ent
 bool              G_CheckDeconProtectionAndWarn( gentity_t *buildable, gentity_t *player );
 itemBuildError_t  G_CanBuild( gentity_t *ent, buildable_t buildable, int distance, vec3_t origin, vec3_t normal, int *groundEntNum );
 bool              G_BuildIfValid( gentity_t *ent, buildable_t buildable );
+int               G_CountBuildablesWithGhosts( team_t team, buildable_t buildable );
 void              G_SetBuildableAnim(gentity_t *ent, buildableAnimNumber_t animation, bool force);
 void              G_SetIdleBuildableAnim(gentity_t *ent, buildableAnimNumber_t animation);
 void              G_SpawnBuildable(gentity_t *ent, buildable_t buildable);
@@ -109,7 +110,7 @@ void              G_BuildLogRevert( int id );
 void              G_UpdateBuildablePowerStates();
 void              G_BuildableTouchTriggers( gentity_t *ent );
 void              G_HandleClientBuildQueue( gentity_t *ent );
-void              G_ClearClientBuildQueue( gentity_t *ent );
+void              G_ClearClientBuildQueue( gentity_t *ent, bool clearCurrent );
 
 // TODO: Convert these functions to component methods.
 void ABarricade_Shrink( gentity_t *self, bool shrink );

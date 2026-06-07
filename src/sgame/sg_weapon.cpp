@@ -816,6 +816,13 @@ static void FireForceDeconstruct( gentity_t *self )
 		return;
 	}
 
+	// TODO: figure out why we don't use get() here...
+	if ( self->target.entity->s.eType == entityType_t::ET_GHOST_BUILDABLE )
+	{
+		G_FreeEntity( self->target.entity );
+		return;
+	}
+
 	if ( G_DeconstructDead( self->target.entity ) )
 	{
 		return;

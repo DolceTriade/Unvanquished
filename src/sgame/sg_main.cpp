@@ -2305,6 +2305,7 @@ void G_RunFrame( int levelTime )
 	G_CheckPmoveParamChanges();
 
 	std::array<int, BA_NUM_BUILDABLES> numBuildables = {};
+	std::array<std::array<int, BA_NUM_BUILDABLES>, NUM_TEAMS> numBuildablesWithGhosts = {};
 
 	// go through all allocated objects
 	ent = &g_entities[ 0 ];
@@ -2349,6 +2350,17 @@ void G_RunFrame( int levelTime )
 				//       to G_RunThink?
 				G_Physics( ent );
 				numBuildables[ ent->s.modelindex ]++;
+				if ( ent->buildableTeam > TEAM_NONE && ent->buildableTeam < NUM_TEAMS )
+				{
+					numBuildablesWithGhosts[ ent->buildableTeam ][ ent->s.modelindex ]++;
+				}
+				continue;
+
+			case entityType_t::ET_GHOST_BUILDABLE:
+				if ( ent->buildableTeam > TEAM_NONE && ent->buildableTeam < NUM_TEAMS )
+				{
+					numBuildablesWithGhosts[ ent->buildableTeam ][ ent->s.modelindex ]++;
+				}
 				continue;
 
 			case entityType_t::ET_CORPSE:
@@ -2455,6 +2467,7 @@ void G_RunFrame( int levelTime )
 	G_BotUpdateObstacles();
 
 	level.numBuildablesEstimate = numBuildables;
+	level.numBuildablesWithGhosts = numBuildablesWithGhosts;
 
 	// update some configstrings
 	G_TransmitGameplayCvars();
