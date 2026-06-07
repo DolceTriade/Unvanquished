@@ -841,37 +841,9 @@ static void FireBuild( gentity_t *self, dynMenu_t menu )
 		return;
 	}
 
-	// can't build just yet
-	if ( self->client->ps.stats[ STAT_MISC ] > 0 )
-	{
-		G_AddEvent( self, EV_BUILD_DELAY, self->num() );
-		return;
-	}
-
 	// build
 	if ( G_BuildIfValid( self, buildable ) )
 	{
-		if ( !g_instantBuilding.Get() )
-		{
-			int buildTime = BG_Buildable( buildable )->buildTime;
-
-			switch ( G_Team( self ) )
-			{
-				case TEAM_ALIENS:
-					buildTime *= ALIEN_BUILDDELAY_MOD;
-					break;
-
-				case TEAM_HUMANS:
-					buildTime *= HUMAN_BUILDDELAY_MOD;
-					break;
-
-				case TEAM_NONE:
-					break;
-			}
-
-			self->client->ps.stats[ STAT_MISC ] += buildTime;
-		}
-
 		self->client->ps.stats[ STAT_BUILDABLE ] = BA_NONE;
 	}
 }
