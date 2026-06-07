@@ -13,13 +13,15 @@
 		#backdrop {
 			width: 100%;
 			height: 100%;
-			padding: 1.4em;
+			padding: 0.9em;
+			box-sizing: border-box;
 			background: #031316dd;
 		}
 		#shell {
 			width: 100%;
 			height: 100%;
-			padding: 1em 1.1em 1em 1.1em;
+			padding: 0.75em 0.8em 0.75em 0.8em;
+			box-sizing: border-box;
 			background: #06191cf2;
 			border-width: 1px;
 			border-color: #1a4d53;
@@ -37,6 +39,10 @@
 			flex-basis: 0%;
 			min-width: 0;
 			height: 100%;
+		}
+		#mainColumnBody {
+			height: 100%;
+			overflow-y: auto;
 			padding-right: 0.45em;
 			box-sizing: border-box;
 		}
@@ -68,11 +74,26 @@
 		}
 
 		.controls {
-			margin-bottom: 0.8em;
-			padding: 0.7em 0.8em;
+			margin-bottom: 0.55em;
+			padding: 0.55em 0.65em;
 			background: #0c2428cc;
 			border-width: 1px;
 			border-color: #184147;
+		}
+		.controls-layout {
+			display: flex;
+			align-items: flex-start;
+			gap: 0.45em;
+		}
+		.controls-main {
+			flex-grow: 3;
+			flex-shrink: 1;
+			flex-basis: 0%;
+			min-width: 0;
+		}
+		.controls-side {
+			width: 19em;
+			min-width: 19em;
 		}
 		.control-header {
 			display: flex;
@@ -82,17 +103,18 @@
 			margin-bottom: 0.45em;
 		}
 		.filter-row {
-			margin-bottom: 0.45em;
+			margin-bottom: 0.25em;
 		}
 		.filter-label {
 			display: inline-block;
-			width: 4.4em;
+			width: 3.7em;
 			color: #8abdc2;
+			font-size: 0.92em;
 		}
 		.controls button {
-			margin-right: 0.45em;
-			margin-bottom: 0.35em;
-			padding: 0.28em 0.7em;
+			margin-right: 0.35em;
+			margin-bottom: 0.25em;
+			padding: 0.22em 0.56em;
 			background: #12373d;
 			color: #dfffff;
 		}
@@ -101,8 +123,7 @@
 			color: #ffffff;
 		}
 		.autodonate-panel {
-			margin-top: 0.75em;
-			padding: 0.75em 0.8em 0.7em 0.8em;
+			padding: 0.45em 0.55em 0.42em 0.55em;
 			background: #10303699;
 			border-top-width: 1px;
 			border-top-color: #184147;
@@ -110,27 +131,31 @@
 			border-color: #1d4a50;
 		}
 		.autodonate-title {
-			margin-bottom: 0.42em;
+			margin-bottom: 0.25em;
 			color: #9efcff;
-			font-size: 0.92em;
+			font-size: 0.86em;
 		}
 		.autodonate-actions {
-			margin-bottom: 0.18em;
+			margin-bottom: 0.12em;
+		}
+		.autodonate-actions button {
+			margin-right: 0.22em;
+			margin-bottom: 0.16em;
 		}
 		.autodonate-hint {
-			margin-top: 0.28em;
+			margin-top: 0.12em;
 			color: #7ba8ac;
-			font-size: 0.82em;
+			font-size: 0.72em;
 		}
 		#searchFilter {
 			display: inline-block;
-			width: 18em;
+			width: 12em;
 			border-width: 1px;
 			border-color: #235359;
 		}
 		.currency-panel {
 			display: inline-block;
-			padding: 0.32em 0.65em;
+			padding: 0.26em 0.55em;
 			background: #10343a;
 			border-width: 1px;
 			border-color: #2c6b72;
@@ -143,11 +168,11 @@
 		.currency-label {
 			color: #9fd6da;
 			text-transform: uppercase;
-			font-size: 0.82em;
+			font-size: 0.76em;
 		}
 
 		#detailPanel {
-			padding: 0.75em;
+			padding: 0.65em;
 			background: #0d2429f2;
 			border-width: 1px;
 			border-color: #24535a;
@@ -265,13 +290,11 @@
 		}
 
 		#content {
-			height: 74%;
-			overflow-y: auto;
-			padding-right: 1.2em;
+			overflow: visible;
 		}
 		.section {
-			margin-bottom: 0.8em;
-			padding: 0.75em;
+			margin-bottom: 0.55em;
+			padding: 0.6em;
 			background: #091d21d9;
 			border-width: 1px;
 			border-color: #14383d;
@@ -286,7 +309,7 @@
 		}
 
 		.group-section {
-			margin-bottom: 0.95em;
+			margin-bottom: 0.7em;
 		}
 		.group-header {
 			display: flex;
@@ -315,11 +338,11 @@
 		.progress-grid {
 			display: flex;
 			flex-wrap: wrap;
-			gap: 0.5em;
+			gap: 0.38em;
 		}
 		.progress-card {
-			width: 14.6em;
-			padding: 0.55em;
+			width: 12.8em;
+			padding: 0.42em;
 			background: #0d2429;
 			border-width: 1px;
 			border-color: #1f5058;
@@ -347,13 +370,13 @@
 		.progress-header {
 			display: flex;
 			align-items: center;
-			margin-bottom: 0.48em;
+			margin-bottom: 0.34em;
 		}
 		.progress-icon {
-			width: 3em;
-			height: 3em;
-			padding: 0.2em;
-			margin-right: 1em;
+			width: 2.5em;
+			height: 2.5em;
+			padding: 0.16em;
+			margin-right: 0.55em;
 			background: #102f35;
 			border-width: 1px;
 			border-color: #2e6970;
@@ -364,59 +387,59 @@
 		}
 		.progress-summary {
 			display: inline-block;
-			width: 9.45em;
+			width: 8.7em;
 			vertical-align: top;
 		}
 		.progress-name {
-			margin: 0 0 0.18em 0;
+			margin: 0 0 0.12em 0;
 			color: #ffffff;
-			font-size: 0.92em;
+			font-size: 0.84em;
 			white-space: normal;
 			word-break: break-word;
 		}
 		.progress-status {
 			color: #9ad8de;
-			font-size: 0.78em;
+			font-size: 0.72em;
 		}
 		.progress-meta {
-			margin-top: 0.22em;
+			margin-top: 0.16em;
 			color: #7fb8bd;
-			font-size: 0.72em;
+			font-size: 0.67em;
 			white-space: normal;
 			word-break: break-word;
 		}
 		.progress-rings {
 			display: flex;
 			flex-wrap: wrap;
-			gap: 0.45em;
-			margin-top: 0.45em;
+			gap: 0.3em;
+			margin-top: 0.32em;
 		}
 		.progress-ring {
-			width: 3.1em;
+			width: 2.45em;
 			text-align: center;
 		}
 		donutprogress.mini-donut {
 			display: block;
-			width: 2.6em;
-			height: 2.6em;
+			width: 2.15em;
+			height: 2.15em;
 			margin-left: auto;
 			margin-right: auto;
-			innerRadius: 0.72em;
-			outerRadius: 1.02em;
+			innerRadius: 0.6em;
+			outerRadius: 0.86em;
 			color: #8fd4db;
 		}
 		.progress-ring-label {
-			margin-top: 0.16em;
+			margin-top: 0.1em;
 			color: #b7e6ea;
-			font-size: 0.66em;
+			font-size: 0.6em;
 			white-space: normal;
 			word-break: break-word;
 		}
 		.progress-line {
 			display: block;
-			margin-top: 0.24em;
+			margin-top: 0.14em;
 			color: #9ed2d7;
-			font-size: 0.72em;
+			font-size: 0.66em;
 			white-space: normal;
 			word-break: break-word;
 		}
@@ -1175,7 +1198,7 @@
 				'<button onclick="Cmd.exec(\'autodonate %s\')">%s</button>' ..
 				'<button onclick="Cmd.exec(\'autodonate %s\')">%s</button>' ..
 				'</div>' ..
-				'<div class="autodonate-hint"><translate>Finishes the closest partial purchase first, buys BP when free BP is low and your base is thin, then the cheapest unlock, then a random upgrade.</translate></div>',
+				'<div class="autodonate-hint"><translate>BP first when base pressure is high, otherwise closest partial, then unlocks, then upgrades.</translate></div>',
 				smallAmount,
 				morphPoints and "+1.0" or "+100",
 				mediumAmount,
@@ -1224,32 +1247,40 @@
 			<div id="shell">
 				<div id="workspace">
 					<div id="mainColumn">
-						<div class="headerbar">
-							<h1><translate>Overload</translate></h1>
-							<p class="subtitle"><translate>Fund team progression by buying bundles, unlocks, and upgrades at the main structure.</translate></p>
-							<p class="hint"><translate>Press ESC or right click to close.</translate></p>
-						</div>
-						<div class="controls">
-							<div class="control-header">
-								<div class="currency-panel"><span id="currencyValue"><credits/></span>&nbsp;<span class="currency-label" id="currencyLabel">credits</span></div>
+						<div id="mainColumnBody">
+							<div class="headerbar">
+								<h1><translate>Overload</translate></h1>
+								<p class="subtitle"><translate>Fund team progression by buying bundles, unlocks, and upgrades at the main structure.</translate></p>
+								<p class="hint"><translate>Press ESC or right click to close.</translate></p>
 							</div>
-							<div class="filter-row">
-								<span class="filter-label"><translate>Show</translate></span>
-								<button id="filterAvailable" onclick="OverloadSetFilter('available', document)"><translate>Available</translate></button>
-								<button id="filterProgress" onclick="OverloadSetFilter('progress', document)"><translate>In Progress</translate></button>
-								<button id="filterDone" onclick="OverloadSetFilter('done', document)"><translate>Completed</translate></button>
-								<button id="filterAll" onclick="OverloadSetFilter('all', document)"><translate>All</translate></button>
+							<div class="controls">
+								<div class="controls-layout">
+									<div class="controls-main">
+										<div class="control-header">
+											<div class="currency-panel"><span id="currencyValue"><credits/></span>&nbsp;<span class="currency-label" id="currencyLabel">credits</span></div>
+										</div>
+										<div class="filter-row">
+											<span class="filter-label"><translate>Show</translate></span>
+											<button id="filterAvailable" onclick="OverloadSetFilter('available', document)"><translate>Available</translate></button>
+											<button id="filterProgress" onclick="OverloadSetFilter('progress', document)"><translate>In Progress</translate></button>
+											<button id="filterDone" onclick="OverloadSetFilter('done', document)"><translate>Completed</translate></button>
+											<button id="filterAll" onclick="OverloadSetFilter('all', document)"><translate>All</translate></button>
+										</div>
+										<div class="filter-row">
+											<span class="filter-label"><translate>Search</translate></span>
+											<input id="searchFilter" type="text" class="text" value="" onkeyup="OverloadSetSearchFilter(event.target_element, document)" placeholder="Filter upgrades, unlocks, or items"/>
+										</div>
+									</div>
+									<div class="controls-side">
+										<div class="autodonate-panel" id="autoDonatePanel"></div>
+									</div>
+								</div>
 							</div>
-							<div class="filter-row">
-								<span class="filter-label"><translate>Search</translate></span>
-								<input id="searchFilter" type="text" class="text" value="" onkeyup="OverloadSetSearchFilter(event.target_element, document)" placeholder="Filter upgrades, unlocks, or items"/>
-							</div>
-							<div class="autodonate-panel" id="autoDonatePanel"></div>
-						</div>
-						<div id="content">
-							<div class="section">
-								<div class="section-title"><translate>Progression</translate></div>
-								<div id="progressionRows"></div>
+							<div id="content">
+								<div class="section">
+									<div class="section-title"><translate>Progression</translate></div>
+									<div id="progressionRows"></div>
+								</div>
 							</div>
 						</div>
 					</div>
