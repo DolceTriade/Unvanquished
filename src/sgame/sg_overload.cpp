@@ -1211,9 +1211,9 @@ static void BuildOverloadCatalog()
 	// Alien lifeforms: advanced granger, dretch, mantis, marauder, advanced marauder, dragoon, advanced dragoon, tyrant.
 	AddClassUnlock( TEAM_ALIENS, PCL_ALIEN_BUILDER0_UPG );
 	AddUpgrade( TEAM_ALIENS, DefaultUpgradeBaseCost( 0 ), DefaultUpgradeStepCost( 0 ), OVERLOAD_UNCAPPED_RANKS, "level0", "Dretch", "damage", "damage", "Dretch Damage", "Increase dretch bite damage.",
-	            { GameplayEffect( "LEVEL0_BITE_DMG", 3.0 ) } );
+	            { GameplayEffect( "LEVEL0_BITE_DMG", 5.0 ) } );
 	AddUpgrade( TEAM_ALIENS, DefaultUpgradeBaseCost( 0 ), DefaultUpgradeStepCost( 0 ), OVERLOAD_UNCAPPED_RANKS, "level1", "Mantis", "damage", "damage", "Mantis Damage", "Increase mantis claw damage.",
-	            { GameplayEffect( "LEVEL1_CLAW_DMG", 4.0 ) } );
+	            { GameplayEffect( "LEVEL1_CLAW_DMG", 6.0 ) } );
 	AddClassUnlock( TEAM_ALIENS, PCL_ALIEN_LEVEL2 );
 	AddClassUnlock( TEAM_ALIENS, PCL_ALIEN_LEVEL2_UPG );
 	AddClassUnlock( TEAM_ALIENS, PCL_ALIEN_LEVEL3 );
