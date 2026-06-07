@@ -37,6 +37,7 @@ bool overloadCatalogReady = false;
 static void BuildOverloadCatalog();
 static int FindUnlockThresholdField( bgAttributeFamily_t family );
 static int OverloadNextCost( const overloadPurchaseDef_t& entry, int entryIndex, team_t team );
+static int AutoDonateSpendCapacity( team_t team, int purchaseIndex );
 
 
 static bool OverloadEntryMatchesTeam( team_t team, int purchaseIndex )
@@ -94,6 +95,61 @@ static bool OverloadEntryIsUpgrade( team_t team, int purchaseIndex )
 	       overloadPurchases[ purchaseIndex ].kind == overloadPurchaseKind_t::UPGRADE;
 }
 
+static bool TeamHasEstimatedBuildable( buildable_t buildable )
+{
+	return level.numBuildablesEstimate[ buildable ] > 0;
+}
+
+static int TeamAliveBuildableValue( team_t team )
+{
+	int total = 0;
+
+	for ( int buildable = BA_NONE + 1; buildable < BA_NUM_BUILDABLES; ++buildable )
+	{
+		const buildableAttributes_t* attributes = BG_Buildable( buildable );
+		if ( !attributes || attributes->team != team )
+		{
+			continue;
+		}
+
+		total += level.numBuildablesEstimate[ buildable ] * attributes->buildPoints;
+	}
+
+	return total;
+}
+
+static bool TeamNeedsAutoDonateBP( team_t team )
+{
+	static constexpr int OVERLOAD_AUTODONATE_BP_LOW_FREE_THRESHOLD = 10;
+	static constexpr int OVERLOAD_AUTODONATE_BP_LOW_BASE_THRESHOLD = 75;
+	static constexpr int OVERLOAD_AUTODONATE_BP_LOW_SPAWN_THRESHOLD = 2;
+
+	if ( G_GetFreeBudget( team ) >= OVERLOAD_AUTODONATE_BP_LOW_FREE_THRESHOLD )
+	{
+		return false;
+	}
+
+	if ( level.team[ team ].numSpawns < OVERLOAD_AUTODONATE_BP_LOW_SPAWN_THRESHOLD )
+	{
+		return true;
+	}
+
+	if ( team == TEAM_HUMANS &&
+	     ( !TeamHasEstimatedBuildable( BA_H_ARMOURY ) ||
+	       !TeamHasEstimatedBuildable( BA_H_MEDISTAT ) ) )
+	{
+		return true;
+	}
+
+	if ( team == TEAM_ALIENS && BG_BuildableUnlocked( BA_A_BOOSTER ) &&
+	     !TeamHasEstimatedBuildable( BA_A_BOOSTER ) )
+	{
+		return true;
+	}
+
+	return TeamAliveBuildableValue( team ) < OVERLOAD_AUTODONATE_BP_LOW_BASE_THRESHOLD;
+}
+
 static int FindAutoDonatePartialPurchase( team_t team )
 {
 	int bestPurchaseIndex = -1;
@@ -106,7 +162,7 @@ static int FindAutoDonatePartialPurchase( team_t team )
 			continue;
 		}
 
-		const int remaining = RemainingSpendCapacity( overloadPurchases[ i ], i, team );
+		const int remaining = AutoDonateSpendCapacity( team, i );
 		if ( remaining > 0 && remaining < bestRemaining )
 		{
 			bestPurchaseIndex = i;
@@ -117,46 +173,9 @@ static int FindAutoDonatePartialPurchase( team_t team )
 	return bestPurchaseIndex;
 }
 
-static bool AutoDonateBuildablesRecentlyKilled( team_t team )
-{
-	static constexpr int OVERLOAD_AUTODONATE_BP_AFTER_DESTRUCTION_WINDOW = 30000;
-
-	for ( int i = 0; i < level.numBuildLogs; ++i )
-	{
-		const buildLog_t& log = level.buildLog[ ( level.buildId - i - 1 ) % MAX_BUILDLOG ];
-		if ( level.time - log.time > OVERLOAD_AUTODONATE_BP_AFTER_DESTRUCTION_WINDOW )
-		{
-			return false;
-		}
-
-		if ( log.buildableTeam != team )
-		{
-			continue;
-		}
-
-		switch ( log.fate )
-		{
-			case BF_DESTROY:
-			case BF_TEAMKILL:
-				return true;
-
-			case BF_AUTO:
-			case BF_CONSTRUCT:
-			case BF_DECONSTRUCT:
-			case BF_REPLACE:
-				break;
-		}
-	}
-
-	return false;
-}
-
 static int FindAutoDonateBPPurchase( team_t team )
 {
-	static constexpr int OVERLOAD_AUTODONATE_BP_PRESSURE_THRESHOLD = 20;
-
-	if ( G_GetFreeBudget( team ) >= OVERLOAD_AUTODONATE_BP_PRESSURE_THRESHOLD ||
-	     !AutoDonateBuildablesRecentlyKilled( team ) )
+	if ( !TeamNeedsAutoDonateBP( team ) )
 	{
 		return -1;
 	}
@@ -218,16 +237,16 @@ static int FindAutoDonateUpgradePurchase( team_t team )
 
 static int FindAutoDonatePurchase( team_t team )
 {
-	const int partialPurchase = FindAutoDonatePartialPurchase( team );
-	if ( partialPurchase >= 0 )
-	{
-		return partialPurchase;
-	}
-
 	const int bpPurchase = FindAutoDonateBPPurchase( team );
 	if ( bpPurchase >= 0 )
 	{
 		return bpPurchase;
+	}
+
+	const int partialPurchase = FindAutoDonatePartialPurchase( team );
+	if ( partialPurchase >= 0 )
+	{
+		return partialPurchase;
 	}
 
 	const int unlockPurchase = FindAutoDonateUnlockPurchase( team );
@@ -247,7 +266,8 @@ static int AutoDonateSpendCapacity( team_t team, int purchaseIndex )
 	}
 
 	const overloadPurchaseDef_t& entry = overloadPurchases[ purchaseIndex ];
-	if ( entry.kind == overloadPurchaseKind_t::BP_BUNDLE )
+	if ( entry.kind == overloadPurchaseKind_t::BP_BUNDLE ||
+	     entry.kind == overloadPurchaseKind_t::UPGRADE )
 	{
 		const int invested = TeamEconomy( team ).investedCredits[ purchaseIndex ];
 		return std::max( 0, OverloadNextCost( entry, purchaseIndex, team ) - invested );
