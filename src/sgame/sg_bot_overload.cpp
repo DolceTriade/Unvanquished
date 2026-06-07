@@ -62,6 +62,11 @@ void G_BotOverloadThink( gentity_t *ent )
 		return;
 	}
 
+	if ( !G_ActiveMainBuildable( team ) )
+	{
+		return;
+	}
+
 	std::string error;
 	if ( !G_OverloadAutoDonate( ent, std::min( spendableCredits, OVERLOAD_BOT_SPEND_CHUNK ), &error ) )
 	{
