@@ -1554,6 +1554,7 @@ struct cgMedia_t
 	qhandle_t             yellowBuildShader;
 	qhandle_t             redBuildShader;
 	qhandle_t             humanConstructingShader;
+	qhandle_t             ghostBuildableShader;
 
 	qhandle_t             sphereModel;
 	qhandle_t             sphericalCone64Model;
@@ -2045,6 +2046,7 @@ void        CG_InitClasses();
 // cg_buildable.cpp
 void     CG_GhostBuildable( int buildableInfo );
 void     CG_Buildable( centity_t *cent );
+void     CG_QueuedGhostBuildable( centity_t *cent );
 void     CG_BuildableStatusParse( const char *filename, buildStat_t *bs );
 void     CG_DrawBuildableStatus();
 void     CG_InitBuildables();

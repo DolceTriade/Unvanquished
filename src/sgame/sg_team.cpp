@@ -265,6 +265,8 @@ void G_LeaveTeam( gentity_t *self )
 		}
 	}
 
+	G_ClearClientBuildQueue( self );
+
 	trap_UnlinkEntity( self );
 
 	// cut all relevant zap beams
