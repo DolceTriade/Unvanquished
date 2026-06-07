@@ -1225,7 +1225,7 @@ static void BuildOverloadCatalog()
 	// No weapon overload upgrades should live outside this block.
 
 	// Human weapons: stage 1 / always available.
-	AddUpgrade( TEAM_HUMANS, DefaultUpgradeBaseCost( 0 ), DefaultUpgradeStepCost( 0 ), OVERLOAD_UNCAPPED_RANKS, "rifle", "Rifle", "damage", "damage", "Rifle Damage", "Increase rifle damage.",
+	AddUpgrade( TEAM_HUMANS, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), DefaultUpgradeStepCost( 0 ), OVERLOAD_UNCAPPED_RANKS, "rifle", "Rifle", "damage", "damage", "Rifle Damage", "Increase rifle damage.",
 	            { GameplayEffect( "RIFLE_DMG", 2.0 ) } );
 	AddUpgrade( TEAM_HUMANS, DefaultUpgradeBaseCost( 0 ), DefaultUpgradeStepCost( 0 ), OVERLOAD_UNCAPPED_RANKS, "rifle", "Rifle", "ammo", "ammo", "Rifle Ammo", "Increase rifle ammo reserve.",
 	            { AttributeEffect( BG_ATTR_WEAPON, "rifle", "ammo", 10.0, 1.0 ) } );
