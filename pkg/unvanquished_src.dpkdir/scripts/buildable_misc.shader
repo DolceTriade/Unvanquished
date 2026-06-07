@@ -24,3 +24,13 @@ gfx/buildables/common/yellowbuild
 		rgbGen identity
 	}
 }
+
+gfx/buildables/common/ghost
+{
+	{
+		map $whiteimage
+		blendfunc add
+		rgbGen const ( .2 .2 .2 )
+		alphaGen const .25
+	}
+}

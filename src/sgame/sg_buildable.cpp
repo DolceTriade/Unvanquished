@@ -769,16 +769,6 @@ void G_DeconstructUnprotected( gentity_t *buildable, gentity_t *ent )
 	{
 		// Check if the buildable is protected from instant deconstruction.
 		G_CheckDeconProtectionAndWarn( buildable, ent );
-
-		// Deny if build timer active.
-		if ( ent->client->ps.stats[ STAT_MISC ] > 0 )
-		{
-			G_AddEvent( ent, EV_BUILD_DELAY, ent->client->ps.clientNum );
-			return;
-		}
-
-		// Add to build timer.
-		ent->client->ps.stats[ STAT_MISC ] += BG_Buildable( buildable->s.modelindex )->buildTime / 4;
 	}
 
 	G_Deconstruct( buildable, ent, MOD_DECONSTRUCT );
@@ -1142,32 +1132,50 @@ static void SetBuildableMarkedLinkState( bool link )
 	}
 }
 
-itemBuildError_t G_CanBuild( gentity_t *ent, buildable_t buildable, int /*distance*/, //TODO
-                             vec3_t origin, vec3_t normal, int *groundEntNum )
+static void ComputePlayerBuildPlacement( gentity_t *builder, buildable_t buildable,
+                                         vec3_t origin, vec3_t normal, int *groundEntNum )
 {
-	vec3_t           angles;
-	vec3_t           entity_origin;
+	vec3_t        angles;
+	vec3_t        mins, maxs;
+	trace_t       surfaceTrace;
+	playerState_t *ps = &builder->client->ps;
+
+	BG_BuildableBoundingBox( buildable, mins, maxs );
+	BG_PositionBuildableRelativeToPlayer( ps, mins, maxs, trap_Trace, origin, angles, &surfaceTrace );
+
+	*groundEntNum = surfaceTrace.entityNum;
+	VectorCopy( surfaceTrace.plane.normal, normal );
+}
+
+static itemBuildError_t ValidateBuildPlacement( gentity_t *builder, buildable_t buildable,
+                                                const vec3_t origin, const vec3_t normal,
+                                                gentity_t *ignoredEntity )
+{
 	vec3_t           mins, maxs;
-	trace_t          tr1, tr2, tr3;
+	vec3_t           replacementOrigin;
+	vec3_t           surfaceTraceStart, surfaceTraceEnd;
+	trace_t          surfaceTrace, occupancyTrace, lineTrace;
 	itemBuildError_t reason = IBE_NONE;
 	gentity_t        *tempent;
 	float            minNormal;
-	bool         invert;
+	bool             invert;
 	int              contents;
-	playerState_t    *ps = &ent->client->ps;
 
 	// Stop all buildables from interacting with traces
 	SetBuildableLinkState( false );
 
 	BG_BuildableBoundingBox( buildable, mins, maxs );
 
-	BG_PositionBuildableRelativeToPlayer( ps, mins, maxs, trap_Trace, entity_origin, angles, &tr1 );
-	trap_Trace( &tr2, entity_origin, mins, maxs, entity_origin, ENTITYNUM_NONE, MASK_PLAYERSOLID, 0 );
-	trap_Trace( &tr3, ps->origin, nullptr, nullptr, entity_origin, ent->num(), MASK_PLAYERSOLID, 0 );
+	VectorMA( origin, 32.0f, normal, surfaceTraceStart );
+	VectorMA( origin, -128.0f, normal, surfaceTraceEnd );
+	trap_Trace( &surfaceTrace, surfaceTraceStart, mins, maxs, surfaceTraceEnd,
+	            builder->client->ps.clientNum, MASK_DEADSOLID, 0 );
+	// HACK: We abuse CONTENTS_ITEM for ghost buildables so ensure we can't build over them.
+	trap_Trace( &occupancyTrace, origin, mins, maxs, origin,
+	            ignoredEntity ? ignoredEntity->num() : ENTITYNUM_NONE, MASK_PLAYERSOLID | CONTENTS_ITEM, 0 );
+	trap_Trace( &lineTrace, builder->client->ps.origin, nullptr, nullptr, origin,
+	            builder->num(), MASK_PLAYERSOLID, 0 );
 
-	VectorCopy( entity_origin, origin );
-	*groundEntNum = tr1.entityNum;
-	VectorCopy( tr1.plane.normal, normal );
 	minNormal = BG_Buildable( buildable )->minNormal;
 	invert = BG_Buildable( buildable )->invertNormal;
 
@@ -1177,20 +1185,21 @@ itemBuildError_t G_CanBuild( gentity_t *ent, buildable_t buildable, int /*distan
 		reason = IBE_NORMAL;
 	}
 
-	if ( tr1.entityNum != ENTITYNUM_WORLD )
+	if ( surfaceTrace.entityNum != ENTITYNUM_WORLD )
 	{
 		reason = IBE_NORMAL;
 	}
 
-	contents = G_CM_PointContents( entity_origin, -1 );
+	contents = G_CM_PointContents( origin, -1 );
+	VectorCopy( origin, replacementOrigin );
 
 	// Prepare replacement of other buildables.
 	itemBuildError_t replacementError;
-	if ( ( replacementError = PrepareBuildableReplacement( buildable, origin ) ) != IBE_NONE )
+	if ( ( replacementError = PrepareBuildableReplacement( buildable, replacementOrigin ) ) != IBE_NONE )
 	{
 		reason = replacementError;
 	}
-	else if ( ent->client->pers.team == TEAM_ALIENS )
+	else if ( builder->client->pers.team == TEAM_ALIENS )
 	{
 		// Check for Overmind
 		if ( buildable != BA_A_OVERMIND )
@@ -1202,7 +1211,8 @@ itemBuildError_t G_CanBuild( gentity_t *ent, buildable_t buildable, int /*distan
 		}
 
 		// Check surface permissions
-		bool invalid = (tr1.contents & (CUSTOM_CONTENTS_NOALIENBUILD | CUSTOM_CONTENTS_NOBUILD)) || (contents & (CUSTOM_CONTENTS_NOALIENBUILD | CUSTOM_CONTENTS_NOBUILD));
+		bool invalid = (surfaceTrace.contents & (CUSTOM_CONTENTS_NOALIENBUILD | CUSTOM_CONTENTS_NOBUILD)) ||
+		               (contents & (CUSTOM_CONTENTS_NOALIENBUILD | CUSTOM_CONTENTS_NOBUILD));
 		if ( invalid && !g_ignoreNobuild.Get() )
 		{
 			reason = IBE_SURFACE;
@@ -1214,7 +1224,7 @@ itemBuildError_t G_CanBuild( gentity_t *ent, buildable_t buildable, int /*distan
 			reason = IBE_DISABLED;
 		}
 	}
-	else if ( ent->client->pers.team == TEAM_HUMANS )
+	else if ( builder->client->pers.team == TEAM_HUMANS )
 	{
 		// Check for Reactor
 		if ( buildable != BA_H_REACTOR )
@@ -1226,7 +1236,8 @@ itemBuildError_t G_CanBuild( gentity_t *ent, buildable_t buildable, int /*distan
 		}
 
 		// Check permissions
-		bool invalid = (tr1.contents & (CUSTOM_CONTENTS_NOHUMANBUILD | CUSTOM_CONTENTS_NOBUILD)) || (contents & (CUSTOM_CONTENTS_NOHUMANBUILD | CUSTOM_CONTENTS_NOBUILD));
+		bool invalid = (surfaceTrace.contents & (CUSTOM_CONTENTS_NOHUMANBUILD | CUSTOM_CONTENTS_NOBUILD)) ||
+		               (contents & (CUSTOM_CONTENTS_NOHUMANBUILD | CUSTOM_CONTENTS_NOBUILD));
 		if ( invalid && !g_ignoreNobuild.Get() )
 		{
 			reason = IBE_SURFACE;
@@ -1297,7 +1308,7 @@ itemBuildError_t G_CanBuild( gentity_t *ent, buildable_t buildable, int /*distan
 	}
 
 	//this item does not fit here
-	if ( tr2.fraction < 1.0f || tr3.fraction < 1.0f )
+	if ( occupancyTrace.fraction < 1.0f || lineTrace.fraction < 1.0f )
 	{
 		reason = IBE_NOROOM;
 	}
@@ -1308,6 +1319,51 @@ itemBuildError_t G_CanBuild( gentity_t *ent, buildable_t buildable, int /*distan
 	}
 
 	return reason;
+}
+
+itemBuildError_t G_CanBuild( gentity_t *ent, buildable_t buildable, int /*distance*/, //TODO
+                             vec3_t origin, vec3_t normal, int *groundEntNum )
+{
+	ComputePlayerBuildPlacement( ent, buildable, origin, normal, groundEntNum );
+	return ValidateBuildPlacement( ent, buildable, origin, normal, nullptr );
+}
+
+static dynMenu_t BuildFailureMenu( itemBuildError_t reason )
+{
+	switch ( reason )
+	{
+		case IBE_NOALIENBP:     return MN_A_NOBP;
+		case IBE_NOOVERMIND:    return MN_A_NOOVMND;
+		case IBE_ONEOVERMIND:   return MN_A_ONEOVERMIND;
+		case IBE_NOMORELEECHES: return MN_A_NOMORELEECHES;
+		case IBE_NORMAL:
+		case IBE_SURFACE:       return MN_B_NORMAL;
+		case IBE_DISABLED:      return MN_B_DISABLED;
+		case IBE_ONEREACTOR:    return MN_H_ONEREACTOR;
+		case IBE_NOREACTOR:     return MN_H_NOREACTOR;
+		case IBE_NOMOREDRILLS:  return MN_H_NOMOREDRILLS;
+		case IBE_NOROOM:        return MN_B_NOROOM;
+		case IBE_NOHUMANBP:     return MN_H_NOBP;
+		case IBE_LASTSPAWN:     return MN_B_LASTSPAWN;
+		case IBE_MAINSTRUCTURE: return MN_B_MAINSTRUCTURE;
+		default:                return MN_NONE;
+	}
+}
+
+static void SendBuildFailureFeedback( gentity_t *builder, itemBuildError_t reason )
+{
+	dynMenu_t menu;
+
+	if ( !builder || !builder->client || reason == IBE_NONE )
+	{
+		return;
+	}
+
+	menu = BuildFailureMenu( reason );
+	if ( menu != MN_NONE )
+	{
+		G_TriggerMenu( builder->client->ps.clientNum, menu );
+	}
 }
 
 /** Sets shared buildable entity parameters. */
@@ -1415,6 +1471,71 @@ static void BuildableSpawnCBSE(gentity_t *ent, buildable_t buildable) {
 		default:
 			ASSERT_UNREACHABLE();
 	}
+}
+
+static gentity_t *QueueBuildable( gentity_t *builder, buildable_t buildable,
+                                  const glm::vec3 &origin, const vec3_t normal, const vec3_t angles,
+                                  int groundEntNum )
+{
+	// TODO: refactor into shared helpers with SpawnBuildable.
+	gentity_t *queued;
+	const buildableAttributes_t *attr = BG_Buildable( buildable );
+
+	if ( !builder || !builder->client )
+	{
+		Log::Warn( "Tried to queue buildable %s without a builder!", BG_Buildable( buildable )->name );
+		return nullptr;
+	}
+
+	queued = G_NewEntity( NO_CBSE );
+
+	queued->s.eType = entityType_t::ET_GHOST_BUILDABLE;
+	// HACK: Abuse CONTENTS_ITEM to ensure you can't build over a ghost buildable,
+	// but also you can walk through them.
+	queued->r.contents = CONTENTS_ITEM;
+	queued->killedBy = ENTITYNUM_NONE;
+	queued->classname = BG_strdup( attr->entityName );
+	queued->s.modelindex = buildable;
+	queued->s.modelindex2 = attr->team;
+	queued->buildableTeam = (team_t) queued->s.modelindex2;
+	BG_BuildableBoundingBox( buildable, queued->r.mins, queued->r.maxs );
+
+	queued->s.time = queued->creationTime;
+
+	queued->target     = nullptr;
+	queued->s.weapon   = attr->weapon;
+
+	queued->builtBy = builder->client->pers.namelog;
+
+	G_SetOrigin( queued, origin );
+
+	// HACK: These are preliminary angles. The real angles of the model are calculated client side.
+	// TODO: Use proper angles with respect to the world?
+	queued->s.angles[ PITCH ] = 0.0f;
+	queued->s.angles[ YAW ] = angles[ YAW ];
+	queued->s.angles[ ROLL ] = angles[ ROLL ];
+
+	// Turret angles.
+	VectorClear( queued->s.angles2 );
+
+	queued->physicsBounce = attr->bounce;
+
+	queued->s.groundEntityNum = groundEntNum;
+	if ( groundEntNum == ENTITYNUM_NONE )
+	{
+		queued->s.pos.trType = attr->traj;
+		queued->s.pos.trTime = level.time;
+		// gently nudge the buildable onto the surface :)
+		VectorScale( normal, -50.0f, queued->s.pos.trDelta );
+	}
+
+	VectorCopy( normal, queued->s.origin2 );
+
+	trap_LinkEntity( queued );
+
+	level.buildQueue[ builder->num() ].queue.emplace_back( queued );
+
+	return queued;
 }
 
 static gentity_t *SpawnBuildable( gentity_t *builder, buildable_t buildable, const glm::vec3 &origin,
@@ -1660,6 +1781,7 @@ bool G_BuildIfValid( gentity_t *ent, buildable_t buildable )
 	vec3_t origin, normal;
 	int    groundEntNum;
 	vec3_t forward, aimDir;
+	itemBuildError_t reason;
 
 	BG_GetClientNormal( &ent->client->ps, normal);
 	AngleVectors( ent->client->ps.viewangles, aimDir, nullptr, nullptr );
@@ -1667,73 +1789,23 @@ bool G_BuildIfValid( gentity_t *ent, buildable_t buildable )
 	VectorNormalize( forward );
 	dist = BG_Class( ent->client->ps.stats[ STAT_CLASS ] )->buildDist * DotProduct( forward, aimDir );
 
-	switch ( G_CanBuild( ent, buildable, dist, origin, normal, &groundEntNum ) )
+	reason = G_CanBuild( ent, buildable, dist, origin, normal, &groundEntNum );
+
+	if ( reason == IBE_NONE )
 	{
-		case IBE_NONE:
+		if ( g_instantBuilding.Get() )
+		{
 			SpawnBuildable( ent, buildable, VEC2GLM(origin), normal, ent->s.apos.trBase, groundEntNum );
 			G_SpendBudget( BG_Buildable( buildable )->team, BG_Buildable( buildable )->buildPoints );
-			return true;
-
-		case IBE_NOALIENBP:
-			G_TriggerMenu( ent->client->ps.clientNum, MN_A_NOBP );
-			return false;
-
-		case IBE_NOOVERMIND:
-			G_TriggerMenu( ent->client->ps.clientNum, MN_A_NOOVMND );
-			return false;
-
-		case IBE_ONEOVERMIND:
-			G_TriggerMenu( ent->client->ps.clientNum, MN_A_ONEOVERMIND );
-			return false;
-
-		case IBE_NOMORELEECHES:
-			G_TriggerMenu( ent->client->ps.clientNum, MN_A_NOMORELEECHES );
-			return false;
-
-		case IBE_NORMAL:
-			G_TriggerMenu( ent->client->ps.clientNum, MN_B_NORMAL );
-			return false;
-
-		case IBE_SURFACE:
-			G_TriggerMenu( ent->client->ps.clientNum, MN_B_NORMAL );
-			return false;
-
-		case IBE_DISABLED:
-			G_TriggerMenu( ent->client->ps.clientNum, MN_B_DISABLED );
-			return false;
-
-		case IBE_ONEREACTOR:
-			G_TriggerMenu( ent->client->ps.clientNum, MN_H_ONEREACTOR );
-			return false;
-
-		case IBE_NOREACTOR:
-			G_TriggerMenu( ent->client->ps.clientNum, MN_H_NOREACTOR );
-			return false;
-
-		case IBE_NOMOREDRILLS:
-			G_TriggerMenu( ent->client->ps.clientNum, MN_H_NOMOREDRILLS );
-			return false;
-
-		case IBE_NOROOM:
-			G_TriggerMenu( ent->client->ps.clientNum, MN_B_NOROOM );
-			return false;
-
-		case IBE_NOHUMANBP:
-			G_TriggerMenu( ent->client->ps.clientNum, MN_H_NOBP );
-			return false;
-
-		case IBE_LASTSPAWN:
-			G_TriggerMenu( ent->client->ps.clientNum, MN_B_LASTSPAWN );
-			return false;
-
-		case IBE_MAINSTRUCTURE:
-			G_TriggerMenu( ent->client->ps.clientNum, MN_B_MAINSTRUCTURE );
-			return false;
-
-		default:
-			break;
+		}
+		else
+		{
+			QueueBuildable( ent, buildable, VEC2GLM(origin), normal, ent->s.apos.trBase, groundEntNum );
+		}
+		return true;
 	}
 
+	SendBuildFailureFeedback( ent, reason );
 	return false;
 }
 
@@ -2315,4 +2387,77 @@ void G_BuildLogRevert( int id )
 		level.team[ TEAM_ALIENS ].spentBudget = log->alienSpentBP;
 	}
 
+}
+
+void G_HandleClientBuildQueue( gentity_t *ent )
+{
+	if ( !ent || !ent->client )
+	{
+		Log::Warn( "Non-client entity passed into %s", __func__ );
+	}
+	auto &q = level.buildQueue[ ent->num() ];
+	if ( q.current.get() != nullptr && !q.current->spawned )
+	{
+		return;
+	}
+
+	if ( q.queue.empty() )
+	{
+		return;
+	}
+
+	while ( true )
+	{
+		auto next = q.queue.front();
+		q.queue.pop_front();
+		if ( !next.get() ) continue;
+
+		buildable_t buildable = static_cast<buildable_t>( next->s.modelindex );
+		gentity_t *builder = &g_entities[ next->builtBy->slot ];
+
+		vec3_t origin, normal;
+		VectorCopy( next->s.origin, origin );
+		VectorCopy( next->s.origin2, normal );
+		auto ibe = ValidateBuildPlacement( ent, buildable, origin, normal, next.get() );
+		if ( ibe != IBE_NONE )
+		{
+			SendBuildFailureFeedback( ent, ibe );
+			G_FreeEntity( next.get() );
+			break;
+		}
+
+		G_KillBox( next.get() );
+		q.current = SpawnBuildable( builder, buildable,
+		                            VEC2GLM( next->s.origin ), next->s.origin2, next->s.angles,
+		                            next->s.groundEntityNum );
+		G_SpendBudget( BG_Buildable( buildable )->team, BG_Buildable( buildable )->buildPoints );
+		G_FreeEntity( next.get() );
+
+		break;
+	}
+}
+
+void G_ClearClientBuildQueue( gentity_t *ent )
+{
+	if ( !ent || !ent->client )
+	{
+		Log::Warn( "Non-client entity passed into %s", __func__ );
+	}
+
+	auto &q = level.buildQueue[ ent->num() ];
+	if ( q.current.get() )
+	{
+		q.current = nullptr;
+	}
+
+	for (const auto& queued: q.queue )
+	{
+		if ( !queued.get() )
+		{
+			continue;
+		}
+		G_FreeEntity( queued.get() );
+	}
+
+	q.queue.clear();
 }

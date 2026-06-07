@@ -27,9 +27,10 @@ class ClientComponent: public ClientComponentBase {
 			return clientData;
 		}
 
+		void HandleDie(gentity_t* killer, meansOfDeath_t meansOfDeath);
+
 	private:
 
 };
 
 #endif // CLIENT_COMPONENT_H_
-

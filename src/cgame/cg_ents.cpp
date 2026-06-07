@@ -1160,6 +1160,10 @@ static void CG_AddCEntity( centity_t *cent )
 			CG_Buildable( cent );
 			break;
 
+		case entityType_t::ET_GHOST_BUILDABLE:
+			CG_QueuedGhostBuildable( cent );
+			break;
+
 		case entityType_t::ET_MISSILE:
 			CG_Missile( cent );
 			break;

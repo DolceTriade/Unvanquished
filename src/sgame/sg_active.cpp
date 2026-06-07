@@ -1999,6 +1999,8 @@ static void ClientThink_real( gentity_t *self )
 
 	G_ReplenishDragoonBarbs( self, msec );
 
+	G_HandleClientBuildQueue( self );
+
 	// Throw human grenade
 	if ( BG_InventoryContainsUpgrade( UP_GRENADE, client->ps.stats ) &&
 	     BG_UpgradeIsActive( UP_GRENADE, client->ps.stats ) )
