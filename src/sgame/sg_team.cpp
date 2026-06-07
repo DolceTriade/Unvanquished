@@ -133,7 +133,7 @@ team_t G_Team( const gentity_t *ent )
 	{
 		return (team_t)ent->client->pers.team;
 	}
-	if ( ent->s.eType == entityType_t::ET_BUILDABLE )
+	if ( ent->s.eType == entityType_t::ET_BUILDABLE || ent->s.eType == entityType_t::ET_GHOST_BUILDABLE )
 	{
 		return ent->buildableTeam;
 	}
@@ -265,7 +265,7 @@ void G_LeaveTeam( gentity_t *self )
 		}
 	}
 
-	G_ClearClientBuildQueue( self );
+	G_ClearClientBuildQueue( self, true );
 
 	trap_UnlinkEntity( self );
 

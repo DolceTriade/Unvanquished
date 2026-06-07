@@ -181,6 +181,7 @@ struct botMemory_t
 		botTarget_t goal;
 
 		int myTimer;
+		int buildCooldownUntil;
 
 private:
 		botNavCmd_t m_nav;

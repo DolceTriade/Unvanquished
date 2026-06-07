@@ -647,6 +647,9 @@ struct level_locals_t
 	// however, the numbers will not be more than two frames behind
 	std::array<int, BA_NUM_BUILDABLES> numBuildablesEstimate;
 
+	// Structure counts including queued ghost buildables.
+	std::array<std::array<int, BA_NUM_BUILDABLES>, NUM_TEAMS> numBuildablesWithGhosts;
+
 	struct
 	{
 		// voting state

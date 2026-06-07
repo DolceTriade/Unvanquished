@@ -1314,6 +1314,7 @@ static Cvar::Cvar<bool> g_bot_buildHumans("g_bot_buildHumans", "whether human bo
 static Cvar::Cvar<bool> g_bot_extinguishFire("g_bot_extinguishFire", "whether alien bots should extinguish buildables on fire", Cvar::NONE, true);
 static Cvar::Cvar<int> g_bot_buildNumEggs("g_bot_buildNumEggs", "how many eggs bots should build", Cvar::NONE, 6);
 static Cvar::Cvar<int> g_bot_buildNumTelenodes("g_bot_buildNumTelenodes", "how many telenodes bots should build", Cvar::NONE, 3);
+static Cvar::Cvar<int> g_bot_buildCooldown("g_bot_buildCooldown", "cooldown in milliseconds after a bot successfully builds", Cvar::NONE, 8000);
 static Cvar::Cvar<float> g_bot_buildProbRocketPod("g_bot_buildProbRocketPod", "probability of a bot building a rocket pod instead of a machine gun turret", Cvar::NONE, 0.2);
 
 static bool isBuilder( gentity_t *self )
@@ -1327,25 +1328,30 @@ static bool isBuilder( gentity_t *self )
 buildable_t BotChooseBuildableToBuild( gentity_t *self )
 {
 	buildable_t toBuild = BA_NONE;
+	team_t team = G_Team( self );
+	auto count = [team]( buildable_t buildable ) {
+		return G_CountBuildablesWithGhosts( team, buildable );
+	};
+
 	if ( G_Team( self ) == TEAM_HUMANS )
 	{
-		if ( level.numBuildablesEstimate[ BA_H_REACTOR ] == 0 )
+		if ( count( BA_H_REACTOR ) == 0 )
 		{
 			toBuild = BA_H_REACTOR;
 		}
-		else if ( level.numBuildablesEstimate[ BA_H_DRILL ] == 0 && g_maxMiners.Get() != 0 )
+		else if ( count( BA_H_DRILL ) == 0 && g_maxMiners.Get() != 0 )
 		{
 			toBuild = BA_H_DRILL;
 		}
-		else if ( level.team[ G_Team( self ) ].numSpawns < g_bot_buildNumTelenodes.Get() )
+		else if ( count( BA_H_SPAWN ) < g_bot_buildNumTelenodes.Get() )
 		{
 			toBuild = BA_H_SPAWN;
 		}
-		else if ( level.numBuildablesEstimate[ BA_H_ARMOURY ] == 0 )
+		else if ( count( BA_H_ARMOURY ) == 0 )
 		{
 			toBuild = BA_H_ARMOURY;
 		}
-		else if ( level.numBuildablesEstimate[ BA_H_MEDISTAT ] == 0 )
+		else if ( count( BA_H_MEDISTAT ) == 0 )
 		{
 			toBuild = BA_H_MEDISTAT;
 		}
@@ -1361,23 +1367,23 @@ buildable_t BotChooseBuildableToBuild( gentity_t *self )
 	}
 	else if ( G_Team( self ) == TEAM_ALIENS )
 	{
-		if ( level.numBuildablesEstimate[ BA_A_OVERMIND ] == 0 )
+		if ( count( BA_A_OVERMIND ) == 0 )
 		{
 			toBuild = BA_A_OVERMIND;
 		}
-		else if ( level.numBuildablesEstimate[ BA_A_LEECH ] == 0 && g_maxMiners.Get() != 0 )
+		else if ( count( BA_A_LEECH ) == 0 && g_maxMiners.Get() != 0 )
 		{
 			toBuild = BA_A_LEECH;
 		}
-		else if ( level.team[ G_Team( self ) ].numSpawns < g_bot_buildNumEggs.Get() / 2 )
+		else if ( count( BA_A_SPAWN ) < g_bot_buildNumEggs.Get() / 2 )
 		{
 			toBuild = BA_A_SPAWN;
 		}
-		else if ( BG_BuildableUnlocked( BA_A_BOOSTER ) && level.numBuildablesEstimate[ BA_A_BOOSTER ] == 0 )
+		else if ( BG_BuildableUnlocked( BA_A_BOOSTER ) && count( BA_A_BOOSTER ) == 0 )
 		{
 			toBuild = BA_A_BOOSTER;
 		}
-		else if ( level.team[ G_Team( self ) ].numSpawns < g_bot_buildNumEggs.Get() )
+		else if ( count( BA_A_SPAWN ) < g_bot_buildNumEggs.Get() )
 		{
 			toBuild = BA_A_SPAWN;
 		}
@@ -1396,6 +1402,11 @@ static bool build( gentity_t *self, buildable_t toBuild )
 		return false;
 	}
 
+	if ( self->botMind->buildCooldownUntil > level.time )
+	{
+		return false;
+	}
+
 	if ( BG_Buildable( toBuild )->buildPoints > 0
 		 && G_GetFreeBudget( G_Team( self ) ) < BG_Buildable( toBuild )->buildPoints )
 	{
@@ -1408,12 +1419,14 @@ static bool build( gentity_t *self, buildable_t toBuild )
 		G_ForceWeaponChange( self, WP_HBUILD );
 	}
 
-	self->client->ps.stats[ STAT_BUILDABLE ] = toBuild;
-	if ( self->client->ps.stats[ STAT_MISC ] == 0 )
+	if ( G_BuildIfValid( self, toBuild ) )
 	{
-		BotFireWeapon( WPM_PRIMARY, &self->botMind->cmdBuffer );
+		self->client->ps.stats[ STAT_BUILDABLE ] = BA_NONE;
+		self->botMind->buildCooldownUntil = level.time + g_bot_buildCooldown.Get();
+		return true;
 	}
-	return true;
+
+	return false;
 }
 
 AINodeStatus_t BotActionBuildNowChosenBuildable( gentity_t *self, AIGenericNode_t * )

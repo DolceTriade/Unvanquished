@@ -64,6 +64,16 @@ static gentity_t *FindBuildable(buildable_t buildable) {
 	return found;
 }
 
+int G_CountBuildablesWithGhosts( team_t team, buildable_t buildable )
+{
+	if ( team <= TEAM_NONE || team >= NUM_TEAMS || buildable <= BA_NONE || buildable >= BA_NUM_BUILDABLES )
+	{
+		return 0;
+	}
+
+	return level.numBuildablesWithGhosts[ team ][ buildable ];
+}
+
 template<typename Component>
 static gentity_t *LookUpMainBuildable(bool requireActive)
 {
@@ -686,17 +696,18 @@ gentity_t *G_GetDeconstructibleBuildable( gentity_t *ent )
 	BG_GetClientViewOrigin( &ent->client->ps, viewOrigin );
 	AngleVectors( ent->client->ps.viewangles, forward, nullptr, nullptr );
 	VectorMA( viewOrigin, BUILDER_DECONSTRUCT_RANGE, forward, end );
-	trap_Trace( &trace, viewOrigin, nullptr, nullptr, end, ent->num(), MASK_PLAYERSOLID, 0 );
+	// HACK: We abuse CONTENTS_ITEM for ghost buildables.
+	trap_Trace( &trace, viewOrigin, nullptr, nullptr, end, ent->num(), MASK_PLAYERSOLID | CONTENTS_ITEM, 0 );
 	buildable = &g_entities[ trace.entityNum ];
 
 	// Check if target is valid.
 	if ( trace.fraction >= 1.0f ||
-	     buildable->s.eType != entityType_t::ET_BUILDABLE ||
+	     ( buildable->s.eType != entityType_t::ET_BUILDABLE &&
+	       buildable->s.eType != entityType_t::ET_GHOST_BUILDABLE ) ||
 	     !G_OnSameTeam( ent, buildable ) )
 	{
 		return nullptr;
 	}
-
 	return buildable;
 }
 
@@ -744,6 +755,12 @@ bool G_CheckDeconProtectionAndWarn( gentity_t *buildable, gentity_t *player )
 	{
 		return false;
 	}
+
+	if ( buildable->s.eType == entityType_t::ET_GHOST_BUILDABLE )
+	{
+		return false;
+	}
+
 	switch ( buildable->s.modelindex )
 	{
 		case BA_A_OVERMIND:
@@ -765,12 +782,6 @@ bool G_CheckDeconProtectionAndWarn( gentity_t *buildable, gentity_t *player )
 
 void G_DeconstructUnprotected( gentity_t *buildable, gentity_t *ent )
 {
-	if ( !g_instantBuilding.Get() )
-	{
-		// Check if the buildable is protected from instant deconstruction.
-		G_CheckDeconProtectionAndWarn( buildable, ent );
-	}
-
 	G_Deconstruct( buildable, ent, MOD_DECONSTRUCT );
 }
 
@@ -1147,9 +1158,16 @@ static void ComputePlayerBuildPlacement( gentity_t *builder, buildable_t buildab
 	VectorCopy( surfaceTrace.plane.normal, normal );
 }
 
+enum class BuildPlacementMode
+{
+	PLAYER,
+	GHOST
+};
+
 static itemBuildError_t ValidateBuildPlacement( gentity_t *builder, buildable_t buildable,
                                                 const vec3_t origin, const vec3_t normal,
-                                                gentity_t *ignoredEntity )
+                                                gentity_t *ignoredEntity,
+                                                BuildPlacementMode mode )
 {
 	vec3_t           mins, maxs;
 	vec3_t           replacementOrigin;
@@ -1160,6 +1178,7 @@ static itemBuildError_t ValidateBuildPlacement( gentity_t *builder, buildable_t 
 	float            minNormal;
 	bool             invert;
 	int              contents;
+	team_t           buildTeam = BG_Buildable( buildable )->team;
 
 	// Stop all buildables from interacting with traces
 	SetBuildableLinkState( false );
@@ -1173,8 +1192,15 @@ static itemBuildError_t ValidateBuildPlacement( gentity_t *builder, buildable_t 
 	// HACK: We abuse CONTENTS_ITEM for ghost buildables so ensure we can't build over them.
 	trap_Trace( &occupancyTrace, origin, mins, maxs, origin,
 	            ignoredEntity ? ignoredEntity->num() : ENTITYNUM_NONE, MASK_PLAYERSOLID | CONTENTS_ITEM, 0 );
-	trap_Trace( &lineTrace, builder->client->ps.origin, nullptr, nullptr, origin,
-	            builder->num(), MASK_PLAYERSOLID, 0 );
+	if ( mode == BuildPlacementMode::PLAYER )
+	{
+		trap_Trace( &lineTrace, builder->client->ps.origin, nullptr, nullptr, origin,
+		            builder->num(), MASK_PLAYERSOLID, 0 );
+	}
+	else
+	{
+		lineTrace.fraction = 1.0f;
+	}
 
 	minNormal = BG_Buildable( buildable )->minNormal;
 	invert = BG_Buildable( buildable )->invertNormal;
@@ -1199,7 +1225,7 @@ static itemBuildError_t ValidateBuildPlacement( gentity_t *builder, buildable_t 
 	{
 		reason = replacementError;
 	}
-	else if ( builder->client->pers.team == TEAM_ALIENS )
+	else if ( buildTeam == TEAM_ALIENS )
 	{
 		// Check for Overmind
 		if ( buildable != BA_A_OVERMIND )
@@ -1224,7 +1250,7 @@ static itemBuildError_t ValidateBuildPlacement( gentity_t *builder, buildable_t 
 			reason = IBE_DISABLED;
 		}
 	}
-	else if ( builder->client->pers.team == TEAM_HUMANS )
+	else if ( buildTeam == TEAM_HUMANS )
 	{
 		// Check for Reactor
 		if ( buildable != BA_H_REACTOR )
@@ -1325,7 +1351,7 @@ itemBuildError_t G_CanBuild( gentity_t *ent, buildable_t buildable, int /*distan
                              vec3_t origin, vec3_t normal, int *groundEntNum )
 {
 	ComputePlayerBuildPlacement( ent, buildable, origin, normal, groundEntNum );
-	return ValidateBuildPlacement( ent, buildable, origin, normal, nullptr );
+	return ValidateBuildPlacement( ent, buildable, origin, normal, nullptr, BuildPlacementMode::PLAYER );
 }
 
 static dynMenu_t BuildFailureMenu( itemBuildError_t reason )
@@ -2418,7 +2444,7 @@ void G_HandleClientBuildQueue( gentity_t *ent )
 		vec3_t origin, normal;
 		VectorCopy( next->s.origin, origin );
 		VectorCopy( next->s.origin2, normal );
-		auto ibe = ValidateBuildPlacement( ent, buildable, origin, normal, next.get() );
+		auto ibe = ValidateBuildPlacement( ent, buildable, origin, normal, next.get(), BuildPlacementMode::GHOST );
 		if ( ibe != IBE_NONE )
 		{
 			SendBuildFailureFeedback( ent, ibe );
@@ -2426,7 +2452,6 @@ void G_HandleClientBuildQueue( gentity_t *ent )
 			break;
 		}
 
-		G_KillBox( next.get() );
 		q.current = SpawnBuildable( builder, buildable,
 		                            VEC2GLM( next->s.origin ), next->s.origin2, next->s.angles,
 		                            next->s.groundEntityNum );
@@ -2437,7 +2462,7 @@ void G_HandleClientBuildQueue( gentity_t *ent )
 	}
 }
 
-void G_ClearClientBuildQueue( gentity_t *ent )
+void G_ClearClientBuildQueue( gentity_t *ent, bool clearCurrent )
 {
 	if ( !ent || !ent->client )
 	{
@@ -2445,7 +2470,7 @@ void G_ClearClientBuildQueue( gentity_t *ent )
 	}
 
 	auto &q = level.buildQueue[ ent->num() ];
-	if ( q.current.get() )
+	if ( clearCurrent && q.current.get() )
 	{
 		q.current = nullptr;
 	}
