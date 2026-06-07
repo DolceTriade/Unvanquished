@@ -2462,59 +2462,73 @@ public:
 		if ( shouldBeVisible_ )
 		{
 			playerState_t *ps = &cg.snap->ps;
-			buildable_t buildable = ( buildable_t )( ps->stats[ STAT_BUILDABLE ] & SB_BUILDABLE_MASK );
+			buildable_t buildable =
+				(buildable_t)( ps->stats[ STAT_BUILDABLE ] & SB_BUILDABLE_MASK );
 			const char *msg = nullptr;
 			Color::Color color;
 
 			// Miner prediction uses a linear signed byte for efficiency and a sqrt-compressed
 			// signed byte for income delta. Income is approximate and shown with a leading '~'.
-			float deltaEfficiency = (float)(signed char)(ps->stats[STAT_PREDICTION] & 0xff) / (float)0x7f;
-			int compressedIncome = (int)(signed char)(ps->stats[STAT_PREDICTION] >> 8);
-			int deltaBudget = compressedIncome < 0 ? -( compressedIncome * compressedIncome )
-			                                       :  ( compressedIncome * compressedIncome );
+			float deltaEfficiency =
+				(float)(signed char)( ps->stats[ STAT_PREDICTION ] & 0xff ) / (float)0x7f;
+			int compressedIncome = (int)(signed char)( ps->stats[ STAT_PREDICTION ] >> 8 );
+			int uncompressed = compressedIncome < 0 ? -( compressedIncome * compressedIncome )
+			                                       : ( compressedIncome * compressedIncome );
+			float deltaBudget = ps->persistant[ PERS_TEAM ] == TEAM_ALIENS ? static_cast<float>( uncompressed ) / CREDITS_PER_EVO : uncompressed;
+			int deltaEfficiencyPct = (int)( deltaEfficiency * 100.0f );
 
-			int   deltaEfficiencyPct = (int)(deltaEfficiency * 100.0f);
-
-			if ( deltaEfficiencyPct != lastDeltaEfficiencyPct_ ||
-			     deltaBudget        != lastDeltaBudget_ )
+			if ( deltaEfficiencyPct != lastDeltaEfficiencyPct_ || uncompressed != lastDeltaBudget_ )
 			{
-				if        ( deltaBudget < 0 ) {
+				if ( uncompressed < 0 )
+				{
 					color = Color::Red;
 					// Icon U+E000
-					msg = va( "<span class='material-icon error'>\xee\x80\x80</span> You are collapsing team income!"
-					          " Build the %s%s further apart for greater efficiency.",
-					          BG_Buildable( buildable )->humanName, pluralSuffix_[ buildable ].c_str() );
-				} else if ( deltaBudget < MINER_CREDITS_PER_INTERVAL / 10 ) {
+					msg = va(
+						"<span class='material-icon error'>\xee\x80\x80</span> You are collapsing "
+					    "team income!"
+						" Build the %s%s further apart for greater efficiency.",
+						BG_Buildable( buildable )->humanName, pluralSuffix_[ buildable ].c_str() );
+				}
+				else if ( uncompressed < MINER_CREDITS_PER_INTERVAL / 10 )
+				{
 					color = Color::Orange;
 					// Icon U+E002
-					msg = va( "<span class='material-icon warning'>\xee\x80\x82</span> Minimal team income."
-					          " Build the %s%s further apart for greater efficiency.",
-					          BG_Buildable( buildable )->humanName, pluralSuffix_[ buildable ].c_str() );
-				} else if ( deltaBudget < MINER_CREDITS_PER_INTERVAL / 2 ) {
+					msg = va(
+						"<span class='material-icon warning'>\xee\x80\x82</span> Minimal team "
+					    "income."
+						" Build the %s%s further apart for greater efficiency.",
+						BG_Buildable( buildable )->humanName, pluralSuffix_[ buildable ].c_str() );
+				}
+				else if ( uncompressed < MINER_CREDITS_PER_INTERVAL / 2 )
+				{
 					color = Color::Yellow;
 					// Icon U+E002
-					msg = va( "<span class='material-icon warning'>\xee\x80\x82</span> Subpar team income."
-					          " Build the %s%s further apart for greater efficiency.",
-					          BG_Buildable( buildable )->humanName, pluralSuffix_[ buildable ].c_str() );
-				} else {
+					msg = va(
+						"<span class='material-icon warning'>\xee\x80\x82</span> Subpar team "
+					    "income."
+						" Build the %s%s further apart for greater efficiency.",
+						BG_Buildable( buildable )->humanName, pluralSuffix_[ buildable ].c_str() );
+				}
+				else
+				{
 					color = Color::Green;
 				}
 
 				std::string deltaEfficiencyPctStr = Rocket_QuakeToRML(
-					va( "%s%+d%%", Color::ToString(color).c_str(), deltaEfficiencyPct));
+					va( "%s%+d%%", Color::ToString( color ).c_str(), deltaEfficiencyPct ) );
 				std::string deltaBudgetStr = Rocket_QuakeToRML(
-					va("%s~%+d", Color::ToString(color).c_str(), deltaBudget));
+					va( "%s~%+.1f", Color::ToString( color ).c_str(), deltaBudget ) );
 
-				SetInnerRML(Str::Format(
-					"%s EFFICIENCY<br/>%s TEAM INCOME%s%s",
-					deltaEfficiencyPctStr, deltaBudgetStr, msg ? "<br/>" : "", msg ? msg : ""
-				));
+				SetInnerRML( Str::Format( "%s EFFICIENCY<br/>%s TEAM INCOME%s%s",
+				                          deltaEfficiencyPctStr, deltaBudgetStr, msg ? "<br/>" : "",
+				                          msg ? msg : "" ) );
 
 				lastDeltaEfficiencyPct_ = deltaEfficiencyPct;
-				lastDeltaBudget_        = deltaBudget;
+				lastDeltaBudget_ = uncompressed;
 			}
 		}
 	}
+
 private:
 	bool shouldBeVisible_;
 	int  lastDeltaEfficiencyPct_;
