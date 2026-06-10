@@ -1226,7 +1226,7 @@ static void BuildOverloadCatalog()
 
 	// Human weapons: stage 1 / always available.
 	AddUpgrade( TEAM_HUMANS, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), DefaultUpgradeStepCost( 0 ), OVERLOAD_UNCAPPED_RANKS, "rifle", "Rifle", "damage", "damage", "Rifle Damage", "Increase rifle damage.",
-	            { GameplayEffect( "RIFLE_DMG", 2.0 ) } );
+	            { GameplayEffect( "RIFLE_DMG", 1.0 ) } );
 	AddUpgrade( TEAM_HUMANS, DefaultUpgradeBaseCost( 0 ), DefaultUpgradeStepCost( 0 ), OVERLOAD_UNCAPPED_RANKS, "rifle", "Rifle", "ammo", "ammo", "Rifle Ammo", "Increase rifle ammo reserve.",
 	            { AttributeEffect( BG_ATTR_WEAPON, "rifle", "ammo", 10.0, 1.0 ) } );
 	AddUpgrade( TEAM_HUMANS, DefaultUpgradeBaseCost( 0 ), DefaultUpgradeStepCost( 0 ), OVERLOAD_UNCAPPED_RANKS, "psaw", "Pain Saw", "damage", "damage", "Pain Saw Damage", "Increase pain saw damage per hit.",
@@ -1238,7 +1238,7 @@ static void BuildOverloadCatalog()
 
 	// Human weapons: stage 2 unlocks.
 	AddUpgrade( TEAM_HUMANS, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), DefaultUpgradeStepCost( OVERLOAD_STAGE2_COUNT ), OVERLOAD_UNCAPPED_RANKS, "lgun", "Lasgun", "damage", "damage", "Lasgun Damage", "Increase lasgun damage.",
-	            { GameplayEffect( "LASGUN_DAMAGE", 3.0 ) } );
+	            { GameplayEffect( "LASGUN_DAMAGE", 2.0 ) } );
 	AddUpgrade( TEAM_HUMANS, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), DefaultUpgradeStepCost( OVERLOAD_STAGE2_COUNT ), OVERLOAD_UNCAPPED_RANKS, "lgun", "Lasgun", "ammo", "ammo", "Lasgun Ammo", "Increase lasgun ammo reserve.",
 	            { AttributeEffect( BG_ATTR_WEAPON, "lgun", "ammo", 25.0, 1.0 ) } );
 	AddUpgrade( TEAM_HUMANS, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), DefaultUpgradeStepCost( OVERLOAD_STAGE2_COUNT ), OVERLOAD_UNCAPPED_RANKS, "mdriver", "Mass Driver", "damage", "damage", "Mass Driver Damage", "Increase mass driver damage.",
@@ -1246,7 +1246,7 @@ static void BuildOverloadCatalog()
 	AddUpgrade( TEAM_HUMANS, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), DefaultUpgradeStepCost( OVERLOAD_STAGE2_COUNT ), OVERLOAD_UNCAPPED_RANKS, "mdriver", "Mass Driver", "ammo", "ammo", "Mass Driver Ammo", "Increase mass driver ammo reserve.",
 	            { AttributeEffect( BG_ATTR_WEAPON, "mdriver", "ammo", 2.0, 1.0 ) } );
 	AddUpgrade( TEAM_HUMANS, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), DefaultUpgradeStepCost( OVERLOAD_STAGE2_COUNT ), OVERLOAD_UNCAPPED_RANKS, "chaingun", "Chaingun", "damage", "damage", "Chaingun Damage", "Increase chaingun damage.",
-	            { GameplayEffect( "CHAINGUN_DMG", 2.0 ) } );
+	            { GameplayEffect( "CHAINGUN_DMG", 1.0 ) } );
 	AddUpgrade( TEAM_HUMANS, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), DefaultUpgradeStepCost( OVERLOAD_STAGE2_COUNT ), OVERLOAD_UNCAPPED_RANKS, "chaingun", "Chaingun", "ammo", "ammo", "Chaingun Ammo", "Increase chaingun ammo reserve.",
 	            { AttributeEffect( BG_ATTR_WEAPON, "chaingun", "ammo", 40.0, 1.0 ) } );
 	AddUpgrade( TEAM_HUMANS, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), DefaultUpgradeStepCost( OVERLOAD_STAGE2_COUNT ), OVERLOAD_UNCAPPED_RANKS, "flamer", "Flamethrower", "ammo", "ammo", "Flamer Ammo", "Increase flamer ammo reserve.",
