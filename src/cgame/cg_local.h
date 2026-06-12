@@ -1676,6 +1676,7 @@ struct cgMedia_t
 
 	qhandle_t chaingunBarrelBoneIndex;
 	qhandle_t chaingunGearBoneIndex;
+	qhandle_t painsawBladeBoneIndex;
 };
 
 struct buildStat_t
