@@ -659,8 +659,8 @@ static bool CG_ParseWeaponFile( const char *filename, int weapon, weaponInfo_t *
 							CG_RegisterWeaponAnimation( &wi->animations[ WANIM_RELOAD ],
 							                            va( "%s_view.iqm:reload", token2 ), false, false, false );
 						}
-						// HACK: We'll animate the chaingun in code. Don't load the fire animation.
-						if ( weapon != WP_CHAINGUN )
+						// HACK: We'll animate the chaingun/psaw in code. Don't load the fire animation.
+						if ( weapon != WP_CHAINGUN && weapon != WP_PAIN_SAW )
 						{
 							CG_RegisterWeaponAnimation( &wi->animations[ WANIM_ATTACK1 ],
 														va( "%s_view.iqm:fire", token2 ), false, false, false );
@@ -1136,6 +1136,11 @@ void CG_InitWeapons()
 	{
 		Sys::Drop( "Failed to find chaingun bones 'tag_flash' and/or 'small_gear'" );
 	}
+	cgs.media.painsawBladeBoneIndex = trap_R_BoneIndex( cg_weapons[ WP_PAIN_SAW ].weaponModel, "blade" );
+	if ( cgs.media.painsawBladeBoneIndex < 0 )
+	{
+		Sys::Drop( "Failed to find painsaw bone 'blade'" );
+	}
 }
 
 /*
@@ -1339,9 +1344,10 @@ static void CG_CalculateWeaponPosition( vec3_t out_origin, vec3_t out_angles )
 CG_MachinegunSpinAngle
 ======================
 */
-#define   SPIN_SPEED 0.9f
+#define   CHAINGUN_SPIN_SPEED 0.9f
+#define   PAINSAW_SPIN_SPEED 1.8f
 #define   COAST_TIME 1000
-static float CG_MachinegunSpinAngle( centity_t *cent, bool firing )
+static float CG_MachinegunSpinAngle( centity_t *cent, float spinSpeed, bool firing )
 {
 	int   delta;
 	float angle;
@@ -1351,7 +1357,7 @@ static float CG_MachinegunSpinAngle( centity_t *cent, bool firing )
 
 	if ( cent->pe.barrelSpinning )
 	{
-		angle = cent->pe.barrelAngle + delta * SPIN_SPEED;
+		angle = cent->pe.barrelAngle + delta * spinSpeed;
 	}
 	else
 	{
@@ -1360,7 +1366,7 @@ static float CG_MachinegunSpinAngle( centity_t *cent, bool firing )
 			delta = COAST_TIME;
 		}
 
-		speed = 0.5f * ( SPIN_SPEED + ( float )( COAST_TIME - delta ) / COAST_TIME );
+		speed = 0.5f * ( spinSpeed + ( float )( COAST_TIME - delta ) / COAST_TIME );
 		angle = cent->pe.barrelAngle + delta * speed;
 	}
 
@@ -1521,7 +1527,7 @@ void CG_AddPlayerWeapon( refEntity_t* parent, playerState_t* ps, centity_t* cent
 			// like controlling spin rate and "coasting".
 			if ( weaponNum == WP_CHAINGUN && ps )
 			{
-				float angle = CG_MachinegunSpinAngle( cent, firing );
+				float angle = CG_MachinegunSpinAngle( cent, CHAINGUN_SPIN_SPEED, firing );
 				BoneMod barrel;
 				barrel.index = cgs.media.chaingunBarrelBoneIndex;
 				QuatFromAngles( barrel.rotation, angle, 0.0f, 0.0f );
@@ -1532,6 +1538,17 @@ void CG_AddPlayerWeapon( refEntity_t* parent, playerState_t* ps, centity_t* cent
 				QuatFromAngles( gear.rotation, -angle, 0.0f, 0.0f );
 				gun.boneMods.push_back( gear );
 			}
+			// Spin painsaw blade fast.
+			else if ( weaponNum == WP_PAIN_SAW && ps )
+			{
+				float angle = CG_MachinegunSpinAngle( cent, PAINSAW_SPIN_SPEED, firing );
+				BoneMod blade;
+				blade.index = cgs.media.painsawBladeBoneIndex;
+				QuatFromAngles( blade.rotation, 0.0f, -angle, 0.0f );
+				gun.boneMods.push_back( blade );
+
+			}
+
 
 			gun.scale = weapon->scale;
 		}
@@ -1573,7 +1590,7 @@ void CG_AddPlayerWeapon( refEntity_t* parent, playerState_t* ps, centity_t* cent
 			vec3_t angles;
 			angles[ YAW ] = 0;
 			angles[ PITCH ] = 0;
-			angles[ ROLL ] = CG_MachinegunSpinAngle( cent, firing );
+			angles[ ROLL ] = CG_MachinegunSpinAngle( cent, CHAINGUN_SPIN_SPEED, firing );
 			AnglesToAxis( angles, barrel.axis );
 
 			CG_PositionRotatedEntityOnTag( &barrel, ents.size() - 1, "tag_barrel");
