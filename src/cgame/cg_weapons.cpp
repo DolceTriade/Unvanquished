@@ -2308,15 +2308,50 @@ TODO: Put this into cg_event_weapon.c?
 ===================================================================================================
 */
 
-static bool CalcRangedHitMuzzlePoint( entityState_t *es, int /*attackerNum*/, vec3_t muzzle )
+static bool CalcMuzzlePoint( int entityNum, vec3_t muzzle )
 {
+	centity_t *cent;
+
+	if ( entityNum < 0 || entityNum >= MAX_ENTITIES )
+	{
+		return false;
+	}
+
+	if ( entityNum == cg.predictedPlayerState.clientNum )
+	{
+		cent = &cg.predictedPlayerEntity;
+	}
+	else if ( !( cent = &cg_entities[ entityNum ] ) || !cent->currentValid )
+	{
+		return false;
+	}
+
+	if ( cent->muzzlePS && CG_Attached( &cent->muzzlePS->attachment ) )
+	{
+		CG_AttachmentPoint( &cent->muzzlePS->attachment, muzzle );
+	}
+	else
+	{
+		return false;
+	}
+
+	return true;
+}
+
+static bool CalcRangedHitMuzzlePoint( entityState_t *es, int attackerNum, vec3_t muzzle )
+{
+	if ( attackerNum == cg.predictedPlayerState.clientNum )
+	{
+		return CalcMuzzlePoint( attackerNum, muzzle );
+	}
+
 	if ( es->origin2[ 0 ] || es->origin2[ 1 ] || es->origin2[ 2 ] )
 	{
 		VectorCopy( es->origin2, muzzle );
 		return true;
 	}
 
-	return false;
+	return CalcMuzzlePoint( attackerNum, muzzle );
 }
 
 static bool CalcTracerStartPoint( vec3_t source, vec3_t dest, vec3_t startPoint, float* visibleLength = nullptr )
@@ -2460,7 +2495,7 @@ static void DrawTracer( vec3_t source, vec3_t dest, float chance, float length, 
 	float      visibleLength;
 	vec3_t     start, finish;
 
-	if ( BG_random() > chance )
+	if ( chance < 1.0f && BG_random() > chance )
 	{
 		return;
 	}
