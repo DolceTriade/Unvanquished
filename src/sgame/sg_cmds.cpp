@@ -2284,7 +2284,7 @@ static bool G_NearOverloadTerminal( gentity_t *ent )
 	return mainBuildable &&
 	       mainBuildable->spawned &&
 	       Entities::IsAlive( mainBuildable ) &&
-	       G_Distance( ent, mainBuildable ) <= ENTITY_USE_RANGE;
+	       G_Distance( ent, mainBuildable ) <= ENTITY_USE_RANGE * 3;
 }
 
 static void Cmd_TeamBuy_f( gentity_t *ent )
