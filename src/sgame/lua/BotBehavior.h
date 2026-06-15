@@ -2,7 +2,7 @@
 ===========================================================================
 
 Unvanquished GPL Source Code
-Copyright (C) 2024 Unvanquished Developers
+Copyright (C) 2026 Unvanquished Developers
 
 This file is part of the Unvanquished GPL Source Code (Unvanquished Source Code).
 
@@ -31,27 +31,20 @@ Maryland 20850 USA.
 
 ===========================================================================
 */
+#ifndef LUA_BOTBEHAVIOR_H_
+#define LUA_BOTBEHAVIOR_H_
 
-#ifndef LUA_INTERPRETER_H_
-#define LUA_INTERPRETER_H_
+#include "sgame/sg_local.h"
+#include "sgame/sg_bot_ai.h"
 
-#include "common/Common.h"
 #include "shared/bg_lua.h"
 
 namespace Lua {
 
-void Initialize();
+AIBehaviorTree_t *LoadLuaBehavior( Str::StringRef file );
+void FreeLuaBehaviorTree( AIBehaviorTree_t *tree );
+void FreeLuaActionNode( AIGenericNode_t *node );
 
-void Shutdown();
+}  // namespace Lua
 
-lua_State* State();
-
-bool ExecScript(Str::StringRef scriptPath);
-
-bool ExecCode(Str::StringRef code, Str::StringRef location);
-
-bool LoadScript( Str::StringRef scriptPath );
-
-} // namespace Lua
-
-#endif // LUA_INTERPRETER_H_
+#endif  // LUA_BOTBEHAVIOR_H_

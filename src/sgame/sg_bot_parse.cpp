@@ -29,6 +29,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "sg_bot_util.h"
 #include "CBSE.h"
 #include "Entities.h"
+#include "sgame/lua/BotBehavior.h"
 
 static bool expectToken( const char *s, pc_token_list **list, bool next )
 {
@@ -1627,6 +1628,18 @@ AIBehaviorTree_t *ReadBehaviorTree( const char *name, AITreeList_t *list )
 		}
 	}
 
+	if ( Str::IsSuffix( ".lua", name ) )
+	{
+		auto bt = Lua::LoadLuaBehavior( Str::Format( "bots/%s", name ) );
+		if ( !bt )
+		{
+			return nullptr;
+		}
+		Q_strncpyz( bt->name, name, sizeof( bt->name ) );
+		list->push_back( bt );
+		return bt;
+	}
+
 	SetBehaviorTreeDefines();
 
 	Q_strncpyz( treefilename, va( "bots/%s.bt", name ), sizeof( treefilename ) );
@@ -1888,6 +1901,12 @@ void FreeNode( AIGenericNode_t *node )
 			break;
 		case SPAWN_NODE:
 			BG_Free( node );
+			break;
+		case LUA_BEHAVIOR_NODE:
+			Lua::FreeLuaBehaviorTree( reinterpret_cast<AIBehaviorTree_t *>( node ) );
+			break;
+		case LUA_ACTION_NODE:
+			Lua::FreeLuaActionNode( node );
 			break;
 		case BEHAVIOR_NODE:
 			// this is a pointer into the tree list
