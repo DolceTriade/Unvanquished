@@ -378,6 +378,8 @@ set(SGAMELIST
     ${GAMELOGIC_DIR}/sgame/lua/Votes.h
     ${GAMELOGIC_DIR}/sgame/lua/Workflow.h
     ${GAMELOGIC_DIR}/sgame/lua/Workflow.cpp
+    ${GAMELOGIC_DIR}/sgame/lua/BotBehavior.h
+    ${GAMELOGIC_DIR}/sgame/lua/BotBehavior.cpp
 
     ${ENGINE_DIR}/server/sg_api.h
     ${ENGINE_DIR}/server/sg_msgdef.h

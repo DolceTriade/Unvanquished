@@ -70,27 +70,6 @@ bool RunCode()
 	return true;
 }
 
-bool LoadScript( Str::StringRef scriptPath )
-{
-	fileHandle_t f;
-	int len = BG_FOpenGameOrPakPath( scriptPath, f );
-	if ( len < 0 )
-	{
-		Log::Warn( "error opening %s: %d", scriptPath, len );
-		return false;
-	}
-	std::vector<char> code( len + 1 );
-	code[ len ] = '\0';
-	int ret = trap_FS_Read( code.data(), len, f );
-	trap_FS_FCloseFile( f );
-	if ( ret != len )
-	{
-		Log::Warn( "error reading %s: %d", scriptPath, ret );
-		return false;
-	}
-	return LoadCode( code.data(), scriptPath );
-}
-
 // Based off of the LuaPrint in libRocket, which was based off of
 // luaB_print function from Lua's lbaselib.c
 int LuaPrint( lua_State* L )
@@ -166,6 +145,27 @@ void OverrideGlobalLuaFunctions()
 }
 
 }  // namespace
+
+bool LoadScript( Str::StringRef scriptPath )
+{
+	fileHandle_t f;
+	int len = BG_FOpenGameOrPakPath( scriptPath, f );
+	if ( len < 0 )
+	{
+		Log::Warn( "error opening %s: %d", scriptPath, len );
+		return false;
+	}
+	std::vector<char> code( len + 1 );
+	code[ len ] = '\0';
+	int ret = trap_FS_Read( code.data(), len, f );
+	trap_FS_FCloseFile( f );
+	if ( ret != len )
+	{
+		Log::Warn( "error reading %s: %d", scriptPath, ret );
+		return false;
+	}
+	return LoadCode( code.data(), scriptPath );
+}
 
 bool ExecCode( Str::StringRef code, Str::StringRef location )
 {

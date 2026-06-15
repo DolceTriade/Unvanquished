@@ -50,6 +50,8 @@ bool ExecScript(Str::StringRef scriptPath);
 
 bool ExecCode(Str::StringRef code, Str::StringRef location);
 
+bool LoadScript( Str::StringRef scriptPath );
+
 } // namespace Lua
 
 #endif // LUA_INTERPRETER_H_
