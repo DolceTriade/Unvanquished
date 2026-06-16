@@ -1918,7 +1918,12 @@ void FreeBehaviorTree( AIBehaviorTree_t *tree )
 {
 	if ( tree )
 	{
-		FreeNode(tree->root);
+		// HACK: Lua specific hack...
+		if ( tree->type == LUA_BEHAVIOR_NODE )
+		{
+			tree->classSelectionTree = nullptr;
+		}
+		FreeNode( tree->root );
 		FreeNode( tree->classSelectionTree );
 		BG_Free( tree );
 	}

@@ -44,6 +44,7 @@ struct botMemory_t;
 bool G_BotAdd( const char *name, team_t team, int skill, const char *behavior, bool filler = false );
 void G_BotSetSkill( int clientNum, int skill );
 void G_BotChangeBehavior( int clientNum, Str::StringRef behavior );
+bool G_BotUnloadBehavior( Str::StringRef behavior, std::string *reason = nullptr );
 bool G_BotSetBehavior( botMemory_t *botMind, Str::StringRef behavior );
 bool G_BotSetDefaults( int clientNum, team_t team, Str::StringRef behavior );
 void G_BotDel( int clientNum );

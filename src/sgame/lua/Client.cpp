@@ -100,6 +100,10 @@ GET_FUNC( class, lua_pushstring( L, BG_Class( c->ent->client->ps.stats[ STAT_CLA
 // @tfield integer stamina Read/Write.
 // @within Client
 GET_FUNC( stamina, lua_pushinteger( L, c->ent->client->ps.stats[ STAT_STAMINA ] ) )
+/// Raw pm_flags from playerState_t.
+// @tfield integer pm_flags Read only.
+// @within Client
+GET_FUNC( pm_flags, lua_pushinteger( L, c->ent->client->ps.pm_flags ) )
 /// The client's score.
 // @tfield integer score Read only.
 // @within Client
@@ -430,6 +434,7 @@ luaL_Reg ClientGetters[] = {
 	GETTER( health ),
 	GETTER( class ),
 	GETTER( stamina ),
+	GETTER( pm_flags ),
 	GETTER( score ),
 	GETTER( god ),
 	GETTER( notarget ),
