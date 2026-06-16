@@ -44,6 +44,120 @@ AIBehaviorTree_t *BotBehaviorTree( Str::StringRef behavior )
 	return ReadBehaviorTree( behavior.c_str(), &treeList );
 }
 
+static bool NodeReferencesBehavior( const AIGenericNode_t *node, const AIBehaviorTree_t *target )
+{
+	if ( !node )
+	{
+		return false;
+	}
+
+	switch ( node->type )
+	{
+		case SELECTOR_NODE:
+		{
+			const AINodeList_t *list = reinterpret_cast<const AINodeList_t *>( node );
+			for ( int i = 0; i < list->numNodes; ++i )
+			{
+				if ( NodeReferencesBehavior( list->list[ i ], target ) )
+				{
+					return true;
+				}
+			}
+			return false;
+		}
+
+		case CONDITION_NODE:
+			return NodeReferencesBehavior(
+				reinterpret_cast<const AIConditionNode_t *>( node )->child, target );
+
+		case DECORATOR_NODE:
+			return NodeReferencesBehavior(
+				reinterpret_cast<const AIDecoratorNode_t *>( node )->child, target );
+
+		case BEHAVIOR_NODE:
+			return node == reinterpret_cast<const AIGenericNode_t *>( target );
+
+		case ACTION_NODE:
+		case SPAWN_NODE:
+		case LUA_BEHAVIOR_NODE:
+		case LUA_ACTION_NODE:
+			return false;
+	}
+
+	return false;
+}
+
+bool G_BotUnloadBehavior( Str::StringRef behavior, std::string *reason )
+{
+	auto it = std::find_if( treeList.begin(), treeList.end(),
+	                        [behavior]( AIBehaviorTree_t *tree )
+	                        {
+		                        return !Q_stricmp( tree->name, behavior.c_str() );
+	                        } );
+	if ( it == treeList.end() )
+	{
+		if ( reason )
+		{
+			*reason = Str::Format( "behavior '%s' is not currently loaded", behavior );
+		}
+		return false;
+	}
+
+	AIBehaviorTree_t *tree = *it;
+
+	for ( int i = 0; i < MAX_CLIENTS; ++i )
+	{
+		gentity_t *ent = &g_entities[ i ];
+		if ( !ent->client || ent->client->pers.connected == CON_DISCONNECTED || !ent->client->pers.isBot || !ent->botMind )
+		{
+			continue;
+		}
+
+		if ( ent->botMind->behaviorTree == tree )
+		{
+			if ( reason )
+			{
+				*reason = Str::Format( "behavior '%s' is still in use by bot '%s'",
+				                       behavior, ent->client->pers.netname );
+			}
+			return false;
+		}
+	}
+
+	for ( AIBehaviorTree_t *other : treeList )
+	{
+		if ( other == tree )
+		{
+			continue;
+		}
+
+		if ( NodeReferencesBehavior( other->root, tree ) )
+		{
+			if ( reason )
+			{
+				*reason = Str::Format( "behavior '%s' is still included by behavior '%s'",
+				                       behavior, other->name );
+			}
+			return false;
+		}
+
+		if ( other->classSelectionTree != other->root
+		     && NodeReferencesBehavior( other->classSelectionTree, tree ) )
+		{
+			if ( reason )
+			{
+				*reason = Str::Format( "behavior '%s' is still included by behavior '%s'",
+				                       behavior, other->name );
+			}
+			return false;
+		}
+	}
+
+	treeList.erase( it );
+	FreeBehaviorTree( tree );
+	return true;
+}
+
 /*
 =======================
 Bot management functions
