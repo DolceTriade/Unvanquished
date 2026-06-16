@@ -6129,6 +6129,7 @@ static void BotUsage( gentity_t *ent )
 	                                        "            bot names (aliens | humans) <names>…\n"
 	                                        "            bot names (clear | list)\n"
 	                                        "            bot behavior (<name> | <slot#>) <behavior> [<name> | <slot#> | <x> <y> <z>]\n"
+	                                        "            bot unloadBehavior <behavior>\n"
 	                                        "            bot skill <skill level> [<team>]" ) );
 	ADMP( bot_usage );
 }
@@ -6472,6 +6473,22 @@ bool G_admin_bot( gentity_t *ent )
 			                    ( args.Argc() > 4 ) ? Quote( va( "^* with arguments: ^3%s", ConcatArgs( 4 ) ) ) : QQ( "" ) );
 		}
 
+	}
+	else if ( !Q_stricmp( arg1, "unloadBehavior" ) && args.Argc() == 3 )
+	{
+		std::string reason;
+		const char *behavior = args[ 2 ].data();
+		if ( !G_BotUnloadBehavior( behavior, &reason ) )
+		{
+			ADMP( va( "%s %s", QQ( "^3bot:^* $1$" ), Quote( reason ) ) );
+			return false;
+		}
+
+		if ( ent )
+		{
+			G_admin_action( QQ( N_("^3bot:^* $1$^* unloaded cached behavior ^3$2$") ),
+			                "%s %s", ent, Quote( behavior ) );
+		}
 	}
 	else if ( !Q_stricmp( arg1, "names" ) && args.Argc() >= 3 )
 	{
