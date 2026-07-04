@@ -48,7 +48,7 @@ void Report(lua_State* L, Str::StringRef place);
 // Push a vec3 onto the stack as a table.
 void PushVec3(lua_State* L, const vec3_t vec);
 
-// Convert a lua table into a vec3.
+// Convert either a lua vec3 array or three consecutive numeric arguments into a vec3.
 bool CheckVec3(lua_State* L, int pos, vec3_t vec);
 
 int SetAttributeInt(lua_State* L, bgAttributeFamily_t family, size_t objectIndex, const char* ownerName, const char* fieldName, int valueIndex = 2);

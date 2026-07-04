@@ -71,6 +71,11 @@ private:
 	enum class targetType { EMPTY, COORDS, ENTITY } type;
 };
 
+namespace Lua
+{
+struct BotBehaviorState;
+}
+
 struct botGoalAndDistance_t
 {
 	botTarget_t goal;
@@ -177,6 +182,7 @@ struct botMemory_t
 	// Behavior-specific state. Reset when the bot spawns or the behavior is changed {
 		AIGenericNode_t* currentNode;
 		BoundedVector<AIGenericNode_t*, MAX_NODE_DEPTH> runningNodes;
+		Lua::BotBehaviorState* luaBehaviorState;
 
 		botTarget_t goal;
 

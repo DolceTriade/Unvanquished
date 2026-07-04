@@ -34,17 +34,26 @@ Maryland 20850 USA.
 #ifndef LUA_BOT_H_
 #define LUA_BOT_H_
 
+#include <memory>
+
 #include "sgame/sg_local.h"
 
 #include "shared/bg_lua.h"
 
 namespace Lua {
+struct BotMind
+{
+	BotMind( gentity_t *ent ) : ent( ent ) {}
+
+	gentity_t *ent;
+};
 
 struct Bot
 {
 	Bot( gentity_t *ent ) : ent( ent ) {}
 
 	gentity_t *ent;
+	std::unique_ptr<BotMind> mind;
 };
 
 }  // namespace Lua
