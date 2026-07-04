@@ -44,6 +44,7 @@ namespace Lua {
 AIBehaviorTree_t *LoadLuaBehavior( Str::StringRef file );
 void FreeLuaBehaviorTree( AIBehaviorTree_t *tree );
 void FreeLuaActionNode( AIGenericNode_t *node );
+void ResetBotBehaviorState( botMemory_t& memory );
 
 }  // namespace Lua
 

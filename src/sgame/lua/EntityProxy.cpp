@@ -48,9 +48,14 @@ namespace Lua {
 
 /// Access information and interact with in game entities. Wrapper class for gentity_t.
 // @table EntityProxy
-EntityProxy::EntityProxy( gentity_t* ent, lua_State* L ) : ent( ent ), L( L ) {}
+EntityProxy::EntityProxy( gentity_t* ent, lua_State* L ) : ent( ent ), generation( ent ? ent->generation : 0 ), L( L ) {}
 
 namespace {
+
+static bool IsLiveEntity( EntityProxy* proxy )
+{
+	return proxy && proxy->ent && proxy->ent->inuse && proxy->ent->generation == proxy->generation;
+}
 
 #define GETTER( name )   \
 	{                    \
@@ -65,7 +70,7 @@ namespace {
 	static int Get##var( lua_State* L )                          \
 	{                                                            \
 		EntityProxy* proxy = LuaLib<EntityProxy>::check( L, 1 ); \
-		if ( !proxy || !proxy->ent ) return 0;                   \
+		if ( !IsLiveEntity( proxy ) ) return 0;                  \
 		lua_push##type( L, proxy->ent->var );                    \
 		return 1;                                                \
 	}
@@ -74,7 +79,7 @@ namespace {
 	static int Get##var( lua_State* L )                          \
 	{                                                            \
 		EntityProxy* proxy = LuaLib<EntityProxy>::check( L, 1 ); \
-		if ( !proxy || !proxy->ent ) return 0;                   \
+		if ( !IsLiveEntity( proxy ) ) return 0;                  \
 		func;                                                    \
 		return 1;                                                \
 	}
@@ -117,6 +122,16 @@ GET_FUNC2( maxs, Shared::Lua::PushVec3( L, proxy->ent->r.maxs ) )
 // @tfield integer number Read only.
 // @within EntityProxy
 GET_FUNC2( number, lua_pushinteger( L, proxy->ent->num() ) )
+/// The entity generation captured by this proxy.
+// @tfield integer generation Read only.
+// @within EntityProxy
+static int Getgeneration( lua_State* L )
+{
+	EntityProxy* proxy = LuaLib<EntityProxy>::check( L, 1 );
+	if ( !proxy || !proxy->ent ) return 0;
+	lua_pushinteger( L, proxy->generation );
+	return 1;
+}
 
 /// The entity team.
 // @tfield string team Read only.
@@ -124,7 +139,7 @@ GET_FUNC2( number, lua_pushinteger( L, proxy->ent->num() ) )
 static int Getteam( lua_State* L )
 {
 	EntityProxy* proxy = LuaLib<EntityProxy>::check( L, 1 );
-	if ( !proxy || !proxy->ent ) return 0;
+	if ( !IsLiveEntity( proxy ) ) return 0;
 	team_t team = TEAM_NONE;
 
 	switch ( proxy->ent->s.eType )
@@ -157,7 +172,7 @@ static int Getteam( lua_State* L )
 static int Getclient(lua_State* L)
 {
 	EntityProxy* proxy = LuaLib<EntityProxy>::check( L, 1 );
-	if (!proxy || !proxy->ent || !proxy->ent->client) return 0;
+	if (!IsLiveEntity( proxy ) || !proxy->ent->client) return 0;
 	if (!proxy->client || proxy->client->ent != proxy->ent)
 	{
 		proxy->client.reset(new Client(proxy->ent));
@@ -173,7 +188,7 @@ static int Getclient(lua_State* L)
 static int Getbot(lua_State* L)
 {
 	EntityProxy* proxy = LuaLib<EntityProxy>::check( L, 1 );
-	if (!proxy || !proxy->ent || !proxy->ent->botMind)
+	if (!IsLiveEntity( proxy ) || !proxy->ent->botMind)
 	{
 		proxy->bot.reset();
 		return 0;
@@ -193,7 +208,7 @@ static int Getbot(lua_State* L)
 static int Getbuildable(lua_State* L)
 {
 	EntityProxy* proxy = LuaLib<EntityProxy>::check( L, 1 );
-	if (!proxy || !proxy->ent || proxy->ent->s.eType != entityType_t::ET_BUILDABLE)
+	if (!IsLiveEntity( proxy ) || proxy->ent->s.eType != entityType_t::ET_BUILDABLE)
 	{
 		proxy->buildable.reset();
 		return 0;
@@ -211,6 +226,7 @@ static int Setorigin( lua_State* L )
 	if ( lua_istable( L, 2 ) )
 	{
 		EntityProxy* proxy = LuaLib<EntityProxy>::check( L, 1 );
+		if ( !IsLiveEntity( proxy ) ) return 0;
 		vec3_t origin;
 		Shared::Lua::CheckVec3( L, 2, origin );
 		VectorCopy( origin, proxy->ent->s.origin );
@@ -225,6 +241,7 @@ static int Setorigin2( lua_State* L )
 	if ( lua_istable( L, 2 ) )
 	{
 		EntityProxy* proxy = LuaLib<EntityProxy>::check( L, 1 );
+		if ( !IsLiveEntity( proxy ) ) return 0;
 		vec3_t origin;
 		Shared::Lua::CheckVec3( L, 2, origin );
 		VectorCopy( origin, proxy->ent->s.origin2 );
@@ -237,6 +254,7 @@ static int Setangles( lua_State* L )
 	if ( lua_istable( L, 2 ) )
 	{
 		EntityProxy* proxy = LuaLib<EntityProxy>::check( L, 1 );
+		if ( !IsLiveEntity( proxy ) ) return 0;
 		vec3_t angles;
 		Shared::Lua::CheckVec3( L, 2, angles );
 		VectorCopy( angles, proxy->ent->s.angles );
@@ -249,7 +267,7 @@ static int Setangles( lua_State* L )
 static int Setnextthink( lua_State* L )
 {
 	EntityProxy* proxy = LuaLib<EntityProxy>::check( L, 1 );
-	if ( !proxy ) return 0;
+	if ( !IsLiveEntity( proxy ) ) return 0;
 	int nextthink = luaL_checknumber( L, 2 );
 	if ( nextthink > level.time )
 	{
@@ -263,7 +281,7 @@ static int Setmins( lua_State* L )
 	if ( lua_istable( L, 2 ) )
 	{
 		EntityProxy* proxy = LuaLib<EntityProxy>::check( L, 1 );
-		if ( !proxy ) return 0;
+		if ( !IsLiveEntity( proxy ) ) return 0;
 		vec3_t mins;
 		Shared::Lua::CheckVec3( L, 2, mins );
 		VectorCopy( mins, proxy->ent->r.mins );
@@ -277,7 +295,7 @@ static int Setmaxs( lua_State* L )
 	if ( lua_istable( L, 2 ) )
 	{
 		EntityProxy* proxy = LuaLib<EntityProxy>::check( L, 1 );
-		if ( !proxy ) return 0;
+		if ( !IsLiveEntity( proxy ) ) return 0;
 		vec3_t maxs;
 		Shared::Lua::CheckVec3( L, 2, maxs );
 		VectorCopy( maxs, proxy->ent->r.maxs );
@@ -291,6 +309,7 @@ static int Setid( lua_State* L )
 	if ( lua_istable( L, 2 ) )
 	{
 		EntityProxy* proxy = LuaLib<EntityProxy>::check( L, 1 );
+		if ( !IsLiveEntity( proxy ) ) return 0;
 		const char* luaid = luaL_checkstring( L, 1 );
 		if ( proxy->ent->id )
 		{
@@ -308,6 +327,11 @@ void Push( lua_State* /*L*/, T /*arg*/ )
 template <>
 void Push<gentity_t*>( lua_State* L, gentity_t* ent )
 {
+	if ( !ent )
+	{
+		lua_pushnil( L );
+		return;
+	}
 	EntityProxy* proxy = Entity::CreateProxy( ent, L );
 	LuaLib<EntityProxy>::push( L, proxy );
 }
@@ -361,6 +385,11 @@ void PushArgs( lua_State* L, T arg, Args... args )
 	{                                                                                    \
 		EntityProxy* proxy = LuaLib<EntityProxy>::check( L, 1 );                         \
 		if ( !proxy ) return 0;                                                          \
+		if ( !IsLiveEntity( proxy ) )                                                    \
+		{                                                                                \
+			Log::Warn( "trying to modify a stale entity callback" );                     \
+			return 0;                                                                    \
+		}                                                                                \
 		int ref;                                                                         \
 		/* if set to nil, clear old lua function */                                      \
 		if ( lua_isnil( L, 2 ) )                                                         \
@@ -413,7 +442,7 @@ void PushArgs( lua_State* L, T arg, Args... args )
 	static int Get##method( lua_State* L )                                               \
 	{                                                                                    \
 		EntityProxy* proxy = LuaLib<EntityProxy>::check( L, 1 );                         \
-		if ( !proxy ) return 0;                                                          \
+		if ( !IsLiveEntity( proxy ) ) return 0;                                          \
 		lua_pushboolean( L, proxy->ent->method != nullptr );                             \
 		return 1;                                                                        \
 	}
@@ -486,6 +515,7 @@ luaL_Reg EntityProxyGetters[] = {
 	GETTER( mins ),
 	GETTER( maxs ),
 	GETTER( number ),
+	GETTER( generation ),
 	// Getters for functions just return bool if the function is set.
 	GETTER( think ),
 	GETTER( reset ),

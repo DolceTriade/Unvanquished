@@ -279,15 +279,23 @@ float BotGetGoalRadius( const gentity_t *self )
 	botTarget_t &t = self->botMind->goal;
 	glm::vec3 self_mins = VEC2GLM( self->r.mins );
 	glm::vec3 self_maxs = VEC2GLM( self->r.maxs );
+
+	if ( !t.isValid() )
+	{
+		return RadiusFromBounds2D( self_mins, self_maxs ) + BOT_OBSTACLE_AVOID_RANGE;
+	}
+
 	if ( t.targetsCoordinates() )
 	{
 		// we check the coord to be (almost) in our bounding box
 		return RadiusFromBounds2D( self_mins, self_maxs ) + BOT_OBSTACLE_AVOID_RANGE;
 	}
 
-	// we don't check if the entity is valid: an outdated result is
-	// better than failing here
 	const gentity_t *target = t.getTargetedEntity();
+	if ( !target )
+	{
+		return RadiusFromBounds2D( self_mins, self_maxs ) + BOT_OBSTACLE_AVOID_RANGE;
+	}
 	if ( target->s.modelindex == BA_H_MEDISTAT || target->s.modelindex == BA_A_BOOSTER )
 	{
 		// we want to be quite close to medistat.
@@ -302,7 +310,11 @@ float BotGetGoalRadius( const gentity_t *self )
 bool GoalInRange( const gentity_t *self, float r )
 {
 	gentity_t *ent = nullptr;
-	// we don't need to check the goal is valid here
+
+	if ( !self->botMind->goal.isValid() )
+	{
+		return false;
+	}
 
 	if ( self->botMind->goal.targetsCoordinates() )
 	{

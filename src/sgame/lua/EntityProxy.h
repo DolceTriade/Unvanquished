@@ -49,6 +49,7 @@ struct EntityProxy
 {
 	EntityProxy( gentity_t *ent, lua_State *L );
 	gentity_t *ent;
+	unsigned generation;
 
 	enum FunctionType
 	{

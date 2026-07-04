@@ -938,7 +938,13 @@ AINodeStatus_t BotActionFight( gentity_t *self, AIGenericNode_t *node )
 
 	if ( self->botMind->currentNode != node )
 	{
-		if ( !BotEntityIsValidEnemyTarget( self, self->botMind->bestEnemy.goal.getTargetedEntity() ) || !BotChangeGoalEntity( self, self->botMind->bestEnemy.goal.getTargetedEntity() ) )
+		const gentity_t *target = self->botMind->bestEnemy.goal.getTargetedEntity();
+		if ( !BotEntityIsValidEnemyTarget( self, target ) )
+		{
+			target = mind->goal.getTargetedEntity();
+		}
+
+		if ( !BotEntityIsValidEnemyTarget( self, target ) || !BotChangeGoalEntity( self, const_cast<gentity_t *>( target ) ) )
 		{
 			return STATUS_FAILURE;
 		}
@@ -1234,6 +1240,11 @@ AINodeStatus_t BotActionRoamInRadius( gentity_t *self, AIGenericNode_t *node )
 		}
 		self->botMind->currentNode = node;
 	}
+	else if ( !self->botMind->goal.isValid() )
+	{
+		self->botMind->currentNode = nullptr;
+		return STATUS_FAILURE;
+	}
 
 	if ( GoalInRange( self, BotGetGoalRadius( self ) ) )
 	{
@@ -1253,6 +1264,11 @@ AINodeStatus_t BotActionRoam( gentity_t *self, AIGenericNode_t *node )
 			return STATUS_FAILURE;
 		}
 		self->botMind->currentNode = node;
+	}
+	else if ( !self->botMind->goal.isValid() )
+	{
+		self->botMind->currentNode = nullptr;
+		return STATUS_FAILURE;
 	}
 
 	if ( GoalInRange( self, BotGetGoalRadius( self ) ) )

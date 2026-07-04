@@ -155,8 +155,8 @@ void G_InitSkilltreeCvars()
 		Cvar::NONE,
 		"1:movement 1:fighting 1:feels-pain 1:buy-modern-armor 1:medkit "
 		"3:strafe-attack "
-		"5:aim-barbs 5:mantis-attack-jump 5:small-attack-jump 5:mara-attack-jump 5:goon-attack-jump 5:tyrant-attack-run 5:a-fast-flee 5:h-fast-flee 5:prefer-armor 5:lcannon-tricks "
-		"7:aim-head 7:predict-aim 7:safe-barbs "
+		"5:aim-barbs 5:mantis-attack-jump 5:small-attack-jump 5:mara-attack-jump 5:goon-attack-jump 5:tyrant-attack-run 5:a-fast-flee 5:h-fast-flee 5:prefer-armor 5:lcannon-tricks 5:aim-head"
+		"7:predict-aim 7:safe-barbs "
 		, // unused: fast-aim
 		G_SetBaseSkillset
 		);

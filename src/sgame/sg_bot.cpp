@@ -585,9 +585,10 @@ void G_BotThink( gentity_t *self )
 	self->botMind->willSprint( false ); //let the BT decide that
 	AINodeStatus_t status =
 		self->botMind->behaviorTree->run( self, ( AIGenericNode_t * ) self->botMind->behaviorTree );
+
 	self->botMind->lastThink = level.time;
 
-	if ( traceClient.Get() == self->num() )
+	if ( traceClient.Get() == self->num() && self->botMind->behaviorTree->type != LUA_BEHAVIOR_NODE )
 	{
 		ShowRunningNode( self, status );
 	}
@@ -955,4 +956,9 @@ std::string G_BotToString( gentity_t *bot )
 			BotGoalToString( bot ),
 			bot->botMind->skillLevel,
 			bot->botMind->skillSetExplaination );
+}
+
+int G_BotTraceClient()
+{
+	return traceClient.Get();
 }

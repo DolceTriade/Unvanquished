@@ -85,6 +85,14 @@ GET_FUNC( evos,
 // @tfield string evos Read only.
 // @within Client
 GET_FUNC( weapon, lua_pushstring( L, BG_Weapon( c->ent->client->ps.stats[ STAT_WEAPON ] )->name ) )
+/// Current ammo in the active weapon.
+// @tfield integer ammo Read only.
+// @within Client
+GET_FUNC( ammo, lua_pushinteger( L, c->ent->client->ps.ammo ) )
+/// Current spare clips in the active weapon.
+// @tfield integer clips Read only.
+// @within Client
+GET_FUNC( clips, lua_pushinteger( L, c->ent->client->ps.clips ) )
 /// The client's health.
 // @tfield number health Read/Write.
 // @within Client
@@ -431,6 +439,8 @@ luaL_Reg ClientGetters[] = {
 	GETTER( credits ),
 	GETTER( evos ),
 	GETTER( weapon ),
+	GETTER( ammo ),
+	GETTER( clips ),
 	GETTER( health ),
 	GETTER( class ),
 	GETTER( stamina ),

@@ -52,7 +52,8 @@ std::vector<EntityProxy*> Entity::proxies( MAX_GENTITIES );
 EntityProxy* Entity::CreateProxy( gentity_t* ent, lua_State* L )
 {
 	int entNum = ent->num();
-	if ( !Entity::proxies[ entNum ] || !Entity::proxies[ entNum ]->ent )
+	EntityProxy* proxy = Entity::proxies[ entNum ];
+	if ( !proxy || !proxy->ent || proxy->generation != ent->generation )
 	{
 		Entity::proxies[ entNum ] = new EntityProxy( ent, L );
 	}
@@ -60,6 +61,11 @@ EntityProxy* Entity::CreateProxy( gentity_t* ent, lua_State* L )
 }
 
 namespace {
+
+static bool IsLiveEntityProxy( EntityProxy* proxy )
+{
+	return proxy && proxy->ent && proxy->ent->inuse && proxy->ent->generation == proxy->generation;
+}
 
 /// FindById an entity based on their id. This id must be set manually prior.
 // @function find_by_id
@@ -175,7 +181,11 @@ int New( lua_State* L )
 int Delete( lua_State* L )
 {
 	EntityProxy* proxy = LuaLib<EntityProxy>::check( L, 1 );
-	if ( !proxy ) return 0;
+	if ( !IsLiveEntityProxy( proxy ) )
+	{
+		Log::Warn( "Lua code tried to delete a stale entity." );
+		return 0;
+	}
 	if ( Q_strncmp( proxy->ent->classname, "lua", strlen( proxy->ent->classname ) ) != 0 )
 	{
 		Log::Warn( "Lua code only allowed to delete entities created by lua." );
