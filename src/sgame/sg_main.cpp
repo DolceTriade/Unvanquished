@@ -2471,6 +2471,7 @@ void G_RunFrame( int levelTime )
 
 	// update some configstrings
 	G_TransmitGameplayCvars();
+
 }
 
 void G_PrepareEntityNetCode() {

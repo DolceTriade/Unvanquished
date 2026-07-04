@@ -37,7 +37,9 @@ Maryland 20850 USA.
 #include "sgame/lua/EntityProxy.h"
 #include "sgame/lua/Interpreter.h"
 #include "sgame/sg_bot_parse.h"
+#include "sgame/sg_bot_util.h"
 #include "shared/lua/LuaLib.h"
+#include "shared/lua/Utils.h"
 #include <vector>
 
 namespace Lua
@@ -55,14 +57,20 @@ struct AILuaNode_t
 	AINodeRunner run;
 	// Custom properties.
 	int ref;
+};
+
+struct BotBehaviorState
+{
+	AILuaNode_t *ownerNode = nullptr;
 	AIBotActionWrapper actions[ 2 ];
-	int activeAction;
+	int activeAction = 0;
 };
 
 struct BotContext
 {
 	gentity_t *self;
 	AILuaNode_t *node;
+	BotBehaviorState *actionState;
 };
 
 namespace
@@ -72,6 +80,98 @@ using Shared::Lua::LuaLib;
 using Shared::Lua::RegType;
 
 static bool botContextRegistered = false;
+
+static const char *StatusName( AINodeStatus_t status )
+{
+	switch ( status )
+	{
+		case STATUS_FAILURE: return "FAILURE";
+		case STATUS_SUCCESS: return "SUCCESS";
+		case STATUS_RUNNING: return "RUNNING";
+	}
+
+	return "UNKNOWN";
+}
+
+static void TraceLuaAction( BotContext *ctx, lua_State *L, const char *name, AINodeStatus_t status )
+{
+	if ( !ctx || !ctx->self || G_BotTraceClient() != ctx->self->num() )
+	{
+		return;
+	}
+
+	lua_Debug ar = {};
+	const char *source = "[C]";
+	int line = 0;
+
+	if ( lua_getstack( L, 1, &ar ) && lua_getinfo( L, "Sl", &ar ) )
+	{
+		if ( ar.source && ar.source[ 0 ] == '@' )
+		{
+			source = ar.source + 1;
+		}
+		else if ( ar.short_src[ 0 ] )
+		{
+			source = ar.short_src;
+		}
+		line = ar.currentline;
+	}
+
+	Log::defaultLogger.WithoutSuppression().Notice(
+		"lua bot %d %s:%d %s -> %s",
+		ctx->self->num(), source, line, name, StatusName( status ) );
+}
+
+static bool IsLiveEntityProxy( EntityProxy *proxy )
+{
+	return proxy && proxy->ent && proxy->ent->inuse && proxy->ent->generation == proxy->generation;
+}
+
+static EntityProxy *CheckEntityProxyArg( lua_State *L, int index )
+{
+	auto **proxy = static_cast<EntityProxy **>(
+		luaL_checkudata( L, index, Shared::Lua::GetTClassName<EntityProxy>() ) );
+	if ( !proxy || !IsLiveEntityProxy( *proxy ) )
+	{
+		luaL_argerror( L, index, "expected a live EntityProxy" );
+	}
+
+	return *proxy;
+}
+
+static glm::vec3 CheckPositionArg( lua_State *L, int index )
+{
+	glm::vec3 result;
+	if ( lua_istable( L, index ) )
+	{
+		for ( int i = 0; i < 3; ++i )
+		{
+			lua_rawgeti( L, index, i + 1 );
+			if ( !lua_isnumber( L, -1 ) )
+			{
+				lua_pop( L, 1 );
+				luaL_argerror( L, index, "expected a vec3 array or three numeric coordinates" );
+			}
+			result[ i ] = lua_tonumber( L, -1 );
+			lua_pop( L, 1 );
+		}
+		return result;
+	}
+
+	if ( lua_isnumber( L, index ) &&
+	     lua_isnumber( L, index + 1 ) &&
+	     lua_isnumber( L, index + 2 ) )
+	{
+		for ( int i = 0; i < 3; ++i )
+		{
+			result[ i ] = lua_tonumber( L, index + i );
+		}
+		return result;
+	}
+
+	luaL_argerror( L, index, "expected a vec3 array or three numeric coordinates" );
+	return {};
+}
 
 static void DestroyActionWrapper( AIBotActionWrapper& wrapper )
 {
@@ -87,6 +187,28 @@ static void DestroyActionWrapper( AIBotActionWrapper& wrapper )
 
 	BG_Free( wrapper.action.params );
 	wrapper = {};
+}
+
+static BotBehaviorState& GetBotBehaviorState( botMemory_t& memory, AILuaNode_t *node )
+{
+	if ( !memory.luaBehaviorState )
+	{
+		memory.luaBehaviorState = new BotBehaviorState();
+	}
+
+	BotBehaviorState& state = *memory.luaBehaviorState;
+	if ( state.ownerNode != node )
+	{
+		for ( AIBotActionWrapper& wrapper : state.actions )
+		{
+			DestroyActionWrapper( wrapper );
+		}
+
+		state = {};
+		state.ownerNode = node;
+	}
+
+	return state;
 }
 
 static AIValue_t CloneValue( AIValue_t value )
@@ -168,6 +290,194 @@ static bool BoxLuaValue( lua_State *L, int index, AIValue_t& out )
 	}
 }
 
+static bool ParseMoveDir( const char *name, int& out )
+{
+	if ( !Q_stricmp( name, "forward" ) )
+	{
+		out = MOVE_FORWARD;
+		return true;
+	}
+	if ( !Q_stricmp( name, "backward" ) || !Q_stricmp( name, "back" ) )
+	{
+		out = MOVE_BACKWARD;
+		return true;
+	}
+	if ( !Q_stricmp( name, "left" ) )
+	{
+		out = MOVE_LEFT;
+		return true;
+	}
+	if ( !Q_stricmp( name, "right" ) )
+	{
+		out = MOVE_RIGHT;
+		return true;
+	}
+	return false;
+}
+
+static bool ParseAIEntityName( const char *name, int& out )
+{
+	if ( !Q_stricmp( name, "goal" ) )
+	{
+		out = E_GOAL;
+		return true;
+	}
+	if ( !Q_stricmp( name, "enemy" ) )
+	{
+		out = E_ENEMY;
+		return true;
+	}
+	if ( !Q_stricmp( name, "damaged_building" ) || !Q_stricmp( name, "damagedbuilding" ) )
+	{
+		out = E_DAMAGEDBUILDING;
+		return true;
+	}
+	if ( !Q_stricmp( name, "friendly_building" ) || !Q_stricmp( name, "friendlybuilding" ) )
+	{
+		out = E_FRIENDLYBUILDING;
+		return true;
+	}
+	if ( !Q_stricmp( name, "enemy_building" ) || !Q_stricmp( name, "enemybuilding" ) )
+	{
+		out = E_ENEMYBUILDING;
+		return true;
+	}
+	if ( !Q_stricmp( name, "self" ) )
+	{
+		out = E_SELF;
+		return true;
+	}
+	if ( !Q_stricmp( name, "userpos" ) || !Q_stricmp( name, "user_pos" ) )
+	{
+		out = E_USERPOS;
+		return true;
+	}
+
+	if ( !Q_stricmp( name, "eggpod" ) || !Q_stricmp( name, "spawn" ) || !Q_stricmp( name, "a_spawn" ) )
+	{
+		out = E_A_SPAWN;
+		return true;
+	}
+	if ( !Q_stricmp( name, "overmind" ) )
+	{
+		out = E_A_OVERMIND;
+		return true;
+	}
+	if ( !Q_stricmp( name, "booster" ) )
+	{
+		out = E_A_BOOSTER;
+		return true;
+	}
+	if ( !Q_stricmp( name, "telenode" ) || !Q_stricmp( name, "h_spawn" ) )
+	{
+		out = E_H_SPAWN;
+		return true;
+	}
+	if ( !Q_stricmp( name, "arm" ) || !Q_stricmp( name, "armoury" ) || !Q_stricmp( name, "armory" ) )
+	{
+		out = E_H_ARMOURY;
+		return true;
+	}
+	if ( !Q_stricmp( name, "medistat" ) )
+	{
+		out = E_H_MEDISTAT;
+		return true;
+	}
+	if ( !Q_stricmp( name, "drill" ) )
+	{
+		out = E_H_DRILL;
+		return true;
+	}
+	if ( !Q_stricmp( name, "reactor" ) )
+	{
+		out = E_H_REACTOR;
+		return true;
+	}
+
+	return false;
+}
+
+static bool BoxLuaActionValue( lua_State *L, const char *actionName, int index, AIValue_t& out )
+{
+	if ( lua_type( L, index ) == LUA_TSTRING )
+	{
+		const char *name = lua_tostring( L, index );
+
+		if ( !Q_stricmp( actionName, "evolveTo" ) )
+		{
+			const classAttributes_t *clazz = BG_ClassByName( name );
+			if ( !clazz || clazz->number == PCL_NONE )
+			{
+				return false;
+			}
+			out = AIBoxInt( clazz->number );
+			return true;
+		}
+
+		if ( !Q_stricmp( actionName, "buyPrimary" ) ||
+		     ( !Q_stricmp( actionName, "buy" ) && index == 1 ) )
+		{
+			const weaponAttributes_t *weapon = BG_WeaponByName( name );
+			if ( !weapon || weapon->number == WP_NONE )
+			{
+				return false;
+			}
+			out = AIBoxInt( weapon->number );
+			return true;
+		}
+
+		if ( !Q_stricmp( actionName, "buy" ) && index > 1 )
+		{
+			const upgradeAttributes_t *upgrade = BG_UpgradeByName( name );
+			if ( !upgrade || upgrade->number == UP_NONE )
+			{
+				return false;
+			}
+			out = AIBoxInt( upgrade->number );
+			return true;
+		}
+
+		if ( !Q_stricmp( actionName, "activateUpgrade" ) ||
+		     !Q_stricmp( actionName, "deactivateUpgrade" ) )
+		{
+			const upgradeAttributes_t *upgrade = BG_UpgradeByName( name );
+			if ( !upgrade || upgrade->number == UP_NONE )
+			{
+				return false;
+			}
+			out = AIBoxInt( upgrade->number );
+			return true;
+		}
+
+		if ( !Q_stricmp( actionName, "moveInDir" ) )
+		{
+			int dir = 0;
+			if ( !ParseMoveDir( name, dir ) )
+			{
+				return false;
+			}
+			out = AIBoxInt( dir );
+			return true;
+		}
+
+		if ( !Q_stricmp( actionName, "roamInRadius" ) ||
+		     !Q_stricmp( actionName, "moveTo" ) ||
+		     !Q_stricmp( actionName, "changeGoal" ) ||
+		     !Q_stricmp( actionName, "follow" ) )
+		{
+			int entity = 0;
+			if ( !ParseAIEntityName( name, entity ) )
+			{
+				return false;
+			}
+			out = AIBoxInt( entity );
+			return true;
+		}
+	}
+
+	return BoxLuaValue( L, index, out );
+}
+
 static AINodeStatus_t ExecuteAction( BotContext *ctx, const char *name, AINodeRunner run,
                                      int minparams, int maxparams, lua_State *L )
 {
@@ -182,7 +492,7 @@ static AINodeStatus_t ExecuteAction( BotContext *ctx, const char *name, AINodeRu
 	std::vector<AIValue_t> params( argCount );
 	for ( int i = 0; i < argCount; ++i )
 	{
-		if ( !BoxLuaValue( L, i + 1, params[ i ] ) )
+		if ( !BoxLuaActionValue( L, name, i + 1, params[ i ] ) )
 		{
 			Log::Warn( "lua action '%s' received unsupported argument type at index %d",
 			           name, i + 1 );
@@ -194,12 +504,21 @@ static AINodeStatus_t ExecuteAction( BotContext *ctx, const char *name, AINodeRu
 		}
 	}
 
-	AIBotActionWrapper& active = ctx->node->actions[ ctx->node->activeAction ];
 	AIActionNode_t *actionNode = nullptr;
 
-	if ( active.used && ActionMatches( active.action, run, params.data(), argCount ) )
+	for ( int i = 0; i < 2; ++i )
 	{
-		actionNode = &active.action;
+		AIBotActionWrapper& wrapper = ctx->actionState->actions[ i ];
+		if ( wrapper.used && ActionMatches( wrapper.action, run, params.data(), argCount ) )
+		{
+			ctx->actionState->activeAction = i;
+			actionNode = &wrapper.action;
+			break;
+		}
+	}
+
+	if ( actionNode )
+	{
 		for ( AIValue_t value : params )
 		{
 			AIDestroyValue( value );
@@ -207,28 +526,39 @@ static AINodeStatus_t ExecuteAction( BotContext *ctx, const char *name, AINodeRu
 	}
 	else
 	{
-		const int inactiveIndex = 1 - ctx->node->activeAction;
-		AIBotActionWrapper& inactive = ctx->node->actions[ inactiveIndex ];
-		DestroyActionWrapper( inactive );
+		int replaceIndex = 1 - ctx->actionState->activeAction;
+		AIGenericNode_t *currentNode = ctx->self->botMind->currentNode;
 
-		inactive.used = true;
-		inactive.action.type = ACTION_NODE;
-		inactive.action.run = run;
-		inactive.action.nparams = argCount;
-		inactive.action.lineNum = 0;
-		inactive.action.name = name;
+		for ( int i = 0; i < 2; ++i )
+		{
+			if ( reinterpret_cast<AIGenericNode_t *>( &ctx->actionState->actions[ i ].action ) != currentNode )
+			{
+				replaceIndex = i;
+				break;
+			}
+		}
+
+		AIBotActionWrapper& replacement = ctx->actionState->actions[ replaceIndex ];
+		DestroyActionWrapper( replacement );
+
+		replacement.used = true;
+		replacement.action.type = ACTION_NODE;
+		replacement.action.run = run;
+		replacement.action.nparams = argCount;
+		replacement.action.lineNum = 0;
+		replacement.action.name = name;
 		if ( argCount > 0 )
 		{
-			inactive.action.params =
+			replacement.action.params =
 				static_cast<AIValue_t *>( BG_Alloc( sizeof( AIValue_t ) * argCount ) );
 			for ( int i = 0; i < argCount; ++i )
 			{
-				inactive.action.params[ i ] = CloneValue( params[ i ] );
+				replacement.action.params[ i ] = CloneValue( params[ i ] );
 			}
 		}
 		else
 		{
-			inactive.action.params = nullptr;
+			replacement.action.params = nullptr;
 		}
 
 		for ( AIValue_t value : params )
@@ -236,11 +566,14 @@ static AINodeStatus_t ExecuteAction( BotContext *ctx, const char *name, AINodeRu
 			AIDestroyValue( value );
 		}
 
-		ctx->node->activeAction = inactiveIndex;
-		actionNode = &inactive.action;
+		ctx->actionState->activeAction = replaceIndex;
+		actionNode = &replacement.action;
 	}
 
-	return BotEvaluateNode( ctx->self, reinterpret_cast<AIGenericNode_t *>( actionNode ) );
+	AINodeStatus_t status =
+		BotEvaluateNode( ctx->self, reinterpret_cast<AIGenericNode_t *>( actionNode ) );
+	TraceLuaAction( ctx, L, name, status );
+	return status;
 }
 
 static AINodeStatus_t ExecuteSpawnAs( BotContext *ctx, lua_State *L )
@@ -345,6 +678,81 @@ static int MethodspawnAs( lua_State *L, BotContext *ctx )
 	lua_pushinteger( L, ExecuteSpawnAs( ctx, L ) );
 	return 1;
 }
+
+static int MethoddistanceToEntity( lua_State *L, BotContext *ctx )
+{
+	EntityProxy *proxy = CheckEntityProxyArg( L, 1 );
+	lua_pushnumber( L, G_Distance( ctx->self, proxy->ent ) );
+	return 1;
+}
+
+static int MethoddistanceToPosition( lua_State *L, BotContext *ctx )
+{
+	glm::vec3 position = CheckPositionArg( L, 1 );
+	lua_pushnumber( L, Distance( ctx->self->s.origin, GLM4READ( position ) ) );
+	return 1;
+}
+
+static int MethoddirectPathToEntity( lua_State *L, BotContext *ctx )
+{
+	EntityProxy *proxy = CheckEntityProxyArg( L, 1 );
+	botTarget_t target;
+	target = proxy->ent;
+	lua_pushboolean( L, BotPathIsWalkable( ctx->self, target ) );
+	return 1;
+}
+
+static int MethoddirectPathToPosition( lua_State *L, BotContext *ctx )
+{
+	glm::vec3 position = CheckPositionArg( L, 1 );
+	botTarget_t target;
+	target = position;
+	lua_pushboolean( L, BotPathIsWalkable( ctx->self, target ) );
+	return 1;
+}
+
+static int MethodisVisibleEntity( lua_State *L, BotContext *ctx )
+{
+	EntityProxy *proxy = CheckEntityProxyArg( L, 1 );
+	botTarget_t target;
+	target = proxy->ent;
+
+	bool visible = BotTargetIsVisible( ctx->self, target, MASK_OPAQUE );
+	if ( visible && BotEntityIsValidTarget( proxy->ent ) )
+	{
+		ctx->self->botMind->enemyLastSeen = level.time;
+	}
+
+	lua_pushboolean( L, visible );
+	return 1;
+}
+
+static int MethodinAttackRangeEntity( lua_State *L, BotContext *ctx )
+{
+	EntityProxy *proxy = CheckEntityProxyArg( L, 1 );
+	botTarget_t target;
+	target = proxy->ent;
+	lua_pushboolean( L, BotTargetInAttackRange( ctx->self, target ) );
+	return 1;
+}
+
+#define GET_CTX_FUNC( var, func )                            \
+	static int GetCtx##var( lua_State *L )                   \
+	{                                                        \
+		BotContext *ctx = LuaLib<BotContext>::check( L, 1 ); \
+		if ( !ctx || !ctx->self )                            \
+		{                                                    \
+			Log::Warn( "trying to access stale bot context!" ); \
+			return 0;                                        \
+		}                                                    \
+		func;                                                \
+		return 1;                                            \
+	}
+
+GET_CTX_FUNC( baseRushScore, lua_pushnumber( L, BotGetBaseRushScore( ctx->self ) ) )
+
+#undef GET_CTX_FUNC
+
 DEFINE_BOT_ACTION_METHOD( stayHere, BotActionStayHere, 1, 1 )
 DEFINE_BOT_ACTION_METHOD( strafeDodge, BotActionStrafeDodge, 0, 0 )
 DEFINE_BOT_ACTION_METHOD( suicide, BotActionSuicide, 0, 0 )
@@ -392,10 +800,17 @@ RegType<BotContext> BotContextMethods[] =
 	{ "strafeDodge", MethodstrafeDodge },
 	{ "suicide", Methodsuicide },
 	{ "teleport", Methodteleport },
+	{ "distanceToEntity", MethoddistanceToEntity },
+	{ "distanceToPosition", MethoddistanceToPosition },
+	{ "directPathToEntity", MethoddirectPathToEntity },
+	{ "directPathToPosition", MethoddirectPathToPosition },
+	{ "isVisibleEntity", MethodisVisibleEntity },
+	{ "inAttackRangeEntity", MethodinAttackRangeEntity },
 	{ nullptr, nullptr },
 };
 
 luaL_Reg BotContextGetters[] = {
+	{ "baseRushScore", GetCtxbaseRushScore },
 	{ nullptr, nullptr },
 };
 
@@ -433,7 +848,7 @@ AINodeStatus_t runLuaBehavior( gentity_t *self, AIGenericNode_t *node )
 	AILuaNode_t *root = reinterpret_cast<AILuaNode_t *>( bt->root );
 	EnsureBotContextRegistered( L );
 
-	BotContext context = { self, root };
+	BotContext context = { self, root, &GetBotBehaviorState( *self->botMind, root ) };
 	lua_rawgeti( L, LUA_REGISTRYINDEX, root->ref );
 	LuaLib<EntityProxy>::push( L, Entity::CreateProxy( self, L ) );
 	LuaLib<BotContext>::push( L, &context );
@@ -463,9 +878,6 @@ AIGenericNode_t *luaNode( int funcRef )
 	node->type = LUA_ACTION_NODE;
 	node->run = nullptr;
 	node->ref = funcRef;
-	node->actions[ 0 ] = {};
-	node->actions[ 1 ] = {};
-	node->activeAction = 0;
 	return reinterpret_cast<AIGenericNode_t *>( node );
 }
 
@@ -533,10 +945,24 @@ void FreeLuaActionNode( AIGenericNode_t *node )
 	}
 
 	AILuaNode_t *luaNode = reinterpret_cast<AILuaNode_t *>( node );
-	DestroyActionWrapper( luaNode->actions[ 0 ] );
-	DestroyActionWrapper( luaNode->actions[ 1 ] );
 	luaL_unref( State(), LUA_REGISTRYINDEX, luaNode->ref );
 	BG_Free( luaNode );
+}
+
+void ResetBotBehaviorState( botMemory_t& memory )
+{
+	if ( !memory.luaBehaviorState )
+	{
+		return;
+	}
+
+	for ( AIBotActionWrapper& wrapper : memory.luaBehaviorState->actions )
+	{
+		DestroyActionWrapper( wrapper );
+	}
+
+	delete memory.luaBehaviorState;
+	memory.luaBehaviorState = nullptr;
 }
 
 }  // namespace Lua

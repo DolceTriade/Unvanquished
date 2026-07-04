@@ -69,24 +69,36 @@ void PushVec3(lua_State* L, const vec3_t vec)
 
 bool CheckVec3(lua_State* L, int pos, vec3_t vec)
 {
-	if (!lua_istable(L, pos))
+	if ( lua_istable( L, pos ) )
 	{
-		Log::Warn("CheckVec3: Input must be a table.");
-		return false;
-	}
-	int index = 0;
-	lua_pushnil(L);
-	while (lua_next(L, pos) != 0) {
-		/* uses 'key' (at index -2) and 'value' (at index -1) */
-		vec[index++] = luaL_checknumber(L, -1);
-		/* removes 'value'; keeps 'key' for next iteration */
-		lua_pop(L, 1);
-
-		if (index >= 3) {
-			break;
+		for ( int i = 0; i < 3; ++i )
+		{
+			lua_rawgeti( L, pos, i + 1 );
+			if ( !lua_isnumber( L, -1 ) )
+			{
+				lua_pop( L, 1 );
+				Log::Warn( "CheckVec3: Input table must contain three numbers." );
+				return false;
+			}
+			vec[ i ] = lua_tonumber( L, -1 );
+			lua_pop( L, 1 );
 		}
+		return true;
 	}
-	return true;
+
+	if ( lua_isnumber( L, pos ) &&
+	     lua_isnumber( L, pos + 1 ) &&
+	     lua_isnumber( L, pos + 2 ) )
+	{
+		for ( int i = 0; i < 3; ++i )
+		{
+			vec[ i ] = lua_tonumber( L, pos + i );
+		}
+		return true;
+	}
+
+	Log::Warn( "CheckVec3: Input must be a vec3 table or three numeric arguments." );
+	return false;
 }
 
 int SetAttributeInt( lua_State* L, bgAttributeFamily_t family, size_t objectIndex, const char* ownerName, const char* fieldName, int valueIndex )
