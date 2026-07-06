@@ -9,6 +9,7 @@ local weapons = Unv.weapons
 local math_floor = math.floor
 local STATE = {
     alien_target_lock = {},
+    alien_combat_until = {},
 }
 
 local BUILDER_ANCHOR_RADIUS = 700
@@ -19,6 +20,15 @@ local ALIEN_EVOLVE_TARGETS = {
     "level2upg",
     "level2",
     "level1",
+}
+local ALIEN_COMBAT_TARGETS = {
+    "level4",
+    "level3upg",
+    "level3",
+    "level2upg",
+    "level2",
+    "level1",
+    "level0",
 }
 
 local function elapsed_since(now, timestamp)
@@ -106,6 +116,10 @@ local function clear_alien_target_lock(number)
     STATE.alien_target_lock[number] = nil
 end
 
+local function clear_alien_combat_latch(number)
+    STATE.alien_combat_until[number] = nil
+end
+
 local function lock_alien_target(number, entity, now)
     if not entity or not entity_is_alive(entity) then
         return
@@ -115,6 +129,15 @@ local function lock_alien_target(number, entity, now)
         ref = entity_ref(entity),
         seen_at = now,
     }
+end
+
+local function alien_combat_latched(number, now)
+    local until_time = STATE.alien_combat_until[number]
+    return until_time and until_time > now or false
+end
+
+local function note_alien_combat(number, now, duration)
+    STATE.alien_combat_until[number] = now + duration
 end
 
 local function alien_target_lock(number)
@@ -243,6 +266,22 @@ local function best_alien_evolve_target(client, level)
     return nil
 end
 
+local function best_alien_combat_target(client)
+    local current = class_attr(client.class)
+    if not current then
+        return nil
+    end
+
+    for _, class_name in ipairs(ALIEN_COMBAT_TARGETS) do
+        local target = class_attr(class_name)
+        if target and class_name ~= client.class and client.credits + current.price >= target.price then
+            return class_name
+        end
+    end
+
+    return nil
+end
+
 local function health_fraction(client)
     local max_health = class_health(client.class)
     if max_health <= 0 then
@@ -290,29 +329,35 @@ local function choose_alien_enemy(number, now, enemy_target, enemy_visible, host
     if not locked_entity then
         if sensed_entity then
             lock_alien_target(number, sensed_entity, now)
+            note_alien_combat(number, now, 1500)
             return sensed_entity
         end
 
         clear_alien_target_lock(number)
+        clear_alien_combat_latch(number)
         return nil
     end
 
     local locked_distance = ctx:distanceToEntity(locked_entity)
     if locked_distance and aliensense_range > 0 and locked_distance <= aliensense_range then
         lock.seen_at = now
+        note_alien_combat(number, now, 1500)
         return locked_entity
     end
 
     if elapsed_since(now, lock.seen_at) <= chase_time then
+        note_alien_combat(number, now, 1000)
         return locked_entity
     end
 
     if sensed_entity then
         lock_alien_target(number, sensed_entity, now)
+        note_alien_combat(number, now, 1500)
         return sensed_entity
     end
 
     clear_alien_target_lock(number)
+    clear_alien_combat_latch(number)
     return nil
 end
 
@@ -498,6 +543,28 @@ end
 
 local maybe_fight
 
+local function maybe_retire_builder(team, client, builder, wants_build, ctx)
+    if not builder or wants_build then
+        return STATUS_FAILURE
+    end
+
+    if is_human(team) then
+        return ctx:equip()
+    end
+
+    if is_alien(team) then
+        local target = best_alien_combat_target(client)
+        if target then
+            local status = ctx:evolveTo(target)
+            if status ~= STATUS_FAILURE then
+                return status
+            end
+        end
+    end
+
+    return STATUS_FAILURE
+end
+
 local function maybe_builder_behavior(team, client, builder, wants_build, level, builder_elapsed,
     enemy, enemy_visible, hostile_goal, ctx, mind)
     if not wants_build then
@@ -620,14 +687,15 @@ maybe_fight = function(team, weapon, enemy, enemy_target, hostile_goal, enemy_vi
     return STATUS_FAILURE
 end
 
-local function maybe_heal_or_fight_alien(health_frac, enemy, enemy_target, hostile_goal,
+local function maybe_heal_or_fight_alien(number, health_frac, enemy, enemy_target, hostile_goal,
     enemy_visible, base_rush_score, level, ctx, mind)
     local overmind_distance = building_distance(mind, "overmind")
     local booster_distance = building_distance(mind, "booster")
     local in_safe_heal_area = (overmind_distance and overmind_distance <= 200)
         or (booster_distance and booster_distance <= 200)
     local recently_in_combat = elapsed_since(level.time, mind.enemyLastSeen) < 2000
-    local alerted = enemy ~= nil or hostile_goal or recently_in_combat
+    local latched = alien_combat_latched(number, level.time)
+    local alerted = enemy ~= nil or hostile_goal or recently_in_combat or latched
 
     if alerted then
         if health_frac < 0.4
@@ -639,7 +707,11 @@ local function maybe_heal_or_fight_alien(health_frac, enemy, enemy_target, hosti
             end
         end
 
-        return maybe_fight("aliens", nil, enemy, enemy_target, hostile_goal, enemy_visible, ctx)
+        local status = maybe_fight("aliens", nil, enemy, enemy_target, hostile_goal, enemy_visible, ctx)
+        if status ~= STATUS_FAILURE then
+            note_alien_combat(number, level.time, 1500)
+        end
+        return status
     end
 
     if health_frac < 0.4 and not in_safe_heal_area then
@@ -741,6 +813,7 @@ return function(self, ctx)
 
     if queued_for_spawn(self) and not alive(self) then
         clear_alien_target_lock(number)
+        clear_alien_combat_latch(number)
         return choose_spawn(team, number, team_snapshot, team_level_data, ctx)
     end
 
@@ -767,6 +840,7 @@ return function(self, ctx)
         hostile_goal = hostile_goal or enemy ~= nil
     else
         clear_alien_target_lock(number)
+        clear_alien_combat_latch(number)
     end
 
     local health_frac = health_fraction(client)
@@ -778,6 +852,11 @@ return function(self, ctx)
     end
 
     local status = do_unstick(team, builder, level.time, ctx, mind, enemy, enemy_visible)
+    if status ~= STATUS_FAILURE then
+        return status
+    end
+
+    status = maybe_retire_builder(team, client, builder, wants_build, ctx)
     if status ~= STATUS_FAILURE then
         return status
     end
@@ -804,7 +883,7 @@ return function(self, ctx)
             return status
         end
 
-        status = maybe_heal_or_fight_alien(health_frac, enemy, enemy_target, hostile_goal,
+        status = maybe_heal_or_fight_alien(number, health_frac, enemy, enemy_target, hostile_goal,
             enemy_visible, base_rush_score, level, ctx, mind)
         if status ~= STATUS_FAILURE then
             return status
