@@ -155,7 +155,7 @@ void G_InitSkilltreeCvars()
 		Cvar::NONE,
 		"1:movement 1:fighting 1:feels-pain 1:buy-modern-armor 1:medkit "
 		"3:strafe-attack "
-		"5:aim-barbs 5:mantis-attack-jump 5:small-attack-jump 5:mara-attack-jump 5:goon-attack-jump 5:tyrant-attack-run 5:a-fast-flee 5:h-fast-flee 5:prefer-armor 5:lcannon-tricks 5:aim-head"
+		"5:aim-barbs 5:mantis-attack-jump 5:small-attack-jump 5:mara-attack-jump 5:goon-attack-jump 5:tyrant-attack-run 5:a-fast-flee 5:h-fast-flee 5:prefer-armor 5:lcannon-tricks 5:aim-head 5:attack-from-behind "
 		"7:predict-aim 7:safe-barbs "
 		, // unused: fast-aim
 		G_SetBaseSkillset
@@ -224,6 +224,7 @@ static const std::vector<botSkillTreeElement_t> skillTree =
 	{ "mantis-attack-jump", BOT_A_LEAP_ON_ATTACK,          3,  TEAM_ALIENS, needs_one_of({BOT_B_BASIC_MOVEMENT}) },
 	{ "goon-attack-jump",   BOT_A_POUNCE_ON_ATTACK,        5,  TEAM_ALIENS, needs_one_of({BOT_B_BASIC_MOVEMENT}) },
 	{ "tyrant-attack-run",  BOT_A_TYRANT_CHARGE_ON_ATTACK, 5,  TEAM_ALIENS, needs_one_of({BOT_B_BASIC_MOVEMENT}) },
+	{ "attack-from-behind", BOT_A_ATTACK_FROM_BEHIND,      6,  TEAM_ALIENS, needs_one_of({BOT_B_BASIC_MOVEMENT}) },
 
 
 	////

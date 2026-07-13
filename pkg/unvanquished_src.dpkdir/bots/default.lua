@@ -688,7 +688,7 @@ maybe_fight = function(team, weapon, enemy, enemy_target, hostile_goal, enemy_vi
 end
 
 local function maybe_heal_or_fight_alien(number, health_frac, enemy, enemy_target, hostile_goal,
-    enemy_visible, base_rush_score, level, ctx, mind)
+    enemy_visible, base_rush_score, level, ctx, mind, team, client)
     local overmind_distance = building_distance(mind, "overmind")
     local booster_distance = building_distance(mind, "booster")
     local in_safe_heal_area = (overmind_distance and overmind_distance <= 200)
@@ -696,9 +696,10 @@ local function maybe_heal_or_fight_alien(number, health_frac, enemy, enemy_targe
     local recently_in_combat = elapsed_since(level.time, mind.enemyLastSeen) < 2000
     local latched = alien_combat_latched(number, level.time)
     local alerted = enemy ~= nil or hostile_goal or recently_in_combat or latched
+    local low_tier_alien = is_alien(team) and (client.class == "level0" or client.class == "level1")
 
     if alerted then
-        if health_frac < 0.4
+        if not low_tier_alien and health_frac < 0.4
             and not in_safe_heal_area
             and base_rush_score < 1.0 then
             local status = ctx:heal()
@@ -714,7 +715,7 @@ local function maybe_heal_or_fight_alien(number, health_frac, enemy, enemy_targe
         return status
     end
 
-    if health_frac < 0.4 and not in_safe_heal_area then
+    if not low_tier_alien and health_frac < 0.4 and not in_safe_heal_area then
         local status = ctx:heal()
         if status ~= STATUS_FAILURE then
             return status
@@ -884,7 +885,7 @@ return function(self, ctx)
         end
 
         status = maybe_heal_or_fight_alien(number, health_frac, enemy, enemy_target, hostile_goal,
-            enemy_visible, base_rush_score, level, ctx, mind)
+            enemy_visible, base_rush_score, level, ctx, mind, team, sgame.entity[number].client)
         if status ~= STATUS_FAILURE then
             return status
         end

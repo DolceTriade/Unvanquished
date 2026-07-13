@@ -1996,7 +1996,23 @@ void BotClassMovement( gentity_t *self, bool inAttackRange )
 			break;
 	}
 
-	if ( enemyLookingAtUs && shouldStrafe && self->botMind->skillSet[BOT_A_STRAFE_ON_ATTACK] )
+	// Evasive action: if we have the "feels-pain" skill and were recently shot
+	// or can currently see an enemy, dodge to make ourselves a harder target.
+	// This takes priority over normal strafing since we know we're engaged.
+	constexpr int PAIN_EVASIVE_WINDOW = 1500; // ms after being shot / seeing an enemy
+	bool evasiveAction = self->botMind->skillSet[BOT_B_PAIN]
+		&& ( level.time - self->botMind->painTime < PAIN_EVASIVE_WINDOW
+		     || level.time - self->botMind->seenEnemyTime < PAIN_EVASIVE_WINDOW );
+	if ( evasiveAction )
+	{
+		BotStrafeDodge( self );
+	}
+	else if ( self->botMind->skillSet[BOT_A_ATTACK_FROM_BEHIND]
+	     && mind->goal.getTargetType() == entityType_t::ET_PLAYER )
+	{
+		BotMoveBehindPlayer( self, mind->goal.getTargetedEntity() );
+	}
+	else if ( enemyLookingAtUs && shouldStrafe && self->botMind->skillSet[BOT_A_STRAFE_ON_ATTACK] )
 	{
 		BotStrafeDodge( self );
 	}
@@ -2592,6 +2608,7 @@ void BotPain( gentity_t *self, gentity_t *attacker, int )
 		&& attacker->s.eType == entityType_t::ET_PLAYER
 		&& self->botMind->skillSet[BOT_B_PAIN] )
 	{
+		self->botMind->painTime = level.time;
 
 		BotPushEnemy( &self->botMind->enemyQueue, attacker );
 	}
