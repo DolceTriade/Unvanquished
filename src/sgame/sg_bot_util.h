@@ -126,6 +126,7 @@ bool BotSprint( gentity_t *self, bool enable );
 bool BotJump( gentity_t *self );
 void     BotStrafeDodge( gentity_t *self );
 void     BotAlternateStrafe( gentity_t *self );
+void     BotMoveBehindPlayer( gentity_t *self, const gentity_t *humanTarget );
 void     BotMoveInDir( gentity_t *self, uint32_t moveDir );
 void     BotStandStill( gentity_t *self );
 bool BotWalkIfStaminaLow( gentity_t *self );

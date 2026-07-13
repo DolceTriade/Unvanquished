@@ -951,6 +951,7 @@ AINodeStatus_t BotActionFight( gentity_t *self, AIGenericNode_t *node )
 
 		self->botMind->currentNode = node;
 		self->botMind->enemyLastSeen = level.time;
+		self->botMind->seenEnemyTime = level.time;
 		return STATUS_RUNNING;
 	}
 
@@ -1066,6 +1067,7 @@ AINodeStatus_t BotActionFight( gentity_t *self, AIGenericNode_t *node )
 
 	bool inAttackRange = BotTargetInAttackRange( self, self->botMind->goal );
 	self->botMind->enemyLastSeen = level.time;
+	self->botMind->seenEnemyTime = level.time;
 
 	if ( !( inAttackRange && myTeam == TEAM_HUMANS ) && !mind->nav().directPathToGoal )
 	{
@@ -1103,7 +1105,17 @@ AINodeStatus_t BotActionFight( gentity_t *self, AIGenericNode_t *node )
 		BotActivateJetpack( self, JETPACK_FUEL_MAX / 4 );
 	}
 
-	if ( mind->skillLevel >= 3 && goalDist < Square( MAX_HUMAN_DANCE_DIST )
+	// Evasive action: if we have the "feels-pain" skill and were recently shot
+	// or can currently see an enemy, dodge to make ourselves a harder target.
+	constexpr int PAIN_EVASIVE_WINDOW = 1500; // ms after being shot / seeing an enemy
+	bool evasiveAction = self->botMind->skillSet[BOT_B_PAIN]
+		&& ( level.time - self->botMind->painTime < PAIN_EVASIVE_WINDOW
+		     || level.time - self->botMind->seenEnemyTime < PAIN_EVASIVE_WINDOW );
+	if ( evasiveAction )
+	{
+		BotStrafeDodge( self );
+	}
+	else if ( mind->skillLevel >= 3 && goalDist < Square( MAX_HUMAN_DANCE_DIST )
 	        && ( goalDist > Square( MIN_HUMAN_DANCE_DIST ) || mind->skillLevel < 5 )
 	        && self->client->ps.weapon != WP_PAIN_SAW && self->client->ps.weapon != WP_FLAMER
 	        && BotTraceForFloor( self, MOVE_BACKWARD ) )
