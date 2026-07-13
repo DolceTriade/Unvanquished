@@ -110,6 +110,7 @@ enum bot_skill
 	BOT_A_LEAP_ON_ATTACK, // mantis
 	BOT_A_POUNCE_ON_ATTACK, // dragoon and adv dragoon
 	BOT_A_TYRANT_CHARGE_ON_ATTACK,
+	BOT_A_ATTACK_FROM_BEHIND, // attempt to strafe behind a human target while attacking
 
 	// situation awareness and survival
 	BOT_B_PAIN, // basic awareness: notice an enemy if it bites you, or shoots at you
@@ -175,6 +176,8 @@ struct botMemory_t
 
 		enemyQueue_t enemyQueue;
 		int enemyLastSeen;
+		int painTime; // level.time of the last time the bot was shot
+		int seenEnemyTime; // level.time of the last time the bot had a visible enemy
 
 		bool exhausted;
 	// }

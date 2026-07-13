@@ -473,6 +473,58 @@ void BotStrafeDodge( gentity_t *self )
 	}
 }
 
+void BotMoveBehindPlayer( gentity_t *self, const gentity_t *humanTarget )
+{
+	usercmd_t *botCmdBuffer = &self->botMind->cmdBuffer;
+	signed char speed = BotGetMaxMoveSpeed( self );
+
+	// desired position: a bit behind the human, along -humanForward
+	constexpr float BEHIND_DISTANCE = 100.0f;
+	glm::vec3 humanPos = VEC2GLM( humanTarget->s.origin );
+	glm::vec3 humanForward;
+	AngleVectors( VEC2GLM( humanTarget->client->ps.viewangles ), &humanForward, nullptr, nullptr );
+	glm::vec3 behindPoint = humanPos - humanForward * BEHIND_DISTANCE;
+
+	glm::vec3 dir = behindPoint - VEC2GLM( self->s.origin );
+	dir[2] = 0.0f;
+	if ( glm::length2( dir ) < 1.0f )
+	{
+		return;
+	}
+	dir = glm::normalize( dir );
+
+	glm::vec3 botForward, botRight;
+	AngleVectors( VEC2GLM( self->client->ps.viewangles ), &botForward, &botRight, nullptr );
+
+	float f = glm::dot( dir, botForward );
+	float r = glm::dot( dir, botRight );
+
+	bool floorForward = BotTraceForFloor( self, MOVE_FORWARD );
+	bool floorRight   = BotTraceForFloor( self, MOVE_RIGHT );
+	bool floorLeft    = BotTraceForFloor( self, MOVE_LEFT );
+
+	if ( f > 0.1f && floorForward )
+	{
+		botCmdBuffer->forwardmove = speed;
+	}
+	else if ( f < -0.1f )
+	{
+		botCmdBuffer->forwardmove = -speed;
+	}
+
+	if ( r > 0.1f && floorRight )
+	{
+		botCmdBuffer->rightmove = speed;
+	}
+	else if ( r < -0.1f && floorLeft )
+	{
+		botCmdBuffer->rightmove = -speed;
+	}
+
+	// Keep facing the enemy while flanking behind them
+	BotAimAtEnemy( self );
+}
+
 void BotMoveInDir( gentity_t *self, uint32_t dir )
 {
 	usercmd_t *botCmdBuffer = &self->botMind->cmdBuffer;
