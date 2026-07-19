@@ -679,6 +679,43 @@ static int MethodspawnAs( lua_State *L, BotContext *ctx )
 	return 1;
 }
 
+static int MethodcanEvolveTo( lua_State *L, BotContext *ctx )
+{
+	if ( lua_gettop( L ) != 1 )
+	{
+		Log::Warn( "lua query 'canEvolveTo' expected exactly 1 argument" );
+		lua_pushboolean( L, false );
+		return 1;
+	}
+
+	int selection = 0;
+	if ( lua_isinteger( L, 1 ) )
+	{
+		selection = lua_tointeger( L, 1 );
+	}
+	else if ( lua_isstring( L, 1 ) )
+	{
+		const char *name = lua_tostring( L, 1 );
+		const classAttributes_t *clazz = BG_ClassByName( name );
+		if ( !clazz || clazz->number == PCL_NONE )
+		{
+			lua_pushboolean( L, false );
+			return 1;
+		}
+		selection = clazz->number;
+	}
+	else
+	{
+		lua_pushboolean( L, false );
+		return 1;
+	}
+
+	class_t c = static_cast<class_t>( selection );
+	lua_pushboolean( L, BotIsClassAvailable( c ) &&
+		G_AlienEvolve( ctx->self, c, false, /* dryRun = */ true ) );
+	return 1;
+}
+
 static int MethoddistanceToEntity( lua_State *L, BotContext *ctx )
 {
 	EntityProxy *proxy = CheckEntityProxyArg( L, 1 );
@@ -769,6 +806,7 @@ RegType<BotContext> BotContextMethods[] =
 	{ "buildNowChosenBuildable", MethodbuildNowChosenBuildable },
 	{ "buy", Methodbuy },
 	{ "buyPrimary", MethodbuyPrimary },
+	{ "canEvolveTo", MethodcanEvolveTo },
 	{ "changeBehavior", MethodchangeBehavior },
 	{ "changeGoal", MethodchangeGoal },
 	{ "classDodge", MethodclassDodge },

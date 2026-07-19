@@ -1642,7 +1642,14 @@ AIBehaviorTree_t *ReadBehaviorTree( const char *name, AITreeList_t *list )
 
 	SetBehaviorTreeDefines();
 
-	Q_strncpyz( treefilename, va( "bots/%s.bt", name ), sizeof( treefilename ) );
+	if ( Str::IsSuffix( ".bt", name ) )
+	{
+		Q_strncpyz( treefilename, va( "bots/%s", name ), sizeof( treefilename ) );
+	}
+	else
+	{
+		Q_strncpyz( treefilename, va( "bots/%s.bt", name ), sizeof( treefilename ) );
+	}
 
 	handle = Parse_LoadSourceHandle( treefilename, BG_FOpenGameOrPakPath );
 	if ( !handle )

@@ -41,6 +41,16 @@ static AITreeList_t treeList;
 
 AIBehaviorTree_t *BotBehaviorTree( Str::StringRef behavior )
 {
+	if ( Str::IsSuffix( ".lua", behavior ) || Str::IsSuffix( ".bt", behavior ) )
+	{
+		return ReadBehaviorTree( behavior.c_str(), &treeList );
+	}
+
+	if ( AIBehaviorTree_t* tree = ReadBehaviorTree( Str::Format( "%s.lua", behavior ).c_str(), &treeList ) )
+	{
+		return tree;
+	}
+
 	return ReadBehaviorTree( behavior.c_str(), &treeList );
 }
 
@@ -317,13 +327,13 @@ bool G_BotSetBehavior( botMemory_t *botMind, Str::StringRef behavior )
 	botMind->myTimer = level.time;
 	botMind->buildCooldownUntil = 0;
 
-	botMind->behaviorTree = ReadBehaviorTree( behavior.c_str(), &treeList );
+	botMind->behaviorTree = BotBehaviorTree( behavior );
 
 	if ( !botMind->behaviorTree )
 	{
 		Log::Warn( "Problem when loading behavior tree %s, trying default", behavior );
 		const std::string behaviorString = g_bot_defaultBehavior.Get();
-		botMind->behaviorTree = ReadBehaviorTree( behaviorString.c_str(), &treeList );
+		botMind->behaviorTree = BotBehaviorTree( behaviorString );
 
 		if ( !botMind->behaviorTree )
 		{
