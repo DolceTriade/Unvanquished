@@ -2410,7 +2410,7 @@ void G_RunFrame( int levelTime )
 		// ignore the entity if it was created this frame.
 		if (entity.oldEnt->creationTime != level.time && thinkingComponent.GetLastThinkTime() != level.time
 			&& !entity.oldEnt->freeAfterEvent) {
-			Log::Warn("ThinkingComponent was not called");
+			Log::Warn("ThinkingComponent was not called for ent %d", entity.oldEnt->num());
 			thinkingComponent.Think();
 		}
 	});

@@ -57,6 +57,21 @@ Cvar::Range<Cvar::Cvar<int>> g_killDelay(
 		Cvar::NONE,
 		20, 0, 120 );
 
+static bool TacticBehaviorAllowed( Str::StringRef behavior )
+{
+	if ( BG_TacticBehaviorAllowed( behavior ) )
+	{
+		return true;
+	}
+
+	if ( Str::IsSuffix( ".lua", behavior ) || Str::IsSuffix( ".bt", behavior ) )
+	{
+		return BG_TacticBehaviorAllowed( FS::Path::StripExtension( behavior ) );
+	}
+
+	return false;
+}
+
 /*
 ==================
 G_SanitiseString
@@ -3262,7 +3277,7 @@ static void Cmd_Tactic_f( gentity_t * ent )
 
 	char behavior[ MAX_STRING_CHARS ];
 	trap_Argv( 1, behavior, sizeof( behavior ) );
-	if ( !BG_TacticBehaviorAllowed( std::string( behavior ) ) )
+	if ( !TacticBehaviorAllowed( std::string( behavior ) ) )
 	{
 		ADMP( va( "%s %s", QQ( N_("^3tactic:^* $1$ is not allowed") ), behavior ) );
 		return;

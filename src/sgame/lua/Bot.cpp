@@ -362,6 +362,7 @@ GET_MIND_FUNC( stuckPosition,
                Shared::Lua::PushVec3( L, GLM4READ( mind->ent->botMind->stuckPosition ) );
                SetReadOnlyTable( L ) )
 GET_MIND_FUNC( enemyLastSeen, lua_pushinteger( L, mind->ent->botMind->enemyLastSeen ) )
+GET_MIND_FUNC( painTime, lua_pushinteger( L, mind->ent->botMind->painTime ) )
 GET_MIND_FUNC( exhausted, lua_pushboolean( L, mind->ent->botMind->exhausted ) )
 GET_MIND_FUNC( stuckTimer, lua_pushinteger( L, mind->ent->botMind->myTimer ) )
 GET_MIND_FUNC( buildCooldownUntil, lua_pushinteger( L, mind->ent->botMind->buildCooldownUntil ) )
@@ -464,6 +465,7 @@ luaL_Reg BotMindGetters[] = {
 	{ "stuckTime", GetMindstuckTime },
 	{ "stuckPosition", GetMindstuckPosition },
 	{ "enemyLastSeen", GetMindenemyLastSeen },
+	{ "painTime", GetMindpainTime },
 	{ "exhausted", GetMindexhausted },
 	{ "stuckTimer", GetMindstuckTimer },
 	{ "buildCooldownUntil", GetMindbuildCooldownUntil },
