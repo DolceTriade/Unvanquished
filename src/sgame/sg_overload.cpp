@@ -1272,7 +1272,7 @@ static void BuildOverloadCatalog()
 	AddUpgrade( TEAM_HUMANS, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), DefaultUpgradeStepCost( OVERLOAD_STAGE2_COUNT ), OVERLOAD_UNCAPPED_RANKS, "jetpack", "Jetpack", "fuel", "fuel", "Jetpack Fuel", "Increase jetpack fuel capacity.",
 	            { GameplayEffect( "JETPACK_FUEL_MAX", 2500.0, 1.0, std::numeric_limits< unsigned int >::max() ),
 	              GameplayEffect( "JETPACK_FUEL_RESTORE", 2500.0 * JETPACK_FUEL_RESTORE / JETPACK_FUEL_MAX, 1.0 ) } );
-	AddUpgrade( TEAM_HUMANS, DefaultUpgradeBaseCost( 0 ), DefaultUpgradeStepCost( 0 ), OVERLOAD_UNCAPPED_RANKS, "humans", "Humans", "stamina", "stamina", "Human Stamina", "Increase maximum human stamina.",
+	AddUpgrade( TEAM_HUMANS, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), DefaultUpgradeStepCost( OVERLOAD_STAGE2_COUNT ), OVERLOAD_UNCAPPED_RANKS, "humans", "Humans", "stamina", "stamina", "Human Stamina", "Increase maximum human stamina.",
 	            { GameplayEffect( "STAMINA_MAX", 2500.0, 1.0, std::numeric_limits<unsigned short>::max() ),
 	              PercentAttributeEffect( BG_ATTR_CLASS, "human_naked", "staminaJogRestore", 2500.0 / STAMINA_MAX, 1.0 ),
 	              PercentAttributeEffect( BG_ATTR_CLASS, "human_naked", "staminaWalkRestore", 2500.0 / STAMINA_MAX, 1.0 ),
@@ -1291,7 +1291,7 @@ static void BuildOverloadCatalog()
 	// Covered buildables: medistat, mgturret, rocketpod.
 	AddUpgrade( TEAM_HUMANS, DefaultUpgradeBaseCost( 0 ), DefaultUpgradeStepCost( 0 ), OVERLOAD_UNCAPPED_RANKS, "medistat", "Medistation", "healing_rate", "healing rate", "Medistation Healing Rate", "Increase medistation health restoration.",
 	            { GameplayEffect( "MEDISTAT_HEAL_RATE", 0.0075, 0.0 ),
-				  GameplayEffect( "STAMINA_MEDISTAT_RESTORE", 100, 0 ) } );
+				  GameplayEffect( "STAMINA_MEDISTAT_RESTORE", 33, 0 ) } );
 	AddUpgrade( TEAM_HUMANS, DefaultUpgradeBaseCost( 0 ), DefaultUpgradeStepCost( 0 ), OVERLOAD_UNCAPPED_RANKS, "mgturret", "Machinegun Turret", "damage", "damage", "Machinegun Turret Damage", "Increase machinegun turret damage.",
 	            { GameplayEffect( "MGTURRET_MIN_DAMAGE", 1.0, 0.0 ),
 	              GameplayEffect( "MGTURRET_MAX_DAMAGE", 2.0, 1.0 ) } );
