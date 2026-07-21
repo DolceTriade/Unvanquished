@@ -1210,7 +1210,7 @@ static void BuildOverloadCatalog()
 
 	// Alien lifeforms: advanced granger, dretch, mantis, marauder, advanced marauder, dragoon, advanced dragoon, tyrant.
 	AddClassUnlock( TEAM_ALIENS, PCL_ALIEN_BUILDER0_UPG );
-	AddUpgrade( TEAM_ALIENS, DefaultUpgradeBaseCost( 0 ), DefaultUpgradeStepCost( 0 ), OVERLOAD_UNCAPPED_RANKS, "level0", "Dretch", "damage", "damage", "Dretch Damage", "Increase dretch bite damage.",
+	AddUpgrade( TEAM_ALIENS, DefaultUpgradeBaseCost( 0 ), DefaultUpgradeStepCost( OVERLOAD_STAGE3_COUNT ), OVERLOAD_UNCAPPED_RANKS, "level0", "Dretch", "damage", "damage", "Dretch Damage", "Increase dretch bite damage.",
 	            { GameplayEffect( "LEVEL0_BITE_DMG", 5.0 ) } );
 	AddUpgrade( TEAM_ALIENS, DefaultUpgradeBaseCost( 0 ), DefaultUpgradeStepCost( 0 ), OVERLOAD_UNCAPPED_RANKS, "level1", "Mantis", "damage", "damage", "Mantis Damage", "Increase mantis claw damage.",
 	            { GameplayEffect( "LEVEL1_CLAW_DMG", 6.0 ) } );
@@ -1225,36 +1225,36 @@ static void BuildOverloadCatalog()
 	// No weapon overload upgrades should live outside this block.
 
 	// Human weapons: stage 1 / always available.
-	AddUpgrade( TEAM_HUMANS, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), DefaultUpgradeStepCost( 0 ), OVERLOAD_UNCAPPED_RANKS, "rifle", "Rifle", "damage", "damage", "Rifle Damage", "Increase rifle damage.",
+	AddUpgrade( TEAM_HUMANS, DefaultUpgradeBaseCost( OVERLOAD_STAGE3_COUNT ), DefaultUpgradeStepCost( 0 ), OVERLOAD_UNCAPPED_RANKS, "rifle", "Rifle", "damage", "damage", "Rifle Damage", "Increase rifle damage.",
 	            { GameplayEffect( "RIFLE_DMG", 1.0 ) } );
 	AddUpgrade( TEAM_HUMANS, DefaultUpgradeBaseCost( 0 ), DefaultUpgradeStepCost( 0 ), OVERLOAD_UNCAPPED_RANKS, "rifle", "Rifle", "ammo", "ammo", "Rifle Ammo", "Increase rifle ammo reserve.",
-	            { AttributeEffect( BG_ATTR_WEAPON, "rifle", "ammo", 10.0, 1.0 ) } );
+	            { AttributeEffect( BG_ATTR_WEAPON, "rifle", "ammo", 5.0, 1.0 ) } );
 	AddUpgrade( TEAM_HUMANS, DefaultUpgradeBaseCost( 0 ), DefaultUpgradeStepCost( 0 ), OVERLOAD_UNCAPPED_RANKS, "psaw", "Pain Saw", "damage", "damage", "Pain Saw Damage", "Increase pain saw damage per hit.",
 	            { GameplayEffect( "PAINSAW_DAMAGE", 2.0, 1.0 ) } );
 	AddUpgrade( TEAM_HUMANS, DefaultUpgradeBaseCost( 0 ), DefaultUpgradeStepCost( 0 ), OVERLOAD_UNCAPPED_RANKS, "shotgun", "Shotgun", "damage", "damage", "Shotgun Damage", "Increase shotgun pellet damage.",
 	            { GameplayEffect( "SHOTGUN_DMG", 1.0 ) } );
 	AddUpgrade( TEAM_HUMANS, DefaultUpgradeBaseCost( 0 ), DefaultUpgradeStepCost( 0 ), OVERLOAD_UNCAPPED_RANKS, "shotgun", "Shotgun", "ammo", "ammo", "Shotgun Ammo", "Increase shotgun ammo reserve.",
-	            { AttributeEffect( BG_ATTR_WEAPON, "shotgun", "ammo", 2.0, 1.0 ) } );
+	            { AttributeEffect( BG_ATTR_WEAPON, "shotgun", "ammo", 1.0, 1.0 ) } );
 
 	// Human weapons: stage 2 unlocks.
 	AddUpgrade( TEAM_HUMANS, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), DefaultUpgradeStepCost( OVERLOAD_STAGE2_COUNT ), OVERLOAD_UNCAPPED_RANKS, "lgun", "Lasgun", "damage", "damage", "Lasgun Damage", "Increase lasgun damage.",
 	            { GameplayEffect( "LASGUN_DAMAGE", 2.0 ) } );
 	AddUpgrade( TEAM_HUMANS, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), DefaultUpgradeStepCost( OVERLOAD_STAGE2_COUNT ), OVERLOAD_UNCAPPED_RANKS, "lgun", "Lasgun", "ammo", "ammo", "Lasgun Ammo", "Increase lasgun ammo reserve.",
-	            { AttributeEffect( BG_ATTR_WEAPON, "lgun", "ammo", 25.0, 1.0 ) } );
+	            { AttributeEffect( BG_ATTR_WEAPON, "lgun", "ammo", 10.0, 1.0 ) } );
 	AddUpgrade( TEAM_HUMANS, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), DefaultUpgradeStepCost( OVERLOAD_STAGE2_COUNT ), OVERLOAD_UNCAPPED_RANKS, "mdriver", "Mass Driver", "damage", "damage", "Mass Driver Damage", "Increase mass driver damage.",
 	            { GameplayEffect( "MDRIVER_DMG", 10.0 ) } );
 	AddUpgrade( TEAM_HUMANS, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), DefaultUpgradeStepCost( OVERLOAD_STAGE2_COUNT ), OVERLOAD_UNCAPPED_RANKS, "mdriver", "Mass Driver", "ammo", "ammo", "Mass Driver Ammo", "Increase mass driver ammo reserve.",
-	            { AttributeEffect( BG_ATTR_WEAPON, "mdriver", "ammo", 2.0, 1.0 ) } );
+	            { AttributeEffect( BG_ATTR_WEAPON, "mdriver", "ammo", 1.0, 1.0 ) } );
 	AddUpgrade( TEAM_HUMANS, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), DefaultUpgradeStepCost( OVERLOAD_STAGE2_COUNT ), OVERLOAD_UNCAPPED_RANKS, "chaingun", "Chaingun", "damage", "damage", "Chaingun Damage", "Increase chaingun damage.",
 	            { GameplayEffect( "CHAINGUN_DMG", 1.0 ) } );
 	AddUpgrade( TEAM_HUMANS, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), DefaultUpgradeStepCost( OVERLOAD_STAGE2_COUNT ), OVERLOAD_UNCAPPED_RANKS, "chaingun", "Chaingun", "ammo", "ammo", "Chaingun Ammo", "Increase chaingun ammo reserve.",
-	            { AttributeEffect( BG_ATTR_WEAPON, "chaingun", "ammo", 40.0, 1.0 ) } );
+	            { AttributeEffect( BG_ATTR_WEAPON, "chaingun", "ammo", 20.0, 1.0 ) } );
 	AddUpgrade( TEAM_HUMANS, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), DefaultUpgradeStepCost( OVERLOAD_STAGE2_COUNT ), OVERLOAD_UNCAPPED_RANKS, "flamer", "Flamethrower", "ammo", "ammo", "Flamer Ammo", "Increase flamer ammo reserve.",
 	            { AttributeEffect( BG_ATTR_WEAPON, "flamer", "ammo", 25.0, 1.0 ) } );
 	AddUpgrade( TEAM_HUMANS, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), DefaultUpgradeStepCost( OVERLOAD_STAGE2_COUNT ), OVERLOAD_UNCAPPED_RANKS, "prifle", "Pulse Rifle", "damage", "damage", "Pulse Rifle Damage", "Increase pulse rifle projectile damage.",
 	            { AttributeEffect( BG_ATTR_MISSILE, "prifle", "damage", 2.0, 1.0 ) } );
 	AddUpgrade( TEAM_HUMANS, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), DefaultUpgradeStepCost( OVERLOAD_STAGE2_COUNT ), OVERLOAD_UNCAPPED_RANKS, "prifle", "Pulse Rifle", "ammo", "ammo", "Pulse Rifle Ammo", "Increase pulse rifle ammo reserve.",
-	            { AttributeEffect( BG_ATTR_WEAPON, "prifle", "ammo", 10.0, 1.0 ) } );
+	            { AttributeEffect( BG_ATTR_WEAPON, "prifle", "ammo", 5.0, 1.0 ) } );
 
 	// Human weapons: stage 3 unlocks.
 	AddUpgrade( TEAM_HUMANS, DefaultUpgradeBaseCost( OVERLOAD_STAGE3_COUNT ), DefaultUpgradeStepCost( OVERLOAD_STAGE3_COUNT ), OVERLOAD_UNCAPPED_RANKS, "lcannon", "Lucifer Cannon", "damage", "damage", "Lucifer Cannon Damage", "Increase lucifer cannon damage.",
@@ -1309,7 +1309,7 @@ static void BuildOverloadCatalog()
 	// Alien class upgrades.
 	// Covered classes: dretch, level1 scout, marauder, advanced marauder, dragoon, advanced dragoon, tyrant.
 	// Intentionally missing for now: granger, advanced granger.
-	AddUpgrade( TEAM_ALIENS, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), DefaultUpgradeStepCost( OVERLOAD_STAGE3_COUNT ), OVERLOAD_UNCAPPED_RANKS, "aliens", "Alien Lifeforms", "vitality", "vitality", "Alien Vitality", "Increase max health for all alien classes.",
+	AddUpgrade( TEAM_ALIENS, DefaultUpgradeBaseCost( 0 ), DefaultUpgradeStepCost( OVERLOAD_STAGE2_COUNT ), OVERLOAD_UNCAPPED_RANKS, "aliens", "Alien Lifeforms", "vitality", "vitality", "Alien Vitality", "Increase max health for all alien classes.",
 	            { PercentAttributeEffect( BG_ATTR_CLASS, "builder", "health", 0.1, 1.0 ),
 	              PercentAttributeEffect( BG_ATTR_CLASS, "builderupg", "health", 0.1, 1.0 ),
 	              PercentAttributeEffect( BG_ATTR_CLASS, "level0", "health", 0.1, 1.0 ),
