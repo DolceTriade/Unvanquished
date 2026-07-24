@@ -1353,6 +1353,27 @@ static bool isBuilder( gentity_t *self )
 		|| ( team == TEAM_ALIENS && ( cl == PCL_ALIEN_BUILDER0 || cl == PCL_ALIEN_BUILDER0_UPG ) );
 }
 
+static buildable_t ResolveBuildableSelection( int selection )
+{
+	if ( selection <= BA_NONE || selection >= BA_NUM_BUILDABLES )
+	{
+		return BA_NONE;
+	}
+
+	return static_cast<buildable_t>( selection );
+}
+
+static buildable_t ResolveBuildableSelection( const char *name )
+{
+	const buildableAttributes_t *buildable = name ? BG_BuildableByName( name ) : nullptr;
+	if ( !buildable || buildable->number <= BA_NONE || buildable->number >= BA_NUM_BUILDABLES )
+	{
+		return BA_NONE;
+	}
+
+	return buildable->number;
+}
+
 buildable_t BotChooseBuildableToBuild( gentity_t *self )
 {
 	buildable_t toBuild = BA_NONE;
@@ -1457,6 +1478,44 @@ static bool build( gentity_t *self, buildable_t toBuild )
 	return false;
 }
 
+bool BotCanBuild( gentity_t *self, buildable_t buildable )
+{
+	if ( !self || !self->client || !isBuilder( self ) )
+	{
+		return false;
+	}
+
+	if ( buildable <= BA_NONE || buildable >= BA_NUM_BUILDABLES )
+	{
+		return false;
+	}
+
+	if ( self->botMind->buildCooldownUntil > level.time )
+	{
+		return false;
+	}
+
+	const buildableAttributes_t *attr = BG_Buildable( buildable );
+	if ( !attr || attr->team != G_Team( self ) )
+	{
+		return false;
+	}
+
+	if ( BG_BuildableDisabled( buildable ) || !BG_BuildableUnlocked( buildable ) )
+	{
+		return false;
+	}
+
+	if ( attr->buildPoints > 0 && G_GetFreeBudget( G_Team( self ) ) < attr->buildPoints )
+	{
+		return false;
+	}
+
+	vec3_t origin, normal;
+	int groundEntNum;
+	return G_CanBuild( self, buildable, 0, origin, normal, &groundEntNum ) == IBE_NONE;
+}
+
 AINodeStatus_t BotActionBuildNowChosenBuildable( gentity_t *self, AIGenericNode_t * )
 {
 	if ( !isBuilder( self ) )
@@ -1465,6 +1524,23 @@ AINodeStatus_t BotActionBuildNowChosenBuildable( gentity_t *self, AIGenericNode_
 	}
 
 	return build( self, BotChooseBuildableToBuild( self ) ) ? STATUS_SUCCESS : STATUS_FAILURE;
+}
+
+AINodeStatus_t BotActionBuildNow( gentity_t *self, AIGenericNode_t *node )
+{
+	if ( !isBuilder( self ) )
+	{
+		return STATUS_FAILURE;
+	}
+
+	AIActionNode_t *a = ( AIActionNode_t * ) node;
+	buildable_t buildable = ResolveBuildableSelection( AIUnBoxString( a->params[ 0 ] ) );
+	if ( buildable == BA_NONE )
+	{
+		buildable = ResolveBuildableSelection( AIUnBoxInt( a->params[ 0 ] ) );
+	}
+
+	return build( self, buildable ) ? STATUS_SUCCESS : STATUS_FAILURE;
 }
 
 AINodeStatus_t BotActionResetMyTimer( gentity_t *self, AIGenericNode_t * )

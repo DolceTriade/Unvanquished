@@ -644,6 +644,7 @@ DEFINE_BOT_ACTION_METHOD( activateUpgrade, BotActionActivateUpgrade, 1, 1 )
 DEFINE_BOT_ACTION_METHOD( aimAtGoal, BotActionAimAtGoal, 0, 0 )
 DEFINE_BOT_ACTION_METHOD( alternateStrafe, BotActionAlternateStrafe, 0, 0 )
 DEFINE_BOT_ACTION_METHOD( blackboardNoteTransient, BotActionBlackboardNoteTransient, 1, 1 )
+DEFINE_BOT_ACTION_METHOD( buildNow, BotActionBuildNow, 1, 1 )
 DEFINE_BOT_ACTION_METHOD( buildNowChosenBuildable, BotActionBuildNowChosenBuildable, 0, 0 )
 DEFINE_BOT_ACTION_METHOD( buy, BotActionBuy, 1, 4 )
 DEFINE_BOT_ACTION_METHOD( buyPrimary, BotActionBuyPrimary, 1, 1 )
@@ -713,6 +714,41 @@ static int MethodcanEvolveTo( lua_State *L, BotContext *ctx )
 	class_t c = static_cast<class_t>( selection );
 	lua_pushboolean( L, BotIsClassAvailable( c ) &&
 		G_AlienEvolve( ctx->self, c, false, /* dryRun = */ true ) );
+	return 1;
+}
+
+static int MethodcanBuild( lua_State *L, BotContext *ctx )
+{
+	if ( lua_gettop( L ) != 1 )
+	{
+		Log::Warn( "lua query 'canBuild' expected exactly 1 argument" );
+		lua_pushboolean( L, false );
+		return 1;
+	}
+
+	int selection = BA_NONE;
+	if ( lua_isinteger( L, 1 ) )
+	{
+		selection = lua_tointeger( L, 1 );
+	}
+	else if ( lua_isstring( L, 1 ) )
+	{
+		const char *name = lua_tostring( L, 1 );
+		const buildableAttributes_t *buildable = BG_BuildableByName( name );
+		if ( !buildable || buildable->number == BA_NONE )
+		{
+			lua_pushboolean( L, false );
+			return 1;
+		}
+		selection = buildable->number;
+	}
+	else
+	{
+		lua_pushboolean( L, false );
+		return 1;
+	}
+
+	lua_pushboolean( L, BotCanBuild( ctx->self, static_cast<buildable_t>( selection ) ) );
 	return 1;
 }
 
@@ -803,9 +839,11 @@ RegType<BotContext> BotContextMethods[] =
 	{ "aimAtGoal", MethodaimAtGoal },
 	{ "alternateStrafe", MethodalternateStrafe },
 	{ "blackboardNoteTransient", MethodblackboardNoteTransient },
+	{ "buildNow", MethodbuildNow },
 	{ "buildNowChosenBuildable", MethodbuildNowChosenBuildable },
 	{ "buy", Methodbuy },
 	{ "buyPrimary", MethodbuyPrimary },
+	{ "canBuild", MethodcanBuild },
 	{ "canEvolveTo", MethodcanEvolveTo },
 	{ "changeBehavior", MethodchangeBehavior },
 	{ "changeGoal", MethodchangeGoal },

@@ -112,6 +112,14 @@ local function buildable_unlocked(team_name, name)
     return team.overload_progress >= buildable.unlock_threshold
 end
 
+function M.buildable_cost(name)
+    return buildable_cost(name)
+end
+
+function M.buildable_unlocked(team, name)
+    return buildable_unlocked(normalize_team_name(team), name)
+end
+
 local function count_buildable(team_name, name)
     local team = M.state.teams[team_name]
     if not team then
