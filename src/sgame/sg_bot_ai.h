@@ -290,6 +290,7 @@ AINodeStatus_t BotActionGesture( gentity_t *self, AIGenericNode_t* );
 AINodeStatus_t BotActionStayHere( gentity_t *self, AIGenericNode_t* );
 AINodeStatus_t BotActionFollow( gentity_t *self, AIGenericNode_t* );
 AINodeStatus_t BotActionBuildNowChosenBuildable( gentity_t *self, AIGenericNode_t *node );
+AINodeStatus_t BotActionBuildNow( gentity_t *self, AIGenericNode_t *node );
 AINodeStatus_t BotActionResetMyTimer( gentity_t *self, AIGenericNode_t *node );
 AINodeStatus_t BotActionBlackboardNoteTransient( gentity_t *self, AIGenericNode_t *node );
 AINodeStatus_t BotActionExtinguishFire( gentity_t *self, AIGenericNode_t *node );
@@ -298,6 +299,7 @@ AINodeStatus_t BotActionExtinguishFire( gentity_t *self, AIGenericNode_t *node )
 AINodeStatus_t BotSpawnNode( gentity_t *self, AIGenericNode_t *node );
 
 buildable_t BotChooseBuildableToBuild( gentity_t *self );
+bool BotCanBuild( gentity_t *self, buildable_t buildable );
 
 AIBehaviorTree_t *BotBehaviorTree( Str::StringRef behavior );
 

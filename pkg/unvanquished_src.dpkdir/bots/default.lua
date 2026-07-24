@@ -328,9 +328,7 @@ local function builder_needed(team_name, number, team_snapshot, level)
 
     if is_alien(team_name) then
         return level_time >= 60000
-            and (level.num_players == 0
-                or ((team_snapshot.buildables.eggpod or 0) < 2
-                    and (team_snapshot.buildables.eggpod or 0) < cache.cvar_number("g_bot_buildNumEggs")))
+            and level.num_players == 0
             and cache.cvar("g_bot_buildAliens") ~= "0"
             and usable_build_points >= chosen_cost
             and not cache.has_teammate_weapon(team_name, "abuild", number)
@@ -339,9 +337,7 @@ local function builder_needed(team_name, number, team_snapshot, level)
 
     if is_human(team_name) then
         return level_time >= 60000
-            and (level.num_players == 0
-                or ((team_snapshot.buildables.telenode or 0) < 2
-                    and (team_snapshot.buildables.telenode or 0) < cache.cvar_number("g_bot_buildNumTelenodes")))
+            and level.num_players == 0
             and cache.cvar("g_bot_buildHumans") ~= "0"
             and usable_build_points >= chosen_cost
             and not cache.has_teammate_weapon(team_name, "ckit", number)
