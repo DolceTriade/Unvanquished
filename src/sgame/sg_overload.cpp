@@ -1257,8 +1257,13 @@ static void BuildOverloadCatalog()
 	            { AttributeEffect( BG_ATTR_WEAPON, "prifle", "ammo", 5.0, 1.0 ) } );
 
 	// Human weapons: stage 3 unlocks.
-	AddUpgrade( TEAM_HUMANS, DefaultUpgradeBaseCost( OVERLOAD_STAGE3_COUNT ), DefaultUpgradeStepCost( OVERLOAD_STAGE3_COUNT ), OVERLOAD_UNCAPPED_RANKS, "lcannon", "Lucifer Cannon", "damage", "damage", "Lucifer Cannon Damage", "Increase lucifer cannon damage.",
-	            { GameplayEffect( "LCANNON_DAMAGE", 15.0 ) } );
+	AddUpgrade( TEAM_HUMANS, DefaultUpgradeBaseCost( OVERLOAD_STAGE3_COUNT ),
+	            DefaultUpgradeStepCost( OVERLOAD_STAGE3_COUNT ), OVERLOAD_UNCAPPED_RANKS, "lcannon",
+	            "Lucifer Cannon", "damage", "damage", "Lucifer Cannon Damage",
+	            "Increase lucifer cannon damage.",
+	            { GameplayEffect( "LCANNON_DAMAGE", 15.0 ),
+	              AttributeEffect( BG_ATTR_MISSILE, "lcannon", "splash_radius", 5.0 ),
+	              AttributeEffect( BG_ATTR_MISSILE, "lcannon2", "damage", 5.0 ) } );
 	AddUpgrade( TEAM_HUMANS, DefaultUpgradeBaseCost( OVERLOAD_STAGE3_COUNT ), DefaultUpgradeStepCost( OVERLOAD_STAGE3_COUNT ), OVERLOAD_UNCAPPED_RANKS, "lcannon", "Lucifer Cannon", "ammo", "ammo", "Lucifer Cannon Ammo", "Increase lucifer cannon ammo reserve.",
 	            { AttributeEffect( BG_ATTR_WEAPON, "lcannon", "ammo", 10.0, 1.0 ) } );
 
