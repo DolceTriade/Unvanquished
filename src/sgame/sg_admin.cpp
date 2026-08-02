@@ -6176,7 +6176,10 @@ static bool BotAddCmd( gentity_t* ent, const Cmd::Args& args )
 		skill = BotSkillFromString( ent, args[4].data() );
 	}
 
-	const std::string behaviorString = g_bot_defaultBehavior.Get();
+	const std::string behaviorString =
+		team == TEAM_HUMANS ? g_bot_defaultBehaviorHuman.Get() :
+		team == TEAM_ALIENS ? g_bot_defaultBehaviorAlien.Get() :
+		BOT_DEFAULT_BEHAVIOR;
 	const char* behavior = args.Argc() >= 6 ? args[5].data() : behaviorString.c_str();
 
 	if ( level.inClient && g_clients[ 0 ].pers.connected < CON_CONNECTED )

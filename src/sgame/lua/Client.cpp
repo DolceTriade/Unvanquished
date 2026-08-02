@@ -291,6 +291,31 @@ int Methodhaspermission( lua_State* L, Client* c )
 	return 1;
 }
 
+/// Check if the client has the given upgrade in inventory.
+// @tparam string upgrade The upgrade name, e.g. "medkit", "gren", or "firebomb".
+// @treturn boolean Returns true if the upgrade is in inventory.
+// @usage client:hasUpgrade('medkit')
+// @within Client
+int MethodhasUpgrade( lua_State* L, Client* c )
+{
+	if ( !c || !c->ent || !c->ent->client )
+	{
+		Log::Warn( "trying to access stale client info!" );
+		return 0;
+	}
+
+	const char* upgradeName = luaL_checkstring( L, 1 );
+	const upgradeAttributes_t* upgrade = BG_UpgradeByName( upgradeName );
+	if ( !upgrade || upgrade->number <= UP_NONE || upgrade->number >= UP_NUM_UPGRADES )
+	{
+		lua_pushboolean( L, false );
+		return 1;
+	}
+
+	lua_pushboolean( L, BG_InventoryContainsUpgrade( upgrade->number, c->ent->client->ps.stats ) );
+	return 1;
+}
+
 int Setname( lua_State* L )
 {
 	Client* c = LuaLib<Client>::check( L, 1 );
@@ -423,6 +448,7 @@ RegType<::Lua::Client> ClientMethods[] = {
 	{ "forceweapon", Methodforceweapon },
 	{ "forceteam", Methodforceteam },
 	{ "haspermission", Methodhaspermission},
+	{ "hasUpgrade", MethodhasUpgrade },
 
 	{ nullptr, nullptr },
 };
