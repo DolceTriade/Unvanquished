@@ -1197,7 +1197,8 @@ static void BuildOverloadCatalog()
 	AddUpgradeUnlock( TEAM_HUMANS, UP_BIOKIT );
 	AddUpgradeUnlock( TEAM_HUMANS, UP_BATTLESUIT );
 	AddUpgradeUnlock( TEAM_HUMANS, UP_GRENADE );
-	AddUpgradeUnlock( TEAM_HUMANS, UP_FIREBOMB );
+	// TODO: Delete firebomb, but for testing, just comment out.
+	// AddUpgradeUnlock( TEAM_HUMANS, UP_FIREBOMB );
 	AddBuildableUnlock( TEAM_HUMANS, BA_H_ROCKETPOD );
 
 	// Alien structures: acid tube, trapper, spiker, booster, hive.

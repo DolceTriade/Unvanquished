@@ -5,6 +5,7 @@ STATUS_RUNNING = 2
 local PMF_QUEUED = 1 << 12
 
 local common = require("bots/common.lua")
+local task_runtime = require("bots/task.lua")
 local weapons = Unv.weapons
 local is_alien = common.is_alien
 local is_human = common.is_human
@@ -15,6 +16,7 @@ local try_evolve_targets = common.try_evolve_targets
 local unstick = common.unstick
 
 local ALIEN_EVOLVE_TARGETS = common.ALIEN_EVOLVE_TARGETS
+local TASKS = task_runtime.new_runtime()
 
 local function maybe_use_medkit(team, client, ctx)
     return use_medkit_if_low(team, client, ctx, 50)
@@ -65,6 +67,80 @@ local function maybe_fight(team, client, enemy_visible, ctx)
     return ctx:fight()
 end
 
+local function follow_enemy_visible(state)
+    return state.enemy_visible
+end
+
+local COMBAT_TASK = {
+    run = function(_, state, ctx)
+        if not follow_enemy_visible(state) then
+            return STATUS_FAILURE
+        end
+
+        if is_human(state.team) then
+            local status = maybe_use_medkit(state.team, state.client, ctx)
+            if status ~= STATUS_FAILURE then
+                return status
+            end
+
+            status = maybe_fight(state.team, state.client, state.enemy_visible, ctx)
+            if status ~= STATUS_FAILURE then
+                return status
+            end
+
+            return maybe_equip(state.team, state.mind, ctx)
+        end
+
+        return maybe_fight(state.team, state.client, state.enemy_visible, ctx)
+    end,
+}
+
+local ESCORT_TASK = {
+    should_preempt = function(_, state)
+        return follow_enemy_visible(state)
+    end,
+    run = function(_, state, ctx)
+        local status = nil
+
+        if is_human(state.team) then
+            status = maybe_use_medkit(state.team, state.client, ctx)
+            if status ~= STATUS_FAILURE then
+                return status
+            end
+
+            status = maybe_reload(state.team, state.client, state.weapon_attr, state.enemy_visible, ctx)
+            if status ~= STATUS_FAILURE then
+                return status
+            end
+
+            status = maybe_equip(state.team, state.mind, ctx)
+            if status ~= STATUS_FAILURE then
+                return status
+            end
+        else
+            status = maybe_evolve(state.self, state.team, state.client, state.enemy_visible, ctx)
+            if status ~= STATUS_FAILURE then
+                return status
+            end
+        end
+
+        status = ctx:follow(250)
+        if status ~= STATUS_FAILURE then
+            return status
+        end
+
+        return ctx:roam()
+    end,
+}
+
+local function select_task(state)
+    if state.enemy_visible then
+        return COMBAT_TASK
+    end
+
+    return ESCORT_TASK
+end
+
 return function(self, ctx)
     if should_spawn(self, PMF_QUEUED) then
         return common.spawn_as_team_default(self.team, ctx, "level0", "rifle")
@@ -80,57 +156,39 @@ return function(self, ctx)
     local enemy = target_entity(mind.bestEnemy)
     local enemy_visible = enemy and ctx:isVisibleEntity(enemy) or false
     local weapon_attr = weapons[client.weapon]
+    local state = {
+        self = self,
+        team = self.team,
+        number = self.number,
+        level = sgame.level,
+        client = client,
+        mind = mind,
+        enemy = enemy,
+        enemy_visible = enemy_visible,
+        weapon_attr = weapon_attr,
+    }
 
     local status = unstick(sgame.level.time, ctx, mind, enemy, enemy_visible, self.team, client)
     if status ~= STATUS_FAILURE then
         return status
     end
 
-    if is_human(self.team) then
-        status = maybe_use_medkit(self.team, client, ctx)
+    local task = TASKS.current(self.number)
+    if task then
+        status = TASKS.maybe_preempt(state, ctx, select_task)
         if status ~= STATUS_FAILURE then
             return status
         end
 
-        status = maybe_fight(self.team, client, enemy_visible, ctx)
-        if status ~= STATUS_FAILURE then
-            return status
-        end
-
-        status = maybe_reload(self.team, client, weapon_attr, enemy_visible, ctx)
-        if status ~= STATUS_FAILURE then
-            return status
-        end
-
-        status = maybe_equip(self.team, mind, ctx)
-        if status ~= STATUS_FAILURE then
-            return status
-        end
-
-        status = ctx:follow(250)
-        if status ~= STATUS_FAILURE then
-            return status
-        end
-
-        return ctx:roam()
-    end
-
-    if is_alien(self.team) then
-        status = maybe_evolve(self, self.team, client, enemy_visible, ctx)
-        if status ~= STATUS_FAILURE then
-            return status
-        end
-
-        status = maybe_fight(self.team, client, enemy_visible, ctx)
-        if status ~= STATUS_FAILURE then
-            return status
-        end
-
-        status = ctx:follow(250)
-        if status ~= STATUS_FAILURE then
-            return status
+        task = TASKS.current(self.number)
+        if task then
+            status = TASKS.run(task, state, ctx)
+            if status ~= STATUS_FAILURE then
+                return status
+            end
         end
     end
 
-    return ctx:roam()
+    task = TASKS.start(self.number, select_task(state))
+    return TASKS.run(task, state, ctx)
 end

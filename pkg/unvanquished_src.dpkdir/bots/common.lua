@@ -122,11 +122,24 @@ function M.use_medkit_if_low(team, client, ctx, threshold)
         return STATUS_FAILURE
     end
 
+    if not client.hasUpgrade or not client:hasUpgrade("medkit") then
+        return STATUS_FAILURE
+    end
+
     return ctx:activateUpgrade("medkit")
 end
 
 function M.recently_attacked(level, mind, window)
-    return level and mind and (level.time - (mind.painTime or 0)) < window or false
+    if not level or not mind then
+        return false
+    end
+
+    local pain_time = mind.painTime or 0
+    if pain_time <= 0 then
+        return false
+    end
+
+    return (level.time - pain_time) < window
 end
 
 function M.heal_to_full_unless_attacked(level, mind, client, ctx, opts)
@@ -207,6 +220,13 @@ function M.evolve_cost_evos(current_name, target_name)
 end
 
 function M.can_evolve_to_class(self, client, level, class_name)
+    if class_name == nil then
+        class_name = level
+        level = client
+        client = self
+        self = nil
+    end
+
     local current = M.class_attr(client.class)
     local target = M.class_attr(class_name)
     if not current or not target or client.class == class_name then
@@ -448,7 +468,12 @@ function M.unstick(now, ctx, mind, enemy, enemy_visible, team, client, builder)
     end
 
     if stuck_for > 45000 then
-        return ctx:suicide()
+        local status = ctx:moveTo("self")
+        if status ~= STATUS_FAILURE then
+            return status
+        end
+
+        return ctx:moveInDir("forward")
     end
 
     if stuck_for > 17500 then

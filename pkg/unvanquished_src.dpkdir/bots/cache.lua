@@ -24,6 +24,7 @@ local OBSERVED_CVARS = {
     "g_bot_extinguishFire",
     "g_bot_chasetime",
     "g_bot_aliensenseRange",
+    "g_bot_humansenseRange",
     "g_maxMiners",
 }
 
