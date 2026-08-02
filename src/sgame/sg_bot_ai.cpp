@@ -863,7 +863,7 @@ AINodeStatus_t BotActionChangeBehavior( gentity_t *self, AIGenericNode_t *node )
 		Log::Warn( "Incorrect number of arguments to changeBehavior action: %d", a->nparams );
 	}
 	const char *behavior = AIUnBoxString( a->params[ 0 ] );
-	return G_BotSetBehavior( self->botMind, behavior ) ? STATUS_SUCCESS : STATUS_FAILURE;
+	return G_BotSetBehavior( self->botMind, static_cast<team_t>( self->client->pers.team ), behavior ) ? STATUS_SUCCESS : STATUS_FAILURE;
 }
 
 AINodeStatus_t BotActionEvolveTo( gentity_t *self, AIGenericNode_t *node )

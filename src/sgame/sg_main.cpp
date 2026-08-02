@@ -309,7 +309,9 @@ Cvar::Cvar<int> g_bot_chasetime("g_bot_chasetime", "bots stop chasing after x ms
 Cvar::Cvar<int> g_bot_reactiontime("g_bot_reactiontime", "bots' reaction time to enemies (milliseconds)", Cvar::NONE, 500);
 Cvar::Cvar<bool> g_bot_infiniteFunds("g_bot_infiniteFunds", "give bots unlimited funds", Cvar::NONE, false);
 Cvar::Cvar<int> g_bot_aliensenseRange("g_bot_aliensenseRange", "custom aliensense range for bots", Cvar::NONE, ALIENSENSE_RANGE);
-Cvar::Cvar<std::string> g_bot_defaultBehavior("g_bot_defaultBehavior", "name of the default .bt file", Cvar::NONE, BOT_DEFAULT_BEHAVIOR);
+Cvar::Cvar<int> g_bot_humansenseRange("g_bot_humansenseRange", "custom humansense range for bots", Cvar::NONE, ALIENSENSE_RANGE);
+Cvar::Cvar<std::string> g_bot_defaultBehaviorHuman("g_bot_defaultBehaviorHuman", "name of the default human .bt file", Cvar::NONE, BOT_DEFAULT_BEHAVIOR);
+Cvar::Cvar<std::string> g_bot_defaultBehaviorAlien("g_bot_defaultBehaviorAlien", "name of the default alien .bt file", Cvar::NONE, BOT_DEFAULT_BEHAVIOR);
 
 //</bot stuff>
 

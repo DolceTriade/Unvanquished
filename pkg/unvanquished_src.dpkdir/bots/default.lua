@@ -99,7 +99,10 @@ local function alien_builder_owner()
     end
 
     local entity = resolve_entity_ref(owner)
-    if not entity or not entity.client or entity.client.health <= 0 then
+    if not entity
+        or not entity.client
+        or not entity.bot
+        or not is_alien(entity.team) then
         STATE.alien_builder_owner = nil
         return nil
     end
@@ -317,6 +320,20 @@ local function choose_alien_enemy(number, now, enemy_target, enemy_visible, host
     return nil
 end
 
+local function has_human_builder(team_snapshot, exclude_entity_num)
+    if not team_snapshot then
+        return false
+    end
+
+    for entity_num, info in pairs(team_snapshot.entities) do
+        if entity_num ~= exclude_entity_num and not info.is_bot and info.weapon == "ckit" then
+            return true
+        end
+    end
+
+    return false
+end
+
 local function builder_needed(team_name, number, team_snapshot, level)
     if not team_snapshot or not level then
         return false
@@ -340,6 +357,7 @@ local function builder_needed(team_name, number, team_snapshot, level)
             and level.num_players == 0
             and cache.cvar("g_bot_buildHumans") ~= "0"
             and usable_build_points >= chosen_cost
+            and not has_human_builder(team_snapshot, number)
             and not cache.has_teammate_weapon(team_name, "ckit", number)
     end
 

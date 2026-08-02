@@ -8,6 +8,7 @@ package.loaded["bots/common.lua"] = nil
 
 local cache = require("bots/cache.lua")
 local common = require("bots/common.lua")
+local task_runtime = require("bots/task.lua")
 local weapons = Unv.weapons
 local elapsed_since = common.elapsed_since
 local is_alien = common.is_alien
@@ -24,6 +25,7 @@ local unstick = common.unstick
 local STATE = {
     alien_builder_owner = nil,
 }
+local TASKS = task_runtime.new_runtime()
 
 local BUILDER_ANCHOR_RADIUS = 700
 local ALIEN_EVOLVE_TARGETS = common.ALIEN_EVOLVE_TARGETS
@@ -588,6 +590,211 @@ local function maybe_rush(builder, base_rush_score, ctx)
     return ctx:rush()
 end
 
+local function human_should_reload(team, client, weapon_attr, level, mind, enemy_visible)
+    return is_human(team)
+        and not enemy_visible
+        and elapsed_since(level.time, mind.enemyLastSeen) > 3000
+        and weapon_attr ~= nil
+        and weapon_attr.ammo > 0
+        and (client.ammo or 0) / weapon_attr.ammo < 0.4
+end
+
+local function human_should_equip(team, level, mind, enemy_visible)
+    return is_human(team)
+        and not enemy_visible
+        and elapsed_since(level.time, mind.enemyLastSeen) > 1000
+end
+
+local function human_should_resupply_empty_ammo(team, client, weapon_attr)
+    return is_human(team)
+        and weapon_attr ~= nil
+        and weapon_attr.ammo > 0
+        and (client.ammo or 0) <= 0
+        and (client.clips or 0) <= 0
+end
+
+local function alien_support_needed(state)
+    if state.client.class == "builderupg" and cache.cvar("g_bot_extinguishFire") ~= "0" then
+        return true
+    end
+
+    if common.best_alien_evolve_target(state.number, state.client, state.level, ALIEN_EVOLVE_TARGETS) ~= nil then
+        return true
+    end
+
+    return state.health_frac < 1.0 and not common.recently_attacked(state.level, state.mind, 2000)
+end
+
+local function has_meaningful_combat_pressure(state, ctx)
+    if state.enemy_visible then
+        return true
+    end
+
+    if state.hostile_goal then
+        return true
+    end
+
+    return state.enemy ~= nil
+        and state.enemy_target.distance ~= nil
+        and state.enemy_target.distance < 500
+        and ctx:directPathToEntity(state.enemy)
+end
+
+local BUILDER_TASK = {
+    should_preempt = function(_, state, ctx)
+        return has_meaningful_combat_pressure(state, ctx)
+    end,
+    preempt_cooldown_ms = 1000,
+    run = function(_, state, ctx)
+        if not state.wants_build then
+            return STATUS_FAILURE
+        end
+
+        if not state.builder and not can_become_builder(state.team) then
+            return STATUS_FAILURE
+        end
+
+        local status = become_builder(state.team, state.number, state.client, state.builder_elapsed, ctx)
+        if status ~= STATUS_FAILURE then
+            return status
+        end
+
+        status = maybe_build(state.builder, ctx)
+        if status ~= STATUS_FAILURE then
+            return status
+        end
+
+        local anchor = main_building_name(state.team)
+        if anchor then
+            status = ctx:roamInRadius(anchor, BUILDER_ANCHOR_RADIUS)
+            if status ~= STATUS_FAILURE then
+                return status
+            end
+        end
+
+        return STATUS_RUNNING
+    end,
+}
+
+local COMBAT_TASK = {
+    run = function(_, state, ctx)
+        if not has_meaningful_combat_pressure(state, ctx) then
+            return STATUS_FAILURE
+        end
+
+        local status = maybe_fight(state.team, state.client.weapon, state.enemy, state.enemy_target,
+            state.hostile_goal, state.enemy_visible, ctx)
+        if status ~= STATUS_FAILURE then
+            return status
+        end
+
+        if is_alien(state.team) then
+            return maybe_fight_or_heal_alien(state.health_frac, state.enemy, state.enemy_target, state.hostile_goal,
+                state.enemy_visible, state.base_rush_score, state.level, ctx, state.mind, state.team, state.client)
+        end
+
+        return STATUS_FAILURE
+    end,
+}
+
+local SUPPORT_TASK = {
+    should_preempt = function(_, state, ctx)
+        return not state.wants_build and has_meaningful_combat_pressure(state, ctx)
+    end,
+    run = function(_, state, ctx)
+        local status = nil
+
+        if is_human(state.team) then
+            status = maybe_repair(state.team, state.number, state.client, ctx, state.mind)
+            if status ~= STATUS_FAILURE then
+                return status
+            end
+
+            status = maybe_reload(state.team, state.client, state.weapon_attr, state.level, state.mind,
+                state.enemy_visible, ctx)
+            if status ~= STATUS_FAILURE then
+                return status
+            end
+
+            status = maybe_equip(state.team, state.level, state.mind, state.enemy_visible, ctx)
+            if status ~= STATUS_FAILURE then
+                return status
+            end
+
+            return maybe_empty_ammo_resupply(state.team, state.client, state.weapon_attr, ctx)
+        end
+
+        status = maybe_extinguish_fire(state.team, state.client, ctx)
+        if status ~= STATUS_FAILURE then
+            return status
+        end
+
+        status = maybe_evolve(state.self, state.team, state.client, state.builder, state.health_frac,
+            state.level, state.mind, state.enemy_visible, ctx)
+        if status ~= STATUS_FAILURE then
+            return status
+        end
+
+        return maybe_fight_or_heal_alien(state.health_frac, state.enemy, state.enemy_target, state.hostile_goal,
+            state.enemy_visible, state.base_rush_score, state.level, ctx, state.mind, state.team, state.client)
+    end,
+}
+
+local IDLE_TASK = {
+    should_preempt = function(_, state, ctx)
+        return has_meaningful_combat_pressure(state, ctx)
+    end,
+    run = function(_, state, ctx)
+        local status = maybe_rush(state.builder, state.base_rush_score, ctx)
+        if status ~= STATUS_FAILURE then
+            return status
+        end
+
+        return ctx:roam()
+    end,
+}
+
+local function should_support(state)
+    if is_human(state.team) then
+        if repair_target(state.mind) then
+            return true
+        end
+
+        if human_should_reload(state.team, state.client, state.weapon_attr, state.level, state.mind,
+            state.enemy_visible) then
+            return true
+        end
+
+        if human_should_equip(state.team, state.level, state.mind, state.enemy_visible) then
+            return true
+        end
+
+        return human_should_resupply_empty_ammo(state.team, state.client, state.weapon_attr)
+    end
+
+    return alien_support_needed(state)
+end
+
+local function select_task(state)
+    if state.wants_build then
+        if has_meaningful_combat_pressure(state, state.ctx) then
+            return COMBAT_TASK
+        end
+
+        return BUILDER_TASK
+    end
+
+    if has_meaningful_combat_pressure(state, state.ctx) then
+        return COMBAT_TASK
+    end
+
+    if should_support(state) then
+        return SUPPORT_TASK
+    end
+
+    return IDLE_TASK
+end
+
 return function(self, ctx)
     local client = self.client
     local team = self.team
@@ -618,6 +825,25 @@ return function(self, ctx)
     local health_frac = health_fraction(client)
     local builder_elapsed = elapsed_since(level.time, mind.stuckTimer)
     local base_rush_score = ctx.baseRushScore or 0
+    local state = {
+        self = self,
+        ctx = ctx,
+        team = team,
+        number = number,
+        level = level,
+        client = client,
+        mind = mind,
+        weapon_attr = weapon_attr,
+        builder = builder,
+        wants_build = wants_build,
+        hostile_goal = hostile_goal,
+        enemy_target = enemy_target,
+        enemy = enemy,
+        enemy_visible = enemy_visible,
+        health_frac = health_frac,
+        builder_elapsed = builder_elapsed,
+        base_rush_score = base_rush_score,
+    }
 
     if not wants_build then
         mind.stuckTimer = level.time
@@ -638,76 +864,24 @@ return function(self, ctx)
         if status ~= STATUS_FAILURE then
             return status
         end
-
-        status = maybe_builder_behavior(team, number, client, builder, wants_build, team_level_data, builder_elapsed,
-            enemy, enemy_target, enemy_visible, hostile_goal, base_rush_score, ctx, mind)
-        if status ~= STATUS_FAILURE then
-            return status
-        end
-
-        status = maybe_fight(team, client.weapon, enemy, enemy_target, hostile_goal, enemy_visible, ctx)
-        if status ~= STATUS_FAILURE then
-            return status
-        end
-
-        status = maybe_repair(team, number, client, ctx, mind)
-        if status ~= STATUS_FAILURE then
-            return status
-        end
-
-        status = maybe_reload(team, client, weapon_attr, level, mind, enemy_visible, ctx)
-        if status ~= STATUS_FAILURE then
-            return status
-        end
-
-        status = maybe_equip(team, level, mind, enemy_visible, ctx)
-        if status ~= STATUS_FAILURE then
-            return status
-        end
-
-        status = maybe_empty_ammo_resupply(team, client, weapon_attr, ctx)
-        if status ~= STATUS_FAILURE then
-            return status
-        end
-
-        status = maybe_rush(builder, base_rush_score, ctx)
-        if status ~= STATUS_FAILURE then
-            return status
-        end
-
-        return ctx:roam()
     end
 
-    if is_alien(team) then
-        status = maybe_builder_behavior(team, number, client, builder, wants_build, team_level_data, builder_elapsed,
-            enemy, enemy_target, enemy_visible, hostile_goal, base_rush_score, ctx, mind)
+    local task = TASKS.current(number)
+    if task then
+        status = TASKS.maybe_preempt(state, ctx, select_task)
         if status ~= STATUS_FAILURE then
             return status
         end
 
-        status = maybe_extinguish_fire(team, client, ctx)
-        if status ~= STATUS_FAILURE then
-            return status
+        task = TASKS.current(number)
+        if task then
+            status = TASKS.run(task, state, ctx)
+            if status ~= STATUS_FAILURE then
+                return status
+            end
         end
-
-        status = maybe_evolve(self, team, client, builder, health_frac, level, mind, enemy_visible, ctx)
-        if status ~= STATUS_FAILURE then
-            return status
-        end
-
-        status = maybe_fight_or_heal_alien(health_frac, enemy, enemy_target, hostile_goal,
-            enemy_visible, base_rush_score, level, ctx, mind, team, client)
-        if status ~= STATUS_FAILURE then
-            return status
-        end
-
-        status = maybe_rush(builder, base_rush_score, ctx)
-        if status ~= STATUS_FAILURE then
-            return status
-        end
-
-        return ctx:roam()
     end
 
-    return ctx:roam()
+    task = TASKS.start(number, select_task(state))
+    return TASKS.run(task, state, ctx)
 end

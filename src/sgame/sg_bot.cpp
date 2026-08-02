@@ -317,10 +317,25 @@ void G_BotChangeBehavior( int clientNum, Str::StringRef behavior )
 	gentity_t *bot = &g_entities[clientNum];
 	ASSERT( bot->client->pers.isBot && bot->botMind );
 
-	G_BotSetBehavior( bot->botMind, behavior );
+	G_BotSetBehavior( bot->botMind, static_cast<team_t>( bot->client->pers.team ), behavior );
 }
 
-bool G_BotSetBehavior( botMemory_t *botMind, Str::StringRef behavior )
+static std::string G_BotDefaultBehavior( team_t team )
+{
+	switch ( team )
+	{
+		case TEAM_HUMANS:
+			return g_bot_defaultBehaviorHuman.Get();
+
+		case TEAM_ALIENS:
+			return g_bot_defaultBehaviorAlien.Get();
+
+		default:
+			return BOT_DEFAULT_BEHAVIOR;
+	}
+}
+
+bool G_BotSetBehavior( botMemory_t *botMind, team_t team, Str::StringRef behavior )
 {
 	G_Bot_ResetBehaviorState( *botMind );
 	botMind->blackboardTransient = 0;
@@ -332,7 +347,7 @@ bool G_BotSetBehavior( botMemory_t *botMind, Str::StringRef behavior )
 	if ( !botMind->behaviorTree )
 	{
 		Log::Warn( "Problem when loading behavior tree %s, trying default", behavior );
-		const std::string behaviorString = g_bot_defaultBehavior.Get();
+		const std::string behaviorString = G_BotDefaultBehavior( team );
 		botMind->behaviorTree = BotBehaviorTree( behaviorString );
 
 		if ( !botMind->behaviorTree )
@@ -351,7 +366,7 @@ bool G_BotSetDefaults( int clientNum, team_t team, Str::StringRef behavior )
 	botMind = self->botMind = &g_botMind[clientNum];
 	ResetStruct( *botMind );
 
-	if ( !G_BotSetBehavior( botMind, behavior ) )
+	if ( !G_BotSetBehavior( botMind, team, behavior ) )
 	{
 		return false;
 	}
@@ -867,13 +882,13 @@ void G_BotFill(bool immediately)
 		}
 	}
 
-	const std::string behaviorString = g_bot_defaultBehavior.Get();
 	while ( missingFillers )
 	{
 		for ( team_t team : {TEAM_ALIENS, TEAM_HUMANS} )
 		{
 			if ( fillers[ team ].target > 0 )
 			{
+				const std::string behaviorString = G_BotDefaultBehavior( team );
 				fillers[ team ].target--;
 				if ( !G_BotAdd( BOT_NAME_FROM_LIST, team, level.team[team].botFillSkillLevel, behaviorString.c_str(), true ) )
 				{

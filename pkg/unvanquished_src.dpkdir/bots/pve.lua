@@ -12,7 +12,6 @@ local random = math.random
 local elapsed_since = common.elapsed_since
 local is_alien = common.is_alien
 local is_human = common.is_human
-local alive = common.alive
 local should_spawn = common.should_spawn
 local target_entity = common.target_entity
 local health_fraction = common.health_fraction
@@ -25,10 +24,11 @@ local unstick = common.unstick
 local STATE = {
     alien_target_lock = {},
     alien_combat_until = {},
-    alien_builder_owner = nil,
+    builder_assignment = {},
     build_failures = {},
     build_retry_after = {},
     build_reposition_until = {},
+    tasks = {},
 }
 
 local PVE_MAX_BUILDERS = 3
@@ -37,9 +37,9 @@ local PVE_BUILD_FAILURE_BASE_DELAY_MS = 750
 local PVE_BUILD_FAILURE_MAX_DELAY_MS = 5000
 local PVE_BUILD_REPOSITION_THRESHOLD = 3
 local PVE_BUILD_REPOSITION_MS = 2000
+local PVE_HUMAN_BUILDER_SEARCH_MS = 4000
 local ALIEN_EVOLVE_TARGETS = common.ALIEN_EVOLVE_TARGETS
 local ALIEN_COMBAT_TARGETS = common.ALIEN_COMBAT_TARGETS
-
 local function random_choice(options)
     if not options or #options == 0 then
         return nil
@@ -103,21 +103,105 @@ local function clear_alien_combat_latch(number)
     STATE.alien_combat_until[number] = nil
 end
 
-local function clear_alien_builder_owner(number)
-    local owner = STATE.alien_builder_owner
-    if not owner then
-        return
-    end
-
-    if number == nil or owner.number == number then
-        STATE.alien_builder_owner = nil
-    end
-end
-
 local function clear_build_failure_state(number)
     STATE.build_failures[number] = nil
     STATE.build_retry_after[number] = nil
     STATE.build_reposition_until[number] = nil
+end
+
+local function clear_builder_assignment(number)
+    STATE.builder_assignment[number] = nil
+end
+
+local function builder_assignment_team(number)
+    return STATE.builder_assignment[number]
+end
+
+local function has_builder_assignment(number, team_name)
+    local assigned_team = builder_assignment_team(number)
+    if not assigned_team then
+        return false
+    end
+
+    if team_name ~= nil then
+        return assigned_team == team_name
+    end
+
+    return true
+end
+
+local function assign_builder(number, team_name)
+    STATE.builder_assignment[number] = team_name
+end
+
+local function clear_task(number)
+    STATE.tasks[number] = nil
+end
+
+local function current_task(number)
+    return STATE.tasks[number]
+end
+
+local function start_task(number, task)
+    STATE.tasks[number] = task
+    return task
+end
+
+local select_task
+
+local function run_task(task, state, ctx)
+    local status = task.run(task, state, ctx)
+    if status ~= STATUS_RUNNING then
+        clear_task(state.number)
+    end
+
+    return status
+end
+
+local function maybe_preempt_task(state, ctx)
+    local task = current_task(state.number)
+    if not task or not task.should_preempt then
+        return STATUS_FAILURE
+    end
+
+    local retry_at = task.preempt_retry_at
+    if retry_at and retry_at > state.level.time then
+        return STATUS_FAILURE
+    end
+
+    if not task.should_preempt(task, state, ctx) then
+        return STATUS_FAILURE
+    end
+
+    local previous_task = task
+    local replacement = select_task(state)
+    if not replacement then
+        return STATUS_FAILURE
+    end
+
+    clear_task(state.number)
+    start_task(state.number, replacement)
+
+    local status = run_task(replacement, state, ctx)
+    if status ~= STATUS_FAILURE then
+        return status
+    end
+
+    previous_task.preempt_retry_at = state.level.time + (previous_task.preempt_cooldown_ms or 1000)
+    start_task(state.number, previous_task)
+    return STATUS_FAILURE
+end
+
+local function builder_role(task)
+    return task
+end
+
+local function attack_role(task)
+    return task
+end
+
+local function roam_role(task)
+    return task
 end
 
 local function build_retry_active(number, now)
@@ -143,36 +227,6 @@ local function note_build_failure(number, now)
     if failures >= PVE_BUILD_REPOSITION_THRESHOLD then
         STATE.build_reposition_until[number] = now + PVE_BUILD_REPOSITION_MS
     end
-end
-
-local function alien_builder_owner()
-    local owner = STATE.alien_builder_owner
-    if not owner then
-        return nil
-    end
-
-    local entity = resolve_entity_ref(owner)
-    if not entity or not entity.client or entity.client.health <= 0 then
-        STATE.alien_builder_owner = nil
-        return nil
-    end
-
-    return owner
-end
-
-local function claim_alien_builder_owner(number)
-    local entity = sgame.entity[number]
-    if not entity then
-        return false
-    end
-
-    STATE.alien_builder_owner = entity_ref(entity)
-    return true
-end
-
-local function is_alien_builder_owner(number)
-    local owner = alien_builder_owner()
-    return owner and owner.number == number or false
 end
 
 local function lock_alien_target(number, entity, now)
@@ -244,23 +298,6 @@ local function distance_to_target(ctx, target)
     return nil
 end
 
-local function goal_reached(ctx, goal, radius)
-    local distance = distance_to_target(ctx, goal)
-    return distance and distance <= radius or false
-end
-
-local function main_building_name(team)
-    if is_alien(team) then
-        return "overmind"
-    end
-
-    if is_human(team) then
-        return "reactor"
-    end
-
-    return nil
-end
-
 local function is_builder(team, client)
     if is_alien(team) then
         return client.class == "builder" or client.class == "builderupg"
@@ -283,22 +320,6 @@ local function team_level(team)
     end
 
     return nil
-end
-
-local function class_attr(class_name)
-    return common.class_attr(class_name)
-end
-
-local function class_health(class_name)
-    return common.class_health(class_name)
-end
-
-local function can_evolve_to_class(client, level, class_name)
-    return common.can_evolve_to_class(client, level, class_name)
-end
-
-local function best_alien_evolve_target(client, level)
-    return common.best_alien_evolve_target(nil, client, level, ALIEN_EVOLVE_TARGETS)
 end
 
 local function best_alien_combat_target(number, client)
@@ -371,25 +392,11 @@ local function choose_alien_enemy(number, now, enemy_target, enemy_visible, host
 end
 
 local function builder_count(team_name, team_snapshot, number)
-    if not team_snapshot then
-        return 0
-    end
-
     local count = 0
 
-    if is_alien(team_name) then
-        count = (team_snapshot.weapons.abuild or 0) + (team_snapshot.weapons.abuildupg or 0)
-        local entity = sgame.entity[number]
-        local client = entity and entity.client or nil
-        if client and (client.class == "builder" or client.class == "builderupg") then
-            count = count - 1
-        end
-    elseif is_human(team_name) then
-        count = team_snapshot.weapons.ckit or 0
-        local entity = sgame.entity[number]
-        local client = entity and entity.client or nil
-        if client and client.weapon == "ckit" then
-            count = count - 1
+    for entity_num, assigned_team in pairs(STATE.builder_assignment) do
+        if entity_num ~= number and assigned_team == team_name then
+            count = count + 1
         end
     end
 
@@ -406,6 +413,12 @@ local function choose_pve_buildable(team_name, team_snapshot)
     end
 
     if is_human(team_name) then
+        local telenodes = team_snapshot.buildables.telenode or 0
+        local arms = team_snapshot.buildables.arm or 0
+        local medis = team_snapshot.buildables.medistat or 0
+        local can_build_telenode = telenodes < cache.cvar_number("g_bot_buildNumTelenodes")
+        local support = nil
+
         if (team_snapshot.buildables.reactor or 0) == 0 then
             return "reactor"
         end
@@ -414,25 +427,43 @@ local function choose_pve_buildable(team_name, team_snapshot)
             return "drill"
         end
 
-        if (team_snapshot.buildables.telenode or 0) == 0 then
+        if arms == 0 and medis == 0 then
+            support = random(2) == 1 and "arm" or "medistat"
+        elseif arms == 0 then
+            support = "arm"
+        elseif medis == 0 then
+            support = "medistat"
+        end
+
+        local roll = random(10)
+
+        if roll <= 6 then
+            if cache.buildable_unlocked("humans", "rocketpod")
+                and random() < cache.cvar_number("g_bot_buildProbRocketPod") then
+                return "rocketpod"
+            end
+
+            return "mgturret"
+        end
+
+        if roll <= 9 and can_build_telenode then
             return "telenode"
         end
 
-        if (team_snapshot.buildables.arm or 0) == 0 then
-            return "arm"
+        if support then
+            return support
         end
 
-        if (team_snapshot.buildables.medistat or 0) == 0 then
-            return "medistat"
+        if can_build_telenode then
+            return "telenode"
         end
 
-        return random_choice({
-            "telenode",
-            "mgturret",
-            "rocketpod",
-            "arm",
-            "medistat",
-        })
+        if cache.buildable_unlocked("humans", "rocketpod")
+            and random() < cache.cvar_number("g_bot_buildProbRocketPod") then
+            return "rocketpod"
+        end
+
+        return "mgturret"
     end
 
     if is_alien(team_name) then
@@ -468,14 +499,12 @@ local function builder_needed(team_name, number, team_snapshot, level, selected_
         return false
     end
 
-    local level_time = sgame.level.match_time
     local chosen_cost = cache.buildable_cost(selected_buildable)
     local usable_build_points = cache.usable_build_points(team_name)
     local build_enabled = is_alien(team_name) and cache.cvar("g_bot_buildAliens") ~= "0"
         or is_human(team_name) and cache.cvar("g_bot_buildHumans") ~= "0"
 
-    return level_time >= 60000
-        and build_enabled
+    return build_enabled
         and usable_build_points >= chosen_cost
         and builder_count(team_name, team_snapshot, number) < PVE_MAX_BUILDERS
 end
@@ -490,32 +519,42 @@ local function can_convert_to_builder_now(team, client, level)
 end
 
 local function wants_builder(team_name, number, team_snapshot, level, builder, selected_buildable)
-    local wanted = builder_needed(team_name, number, team_snapshot, level, selected_buildable)
-    if not wanted then
-        if is_alien(team_name) and not builder then
-            clear_alien_builder_owner(number)
+    if has_builder_assignment(number) then
+        if builder_needed(team_name, number, team_snapshot, level, selected_buildable) then
+            return true
         end
 
+        clear_builder_assignment(number)
         return false
     end
 
-    if builder then
+    if not builder_needed(team_name, number, team_snapshot, level, selected_buildable) then
+        return false
+    end
+
+    if builder or can_convert_to_builder_now(team_name, sgame.entity[number].client, level) then
+        assign_builder(number, team_name)
         return true
     end
 
-    return can_convert_to_builder_now(team_name, sgame.entity[number].client, level)
+    return false
 end
 
 local function wants_builder_spawn(team_name, number, team_snapshot, level, selected_buildable)
-    local wanted = builder_needed(team_name, number, team_snapshot, level, selected_buildable)
-    if not wanted then
-        if is_alien(team_name) then
-            clear_alien_builder_owner(number)
+    if has_builder_assignment(number) then
+        if builder_needed(team_name, number, team_snapshot, level, selected_buildable) then
+            return true
         end
 
+        clear_builder_assignment(number)
         return false
     end
 
+    if not builder_needed(team_name, number, team_snapshot, level, selected_buildable) then
+        return false
+    end
+
+    assign_builder(number, team_name)
     return true
 end
 
@@ -549,7 +588,6 @@ local function become_builder(team, number, client, builder_elapsed, ctx)
         end
 
         if builder_elapsed >= 20000 then
-            clear_alien_builder_owner(number)
             ctx:resetMyTimer()
             return STATUS_FAILURE
         end
@@ -644,56 +682,12 @@ local function maybe_retire_builder(team, number, client, builder, wants_build, 
         if target then
             local status = ctx:evolveTo(target)
             if status ~= STATUS_FAILURE then
-                clear_alien_builder_owner()
                 return status
             end
         end
     end
 
     return STATUS_FAILURE
-end
-
-local function maybe_builder_behavior(team, number, client, builder, wants_build, selected_buildable, level, builder_elapsed,
-    enemy, enemy_visible, hostile_goal, ctx, mind)
-    if not wants_build then
-        return STATUS_FAILURE
-    end
-
-    if not builder and not can_become_builder(team, client, level) then
-        return STATUS_FAILURE
-    end
-
-    local status = become_builder(team, number, client, builder_elapsed, ctx)
-    if status ~= STATUS_FAILURE then
-        clear_build_failure_state(number)
-        return status
-    end
-
-    if build_reposition_active(number, level.time) then
-        status = ctx:roam()
-        if status ~= STATUS_FAILURE then
-            return status
-        end
-    end
-
-    if builder then
-        status = maybe_build(builder, selected_buildable, sgame.level, mind, number, ctx)
-        if status ~= STATUS_FAILURE then
-            return status
-        end
-    end
-
-    status = maybe_fight(team, client.weapon, enemy, mind.bestEnemy, hostile_goal, enemy_visible, ctx)
-    if status ~= STATUS_FAILURE then
-        return status
-    end
-
-    status = ctx:rush()
-    if status ~= STATUS_FAILURE then
-        return status
-    end
-
-    return ctx:roam()
 end
 
 local function maybe_use_medkit(team, client, ctx)
@@ -778,6 +772,11 @@ local function maybe_heal_or_fight_alien(number, health_frac, enemy, enemy_targe
     local alerted = enemy ~= nil or hostile_goal or recently_in_combat or latched
     local low_tier_alien = is_alien(team) and (client.class == "level0" or client.class == "level1")
     local needs_healing = health_frac < 1.0
+    local stuck_for = elapsed_since(level.time, mind.stuckTime)
+
+    if is_alien(team) and stuck_for > 45000 then
+        return ctx:suicide()
+    end
 
     if needs_healing and not recently_attacked then
         local status = ctx:heal()
@@ -856,6 +855,10 @@ local function maybe_repair(team, number, weapon, team_snapshot, ctx, mind)
         return STATUS_FAILURE
     end
 
+    if not has_builder_assignment(number) and builder_count(team, team_snapshot, number) > 0 then
+        return STATUS_FAILURE
+    end
+
     if weapon ~= "ckit" then
         return ctx:buyPrimary("ckit")
     end
@@ -876,8 +879,12 @@ local function maybe_reload(team, client, weapon_attr, level, ctx, mind, enemy_v
     return ctx:reload()
 end
 
-local function maybe_equip(team, level, ctx, mind, enemy_visible)
+local function maybe_equip(team, number, level, ctx, mind, enemy_visible)
     if not is_human(team) or enemy_visible or elapsed_since(level.time, mind.enemyLastSeen) <= 1000 then
+        return STATUS_FAILURE
+    end
+
+    if has_builder_assignment(number) then
         return STATUS_FAILURE
     end
 
@@ -900,6 +907,305 @@ local function maybe_rush(builder, base_rush_score, ctx)
     return ctx:rush()
 end
 
+local function combat_active(state)
+    if state.enemy or state.hostile_goal then
+        return true
+    end
+
+    if is_alien(state.team) then
+        local recently_in_combat = elapsed_since(state.level.time, state.mind.enemyLastSeen) < 2000
+        return recently_in_combat or alien_combat_latched(state.number, state.level.time)
+    end
+
+    return false
+end
+
+local function urgent_combat(state)
+    return state.enemy_visible
+end
+
+local function run_builder_task(task, state, ctx)
+    if not state.wants_build then
+        return STATUS_FAILURE
+    end
+
+    if not state.builder
+        and not (is_human(state.team) and task.phase == "search")
+        and not can_become_builder(state.team, state.client, state.team_level_data) then
+        return STATUS_FAILURE
+    end
+
+    if task.phase == "equip" then
+        if state.client.weapon ~= "ckit"
+            or state.enemy_visible then
+            task.phase = "search"
+            task.search_until = state.level.time + PVE_HUMAN_BUILDER_SEARCH_MS
+        else
+            return ctx:equip()
+        end
+    end
+
+    if task.phase == "search" and is_human(state.team) then
+        if state.level.time >= (task.search_until or 0)
+            or human_repair_target(state.mind) then
+            task.phase = "acquire"
+        else
+            local status = maybe_fight(state.team, state.client.weapon, state.enemy, state.enemy_target,
+                state.hostile_goal, state.enemy_visible, ctx)
+            if status ~= STATUS_FAILURE then
+                return status
+            end
+
+            status = maybe_reload(state.team, state.client, state.weapon_attr, state.level, ctx, state.mind, state.enemy_visible)
+            if status ~= STATUS_FAILURE then
+                return status
+            end
+
+            status = ctx:roam()
+            if status ~= STATUS_FAILURE then
+                return status
+            end
+
+            return STATUS_FAILURE
+        end
+    end
+
+    if not state.builder and task.phase == nil then
+        task.phase = "acquire"
+    end
+
+    local status = become_builder(state.team, state.number, state.client, state.builder_elapsed, ctx)
+    if status ~= STATUS_FAILURE then
+        clear_build_failure_state(state.number)
+        task.phase = "acquire"
+        task.search_until = nil
+        return STATUS_RUNNING
+    end
+
+    if is_human(state.team) and not state.builder then
+        status = ctx:roam()
+        if status ~= STATUS_FAILURE then
+            return status
+        end
+
+        return STATUS_RUNNING
+    end
+
+    task.phase = nil
+
+    if build_reposition_active(state.number, state.level.time) then
+        status = ctx:roam()
+        if status ~= STATUS_FAILURE then
+            return status
+        end
+    end
+
+    if state.builder then
+        status = maybe_build(state.builder, state.selected_buildable, state.level, state.mind, state.number, ctx)
+        if status ~= STATUS_FAILURE then
+            return status
+        end
+
+        if is_human(state.team)
+            and state.client.weapon == "ckit"
+            and not human_repair_target(state.mind)
+            and not ctx:canBuild(state.selected_buildable) then
+            task.phase = "search"
+            task.search_until = state.level.time + PVE_HUMAN_BUILDER_SEARCH_MS
+
+            status = ctx:roam()
+            if status ~= STATUS_FAILURE then
+                return status
+            end
+
+            return STATUS_RUNNING
+        end
+    end
+
+    if is_human(state.team) and state.client.weapon == "ckit" and state.enemy_visible then
+        status = ctx:flee()
+        if status ~= STATUS_FAILURE then
+            return status
+        end
+    end
+
+    if is_alien(state.team) and state.health_frac < 0.8 then
+        status = ctx:heal()
+        if status ~= STATUS_FAILURE then
+            return status
+        end
+    end
+
+    status = ctx:roam()
+    if status ~= STATUS_FAILURE then
+        return status
+    end
+
+    return STATUS_FAILURE
+end
+
+local function should_preempt_builder_task(task, state, ctx)
+    return not state.wants_build or urgent_combat(state)
+end
+
+local function new_builder_task()
+    return {
+        role = builder_role,
+        phase = nil,
+        search_until = nil,
+        preempt_cooldown_ms = 750,
+        run = run_builder_task,
+        should_preempt = should_preempt_builder_task,
+    }
+end
+
+local function run_attack_task(task, state, ctx)
+    if is_alien(state.team) then
+        local status = maybe_extinguish_fire(state.team, state.client, ctx)
+        if status ~= STATUS_FAILURE then
+            return status
+        end
+
+        status = maybe_heal_or_fight_alien(state.number, state.health_frac, state.enemy, state.enemy_target,
+            state.hostile_goal, state.enemy_visible, state.base_rush_score, state.level, ctx, state.mind,
+            state.team, sgame.entity[state.number].client)
+        if status ~= STATUS_FAILURE then
+            return status
+        end
+
+        return STATUS_FAILURE
+    end
+
+    local status = maybe_fight(state.team, state.weapon, state.enemy, state.enemy_target,
+        state.hostile_goal, state.enemy_visible, ctx)
+    if status ~= STATUS_FAILURE then
+        return status
+    end
+
+    if state.builder and state.client.weapon == "ckit" and state.enemy_visible then
+        status = ctx:flee()
+        if status ~= STATUS_FAILURE then
+            return status
+        end
+    end
+
+    return STATUS_FAILURE
+end
+
+local function should_preempt_attack_task(task, state, ctx)
+    return not combat_active(state)
+end
+
+local function new_attack_task()
+    return {
+        role = attack_role,
+        preempt_cooldown_ms = 750,
+        run = run_attack_task,
+        should_preempt = should_preempt_attack_task,
+    }
+end
+
+local function run_roam_task(task, state, ctx)
+    if is_alien(state.team) then
+        local status = maybe_extinguish_fire(state.team, state.client, ctx)
+        if status ~= STATUS_FAILURE then
+            return status
+        end
+
+        status = maybe_evolve(state.self, state.team, state.client, state.builder, state.health_frac,
+            ctx, state.level, state.mind, state.enemy_visible)
+        if status ~= STATUS_FAILURE then
+            return status
+        end
+
+        status = maybe_heal_or_fight_alien(state.number, state.health_frac, state.enemy, state.enemy_target,
+            state.hostile_goal, state.enemy_visible, state.base_rush_score, state.level, ctx, state.mind,
+            state.team, sgame.entity[state.number].client)
+        if status ~= STATUS_FAILURE then
+            return status
+        end
+
+        if state.builder then
+            status = maybe_build(state.builder, state.selected_buildable, state.level, state.mind, state.number, ctx)
+            if status ~= STATUS_FAILURE then
+                return status
+            end
+        end
+
+        status = maybe_rush(state.builder, state.base_rush_score, ctx)
+        if status ~= STATUS_FAILURE then
+            return status
+        end
+
+        return ctx:roam()
+    end
+
+    local status = maybe_fight(state.team, state.weapon, state.enemy, state.enemy_target,
+        state.hostile_goal, state.enemy_visible, ctx)
+    if status ~= STATUS_FAILURE then
+        return status
+    end
+
+    status = maybe_repair(state.team, state.number, state.weapon, state.team_snapshot, ctx, state.mind)
+    if status ~= STATUS_FAILURE then
+        return status
+    end
+
+    status = maybe_reload(state.team, state.client, state.weapon_attr, state.level, ctx, state.mind, state.enemy_visible)
+    if status ~= STATUS_FAILURE then
+        return status
+    end
+
+    status = maybe_equip(state.team, state.number, state.level, ctx, state.mind, state.enemy_visible)
+    if status ~= STATUS_FAILURE then
+        return status
+    end
+
+    status = maybe_flee_human(state.team, state.weapon, state.enemy_visible, ctx)
+    if status ~= STATUS_FAILURE then
+        return status
+    end
+
+    if state.builder then
+        status = maybe_build(state.builder, state.selected_buildable, state.level, state.mind, state.number, ctx)
+        if status ~= STATUS_FAILURE then
+            return status
+        end
+    end
+
+    status = maybe_rush(state.builder, state.base_rush_score, ctx)
+    if status ~= STATUS_FAILURE then
+        return status
+    end
+
+    return ctx:roam()
+end
+
+local function should_preempt_roam_task(task, state, ctx)
+    return state.wants_build or combat_active(state)
+end
+
+local function new_roam_task()
+    return {
+        role = roam_role,
+        preempt_cooldown_ms = 1500,
+        run = run_roam_task,
+        should_preempt = should_preempt_roam_task,
+    }
+end
+
+select_task = function(state)
+    if state.wants_build and not urgent_combat(state) then
+        return new_builder_task()
+    end
+
+    if combat_active(state) then
+        return new_attack_task()
+    end
+
+    return new_roam_task()
+end
+
 return function(self, ctx)
     local client = self.client
     local team = self.team
@@ -913,6 +1219,8 @@ return function(self, ctx)
     if should_spawn(self, PMF_QUEUED) then
         clear_alien_target_lock(number)
         clear_alien_combat_latch(number)
+        clear_task(number)
+        clear_build_failure_state(number)
         return choose_spawn(team, number, team_snapshot, team_level_data, selected_buildable, ctx)
     end
 
@@ -949,6 +1257,7 @@ return function(self, ctx)
     if not wants_build then
         mind.stuckTimer = level.time
         clear_build_failure_state(number)
+        clear_builder_assignment(number)
     end
 
     local status = unstick(level.time, ctx, mind, enemy, enemy_visible, team, client, builder)
@@ -967,77 +1276,51 @@ return function(self, ctx)
         return status
     end
 
-    status = maybe_builder_behavior(team, number, client, builder, wants_build, selected_buildable,
-        team_level_data, builder_elapsed,
-        enemy, enemy_visible, hostile_goal, ctx, mind)
-    if status ~= STATUS_FAILURE then
-        return status
-    end
+    local state = {
+        self = self,
+        client = client,
+        team = team,
+        number = number,
+        level = level,
+        team_level_data = team_level_data,
+        team_snapshot = team_snapshot,
+        selected_buildable = selected_buildable,
+        weapon = weapon,
+        weapon_attr = weapon_attr,
+        builder = builder,
+        wants_build = wants_build,
+        hostile_goal = hostile_goal,
+        enemy_target = enemy_target,
+        enemy = enemy,
+        enemy_visible = enemy_visible,
+        health_frac = health_frac,
+        builder_elapsed = builder_elapsed,
+        base_rush_score = base_rush_score,
+        mind = mind,
+    }
 
-    if is_alien(team) then
-        status = maybe_extinguish_fire(team, client, ctx)
+    local task = current_task(number)
+    if task then
+        status = maybe_preempt_task(state, ctx)
         if status ~= STATUS_FAILURE then
             return status
         end
 
-        status = maybe_evolve(self, team, client, builder, health_frac, ctx, level, mind, enemy_visible)
-        if status ~= STATUS_FAILURE then
-            return status
+        task = current_task(number)
+        if task then
+            status = run_task(task, state, ctx)
+            if status ~= STATUS_FAILURE then
+                return status
+            end
         end
-
-        status = maybe_heal_or_fight_alien(number, health_frac, enemy, enemy_target, hostile_goal,
-            enemy_visible, base_rush_score, level, ctx, mind, team, sgame.entity[number].client)
-        if status ~= STATUS_FAILURE then
-            return status
-        end
-
-        status = maybe_build(builder, selected_buildable, level, mind, number, ctx)
-        if status ~= STATUS_FAILURE then
-            return status
-        end
-
-        status = maybe_rush(builder, base_rush_score, ctx)
-        if status ~= STATUS_FAILURE then
-            return status
-        end
-
-        return ctx:roam()
     end
 
-    status = maybe_fight(team, weapon, enemy, enemy_target, hostile_goal, enemy_visible, ctx)
+    task = start_task(number, select_task(state))
+    status = run_task(task, state, ctx)
     if status ~= STATUS_FAILURE then
         return status
     end
 
-    status = maybe_repair(team, number, weapon, team_snapshot, ctx, mind)
-    if status ~= STATUS_FAILURE then
-        return status
-    end
-
-    status = maybe_reload(team, client, weapon_attr, level, ctx, mind, enemy_visible)
-    if status ~= STATUS_FAILURE then
-        return status
-    end
-
-    status = maybe_equip(team, level, ctx, mind, enemy_visible)
-    if status ~= STATUS_FAILURE then
-        return status
-    end
-
-    status = maybe_flee_human(team, weapon, enemy_visible, ctx)
-    if status ~= STATUS_FAILURE then
-        return status
-    end
-
-    status = maybe_build(builder, selected_buildable, level, mind, number, ctx)
-    if status ~= STATUS_FAILURE then
-        return status
-    end
-
-    status = maybe_rush(builder, base_rush_score, ctx)
-    if status ~= STATUS_FAILURE then
-        return status
-    end
-
+    clear_task(number)
     return ctx:roam()
 end
