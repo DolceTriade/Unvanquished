@@ -796,7 +796,7 @@ void G_ExecuteVote( team_t team )
 
 	trap_SendConsoleCommand( va( "%s", level.team[ team ].voteString ) );
 
-	if ( !Q_stricmp( level.team[ team ].voteString, "map_restart" ) )
+	if ( Str::IsIPrefix( "map_restart", level.team[ team ].voteString ) )
 	{
 		G_MapLog_Result( 'r' );
 		level.restarted = true;
