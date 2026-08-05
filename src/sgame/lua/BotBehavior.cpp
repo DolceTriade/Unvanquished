@@ -64,6 +64,10 @@ struct BotBehaviorState
 	AILuaNode_t *ownerNode = nullptr;
 	AIBotActionWrapper actions[ 2 ];
 	int activeAction = 0;
+	char activeActionName[ MAX_QPATH ] = "";
+	char activeActionSource[ MAX_QPATH ] = "";
+	int activeActionLine = 0;
+	BotActionTraceInfo traceInfo = { activeActionName, activeActionSource, 0 };
 };
 
 struct BotContext
@@ -95,7 +99,7 @@ static const char *StatusName( AINodeStatus_t status )
 
 static void TraceLuaAction( BotContext *ctx, lua_State *L, const char *name, AINodeStatus_t status )
 {
-	if ( !ctx || !ctx->self || G_BotTraceClient() != ctx->self->num() )
+	if ( !ctx || !ctx->self || !ctx->actionState )
 	{
 		return;
 	}
@@ -115,6 +119,18 @@ static void TraceLuaAction( BotContext *ctx, lua_State *L, const char *name, AIN
 			source = ar.short_src;
 		}
 		line = ar.currentline;
+	}
+
+	Q_strncpyz( ctx->actionState->activeActionName, name ? name : "",
+	            sizeof( ctx->actionState->activeActionName ) );
+	Q_strncpyz( ctx->actionState->activeActionSource, source,
+	            sizeof( ctx->actionState->activeActionSource ) );
+	ctx->actionState->activeActionLine = line;
+	ctx->actionState->traceInfo.sourceLine = line;
+
+	if ( G_BotTraceClient() != ctx->self->num() )
+	{
+		return;
 	}
 
 	Log::defaultLogger.WithoutSuppression().Notice(
@@ -906,6 +922,18 @@ static void EnsureBotContextRegistered( lua_State *L )
 }
 
 }  // namespace
+
+const BotActionTraceInfo *GetBotActionTraceInfo( const botMemory_t& memory )
+{
+	static const BotActionTraceInfo emptyTraceInfo = { "", "", 0 };
+
+	if ( !memory.luaBehaviorState || !memory.luaBehaviorState->activeActionName[ 0 ] )
+	{
+		return &emptyTraceInfo;
+	}
+
+	return &memory.luaBehaviorState->traceInfo;
+}
 
 AINodeStatus_t runLuaBehavior( gentity_t *self, AIGenericNode_t *node )
 {

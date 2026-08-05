@@ -71,10 +71,46 @@ private:
 	enum class targetType { EMPTY, COORDS, ENTITY } type;
 };
 
+struct botMemory_t;
+
 namespace Lua
 {
 struct BotBehaviorState;
+
+struct BotActionTraceInfo
+{
+	const char *actionName;
+	const char *sourceName;
+	int sourceLine;
+};
+
+const BotActionTraceInfo *GetBotActionTraceInfo( const botMemory_t& memory );
 }
+
+enum class botTraceBackend_t
+{
+	NONE,
+	BT,
+	LUA,
+};
+
+enum class botTraceStateKind_t
+{
+	NONE,
+	RUNNING,
+	ROOT_SUCCESS,
+	ROOT_FAILURE,
+};
+
+struct botTraceDescriptor_t
+{
+	botTraceBackend_t backend = botTraceBackend_t::NONE;
+	botTraceStateKind_t stateKind = botTraceStateKind_t::NONE;
+	char behavior[ MAX_QPATH ] = "";
+	char actionName[ MAX_QPATH ] = "";
+	char sourceName[ MAX_QPATH ] = "";
+	int sourceLine = 0;
+};
 
 struct botGoalAndDistance_t
 {
@@ -186,6 +222,10 @@ struct botMemory_t
 		AIGenericNode_t* currentNode;
 		BoundedVector<AIGenericNode_t*, MAX_NODE_DEPTH> runningNodes;
 		Lua::BotBehaviorState* luaBehaviorState;
+		botTraceDescriptor_t previousTrace;
+		bool previousTraceInitialized;
+		botTraceDescriptor_t lastFailureTrace;
+		bool lastFailureTraceInitialized;
 
 		botTarget_t goal;
 
