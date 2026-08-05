@@ -26,6 +26,24 @@ local STATE = {
     human_equip_retry_at = {},
 }
 
+local function entity_is_alive(entity)
+    if not entity then
+        return false
+    end
+
+    local client = entity.client
+    if client then
+        return client.health and client.health > 0 or false
+    end
+
+    local buildable = entity.buildable
+    if buildable then
+        return buildable.health and buildable.health > 0 or false
+    end
+
+    return true
+end
+
 local function buildable_health_fraction(entity)
     local buildable = entity and entity.buildable or nil
     local attr = buildable and Unv.buildables[buildable.name] or nil
@@ -273,7 +291,8 @@ local function defend_attack_active(state)
         return true
     end
 
-    return state.mind.enemyLastSeen ~= nil
+    return state.enemy ~= nil
+        and state.mind.enemyLastSeen ~= nil
         and state.mind.enemyLastSeen > 0
         and elapsed_since(state.level.time, state.mind.enemyLastSeen) <= 1500
 end
@@ -292,6 +311,10 @@ end
 
 local function human_should_retire_repair_kit(team, client, mind)
     return is_human(team) and client.weapon == "ckit" and repair_target_info(mind) == nil
+end
+
+local function human_should_heal(team, client)
+    return is_human(team) and client.health < 100
 end
 
 local function human_should_reload(team, client, weapon_attr, enemy_visible, level, mind)
@@ -320,6 +343,10 @@ local function human_should_equip(number, team, enemy_visible, level, mind)
 end
 
 local function human_support_needed(number, team, client, weapon_attr, enemy_visible, level, mind)
+    if human_should_heal(team, client) then
+        return true
+    end
+
     if human_should_retire_repair_kit(team, client, mind) then
         return true
     end
@@ -371,6 +398,11 @@ local REPAIR_HEAL_TASK = {
 
             return maybe_defend_as_alien(state.client, defend_attack_active(state),
                 state.enemy_visible, ctx, state.mind)
+        end
+
+        status = maybe_heal_human(state.client, state.mind, state.enemy_visible, ctx)
+        if status ~= STATUS_FAILURE then
+            return status
         end
 
         status = maybe_repair(state.team, state.number, state.client, ctx, state.mind)
@@ -441,6 +473,9 @@ return function(self, ctx)
     end
 
     local enemy = target_entity(mind.bestEnemy)
+    if enemy and not entity_is_alive(enemy) then
+        enemy = nil
+    end
     local enemy_visible = enemy and ctx:isVisibleEntity(enemy) or false
     local weapon_attr = weapons[client.weapon]
     local state = {
