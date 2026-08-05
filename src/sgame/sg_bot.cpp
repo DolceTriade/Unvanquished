@@ -24,7 +24,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 */
 
 #include "common/Common.h"
+#include "lua/BotBehavior.h"
 #include "sg_bot_parse.h"
+#include "sg_bot_trace.h"
 #include "sg_bot_util.h"
 #include "Entities.h"
 
@@ -501,31 +503,26 @@ void G_BotDelAllBots()
 static void ShowRunningNode( gentity_t *self, AINodeStatus_t status )
 {
 	const char *name = self->client->pers.netname;
-	switch ( status )
+	botTraceDescriptor_t descriptor = G_BotBuildTraceDescriptor( self, status );
+
+	switch ( descriptor.stateKind )
 	{
-	case STATUS_FAILURE:
-		Log::defaultLogger.WithoutSuppression().Notice( "%s^* root tree exited with STATUS_FAILURE", name );
-		break;
-	case STATUS_SUCCESS:
-		Log::defaultLogger.WithoutSuppression().Notice( "%s^* root tree exited with STATUS_SUCCESS", name );
-		break;
-	case STATUS_RUNNING:
-		ASSERT( !self->botMind->runningNodes.empty() );
-		ASSERT_EQ( self->botMind->runningNodes[ 0 ]->type, AINode_t::ACTION_NODE );
-		AIActionNode_t *actionNode = reinterpret_cast<AIActionNode_t *>( self->botMind->runningNodes[ 0 ] );
-		int line = actionNode->lineNum;
-		const char *actionName = actionNode->name;
-		const char *tree = self->botMind->behaviorTree->name;
-		for ( const AIGenericNode_t *node : self->botMind->runningNodes )
-		{
-			if ( node->type == AINode_t::BEHAVIOR_NODE )
-			{
-				tree = reinterpret_cast<const AIBehaviorTree_t *>( node )->name;
-				break;
-			}
-		}
-		Log::defaultLogger.WithoutSuppression().Notice( "%s^* running at %s.bt:%d, action %s", name, tree, line, actionName );
-		break;
+		case botTraceStateKind_t::ROOT_FAILURE:
+			Log::defaultLogger.WithoutSuppression().Notice( "%s^* root tree exited with STATUS_FAILURE", name );
+			break;
+
+		case botTraceStateKind_t::ROOT_SUCCESS:
+			Log::defaultLogger.WithoutSuppression().Notice( "%s^* root tree exited with STATUS_SUCCESS", name );
+			break;
+
+		case botTraceStateKind_t::RUNNING:
+			Log::defaultLogger.WithoutSuppression().Notice(
+				"%s^* running at %s:%d, action %s",
+				name, descriptor.sourceName, descriptor.sourceLine, descriptor.actionName );
+			break;
+
+		case botTraceStateKind_t::NONE:
+			break;
 	}
 }
 
@@ -617,6 +614,8 @@ void G_BotThink( gentity_t *self )
 	{
 		ShowRunningNode( self, status );
 	}
+
+	G_BotTraceTransition( self, status );
 
 	// if we have a jetpack and are falling too fast: fire it
 	if ( G_Team( self ) == TEAM_HUMANS && BG_InventoryContainsUpgrade( UP_JETPACK, self->client->ps.stats ) )
@@ -938,6 +937,8 @@ void botMemory_t::doSprint( int jumpCost, int stamina, usercmd_t& cmd )
 // TODO: also reset state stored in BT nodes
 void G_Bot_ResetBehaviorState( botMemory_t &memory )
 {
+	Lua::ResetBotBehaviorState( memory );
+	G_BotResetTraceCache( memory );
 	memory.currentNode = nullptr;
 	memory.runningNodes.clear();
 	memory.goal.clear();

@@ -63,6 +63,7 @@ void G_BotUpdateObstacles();
 void G_BotBackgroundNavgen();
 bool G_BotInit();
 void G_BotCleanup();
+void G_BotTransitionTraceShutdown();
 void G_BotFill( bool immediately );
 void G_BotRemoveObstacle( qhandle_t handle );
 void G_BotUpdateObstacles();
