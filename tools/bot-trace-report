@@ -1,0 +1,1615 @@
+#! /usr/bin/env python3
+
+import argparse
+import json
+import re
+import sys
+from collections import Counter, defaultdict
+from pathlib import Path
+
+
+ROOT_KINDS = {"root_success", "root_failure"}
+ANSI_COLOR_RE = re.compile(r"\^(?:\d|x[0-9A-Fa-f]{6})")
+
+
+def parse_args():
+    parser = argparse.ArgumentParser(
+        description="Render a self-contained HTML report for a bot transition trace JSONL file."
+    )
+    parser.add_argument("trace_file", help="Path to one bot trace JSONL file.")
+    parser.add_argument(
+        "-o",
+        "--output",
+        help="Output HTML path. Defaults to <trace-file>.html",
+    )
+    parser.add_argument(
+        "--export-events",
+        help="Optional JSON output path for normalized events.",
+    )
+    parser.add_argument(
+        "--export-spans",
+        help="Optional JSON output path for reconstructed spans.",
+    )
+    return parser.parse_args()
+
+
+def clean_bot_name(name):
+    cleaned = ANSI_COLOR_RE.sub("", name or "").strip()
+    return cleaned or (name or "")
+
+
+def stable_json(value):
+    return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+
+
+def event_action(event, field):
+    descriptor = event.get(field) or {}
+    return descriptor.get("action") or descriptor.get("kind") or ""
+
+
+def normalize_event(raw, line_number):
+    required = {
+        "time",
+        "map",
+        "botClientNum",
+        "botName",
+        "team",
+        "backend",
+        "behavior",
+        "event",
+        "current",
+        "status",
+    }
+    missing = sorted(required - set(raw))
+    if missing:
+        raise ValueError(f"line {line_number}: missing required fields: {', '.join(missing)}")
+
+    if raw["event"] not in {"transition", "failure"}:
+        raise ValueError(f"line {line_number}: unsupported event kind {raw['event']!r}")
+
+    current = raw["current"]
+    previous = raw.get("previous")
+    if not isinstance(current, dict):
+        raise ValueError(f"line {line_number}: current descriptor must be an object")
+    if previous is not None and not isinstance(previous, dict):
+        raise ValueError(f"line {line_number}: previous descriptor must be null or an object")
+
+    display_name = clean_bot_name(str(raw["botName"]))
+    event = {
+        "id": f"e{line_number:06d}",
+        "lineNumber": line_number,
+        "time": int(raw["time"]),
+        "map": str(raw["map"]),
+        "botClientNum": int(raw["botClientNum"]),
+        "botName": str(raw["botName"]),
+        "botDisplayName": display_name,
+        "team": str(raw["team"]),
+        "backend": str(raw["backend"]),
+        "behavior": str(raw["behavior"]),
+        "event": str(raw["event"]),
+        "status": str(raw["status"]),
+        "previous": normalize_descriptor(previous),
+        "current": normalize_descriptor(current),
+        "botKey": f"{int(raw['botClientNum'])}:{display_name}",
+        "action": event_action(raw, "current"),
+        "previousAction": event_action(raw, "previous"),
+        "source": (current.get("source") or "") if isinstance(current, dict) else "",
+        "line": int(current.get("line") or 0) if isinstance(current, dict) else 0,
+    }
+    event["searchText"] = " ".join(
+        str(part).lower()
+        for part in [
+            event["botDisplayName"],
+            event["team"],
+            event["behavior"],
+            event["backend"],
+            event["event"],
+            event["status"],
+            event["action"],
+            event["previousAction"],
+            event["current"]["kind"],
+            event["source"],
+            event["line"],
+        ]
+        if part not in ("", None)
+    )
+    return event
+
+
+def normalize_descriptor(descriptor):
+    if descriptor is None:
+        return None
+    kind = str(descriptor.get("kind") or "")
+    return {
+        "kind": kind,
+        "action": str(descriptor.get("action") or ""),
+        "source": str(descriptor.get("source") or ""),
+        "line": int(descriptor.get("line") or 0),
+    }
+
+
+def load_events(path):
+    events = []
+    with path.open("r", encoding="utf-8") as handle:
+        for line_number, raw_line in enumerate(handle, start=1):
+            line = raw_line.strip()
+            if not line:
+                continue
+            try:
+                raw = json.loads(line)
+            except json.JSONDecodeError as exc:
+                raise ValueError(f"line {line_number}: invalid JSON: {exc.msg}") from exc
+            events.append(normalize_event(raw, line_number))
+
+    if not events:
+        raise ValueError(f"no events found in {path}")
+
+    events.sort(key=lambda event: (event["time"], event["lineNumber"]))
+    for index, event in enumerate(events):
+        event["index"] = index
+    return events
+
+
+def derive_run_metadata(events):
+    maps = Counter(event["map"] for event in events)
+    if len(maps) > 1:
+        raise ValueError(f"trace contains multiple maps: {', '.join(sorted(maps))}")
+
+    bot_keys = sorted({event["botKey"] for event in events})
+    behaviors = sorted({event["behavior"] for event in events if event["behavior"]})
+    backends = sorted({event["backend"] for event in events if event["backend"]})
+    teams = sorted({event["team"] for event in events if event["team"]})
+    return {
+        "map": events[0]["map"],
+        "firstTime": events[0]["time"],
+        "lastTime": events[-1]["time"],
+        "eventCount": len(events),
+        "botCount": len(bot_keys),
+        "behaviors": behaviors,
+        "backends": backends,
+        "teams": teams,
+    }
+
+
+def finalize_span(span, end_time, open_ended):
+    span["endTime"] = end_time
+    span["duration"] = max(0, end_time - span["startTime"])
+    span["openEnded"] = open_ended
+    return span
+
+
+def reconstruct_spans(events):
+    events_by_bot = defaultdict(list)
+    for event in events:
+        events_by_bot[event["botKey"]].append(event)
+
+    spans = []
+    spans_by_id = {}
+    for bot_key, bot_events in sorted(events_by_bot.items()):
+        current_span = None
+        bot_last_time = bot_events[-1]["time"]
+        span_counter = 0
+
+        for event in bot_events:
+            descriptor = event["current"]
+            if event["event"] == "transition":
+                if current_span is not None:
+                    finalize_span(current_span, event["time"], False)
+                    spans.append(current_span)
+                    spans_by_id[current_span["id"]] = current_span
+
+                span_counter += 1
+                current_span = {
+                    "id": f"s{event['botClientNum']:03d}-{span_counter:04d}",
+                    "startEventId": event["id"],
+                    "endEventId": None,
+                    "botClientNum": event["botClientNum"],
+                    "botName": event["botName"],
+                    "botDisplayName": event["botDisplayName"],
+                    "team": event["team"],
+                    "backend": event["backend"],
+                    "behavior": event["behavior"],
+                    "kind": descriptor["kind"],
+                    "action": descriptor["action"],
+                    "source": descriptor["source"],
+                    "line": descriptor["line"],
+                    "startTime": event["time"],
+                    "endTime": event["time"],
+                    "duration": 0,
+                    "openEnded": False,
+                    "failureCountWithinSpan": 0,
+                    "failureEventIds": [],
+                    "status": event["status"],
+                }
+            elif current_span is not None:
+                current_span["failureCountWithinSpan"] += 1
+                current_span["failureEventIds"].append(event["id"])
+
+            event["spanId"] = current_span["id"] if current_span is not None else None
+
+        if current_span is not None:
+            finalize_span(current_span, bot_last_time, True)
+            spans.append(current_span)
+            spans_by_id[current_span["id"]] = current_span
+
+    for span in spans:
+        if span["failureEventIds"]:
+            span["endEventId"] = span["failureEventIds"][-1]
+        else:
+            span["endEventId"] = span["startEventId"]
+
+    return spans
+
+
+def bot_summaries(events, spans):
+    summary_by_key = {}
+    for event in events:
+        info = summary_by_key.setdefault(
+            event["botKey"],
+            {
+                "botKey": event["botKey"],
+                "botClientNum": event["botClientNum"],
+                "botName": event["botName"],
+                "botDisplayName": event["botDisplayName"],
+                "team": event["team"],
+                "backend": event["backend"],
+                "eventCount": 0,
+                "failureCount": 0,
+                "firstTime": event["time"],
+                "lastTime": event["time"],
+            },
+        )
+        info["eventCount"] += 1
+        info["failureCount"] += 1 if event["event"] == "failure" else 0
+        info["firstTime"] = min(info["firstTime"], event["time"])
+        info["lastTime"] = max(info["lastTime"], event["time"])
+
+    span_counts = Counter(span["botClientNum"] for span in spans)
+    for info in summary_by_key.values():
+        info["spanCount"] = span_counts.get(info["botClientNum"], 0)
+
+    return sorted(
+        summary_by_key.values(),
+        key=lambda item: (item["team"], item["botDisplayName"].lower(), item["botClientNum"]),
+    )
+
+
+def build_report_data(events, spans):
+    metadata = derive_run_metadata(events)
+    report_events = []
+    for event in events:
+        report_events.append({
+            "id": event["id"],
+            "index": event["index"],
+            "time": event["time"],
+            "map": event["map"],
+            "botClientNum": event["botClientNum"],
+            "botDisplayName": event["botDisplayName"],
+            "team": event["team"],
+            "backend": event["backend"],
+            "behavior": event["behavior"],
+            "event": event["event"],
+            "status": event["status"],
+            "previous": event["previous"],
+            "current": event["current"],
+            "spanId": event.get("spanId"),
+        })
+
+    report_spans = []
+    for span in spans:
+        report_spans.append({
+            "id": span["id"],
+            "startEventId": span["startEventId"],
+            "endEventId": span["endEventId"],
+            "botClientNum": span["botClientNum"],
+            "botDisplayName": span["botDisplayName"],
+            "team": span["team"],
+            "backend": span["backend"],
+            "behavior": span["behavior"],
+            "kind": span["kind"],
+            "action": span["action"],
+            "source": span["source"],
+            "line": span["line"],
+            "startTime": span["startTime"],
+            "endTime": span["endTime"],
+            "duration": span["duration"],
+            "openEnded": span["openEnded"],
+            "failureCountWithinSpan": span["failureCountWithinSpan"],
+        })
+
+    behavior_spans = []
+    events_by_bot = defaultdict(list)
+    for event in events:
+        events_by_bot[event["botKey"]].append(event)
+
+    for bot_key, bot_events in sorted(events_by_bot.items()):
+        current = None
+        counter = 0
+        last_time = bot_events[-1]["time"]
+        for event in bot_events:
+            if current is None:
+                counter += 1
+                current = {
+                    "id": f"b{event['botClientNum']:03d}-{counter:04d}",
+                    "botKey": bot_key,
+                    "botClientNum": event["botClientNum"],
+                    "botDisplayName": event["botDisplayName"],
+                    "team": event["team"],
+                    "backend": event["backend"],
+                    "behavior": event["behavior"],
+                    "startTime": event["time"],
+                    "endTime": event["time"],
+                    "openEnded": False,
+                }
+                continue
+
+            if event["behavior"] != current["behavior"]:
+                current["endTime"] = event["time"]
+                current["openEnded"] = False
+                behavior_spans.append(current)
+                counter += 1
+                current = {
+                    "id": f"b{event['botClientNum']:03d}-{counter:04d}",
+                    "botKey": bot_key,
+                    "botClientNum": event["botClientNum"],
+                    "botDisplayName": event["botDisplayName"],
+                    "team": event["team"],
+                    "backend": event["backend"],
+                    "behavior": event["behavior"],
+                    "startTime": event["time"],
+                    "endTime": event["time"],
+                    "openEnded": False,
+                }
+
+        if current is not None:
+            current["endTime"] = last_time
+            current["openEnded"] = True
+            behavior_spans.append(current)
+
+    return {
+        "run": metadata,
+        "bots": bot_summaries(events, spans),
+        "events": report_events,
+        "spans": report_spans,
+        "behaviorSpans": behavior_spans,
+    }
+
+
+def default_output_path(trace_path):
+    return trace_path.with_suffix(trace_path.suffix + ".html") if trace_path.suffix else Path(str(trace_path) + ".html")
+
+
+def write_json(path, payload):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+
+def html_report(report):
+    payload = stable_json(report)
+    template = """<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bot Trace Report</title>
+<style>
+:root {{
+  --bg: #f7f3ea;
+  --panel: rgba(255,255,255,0.92);
+  --panel-2: rgba(245,239,226,0.92);
+  --ink: #1d1d1b;
+  --muted: #635d54;
+  --border: rgba(48,39,23,0.16);
+  --accent: #a33a2b;
+  --accent-2: #135d66;
+  --shadow: 0 18px 40px rgba(38,29,19,0.12);
+  --bot-row: 64px;
+  --timeline-height: 560px;
+  --font-ui: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Palatino, serif;
+  --font-mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+}}
+* {{ box-sizing: border-box; }}
+body {{
+  margin: 0;
+  font-family: var(--font-ui);
+  color: var(--ink);
+  background:
+    radial-gradient(circle at top left, rgba(163,58,43,0.14), transparent 28%),
+    radial-gradient(circle at top right, rgba(19,93,102,0.12), transparent 24%),
+    linear-gradient(180deg, #f9f5ee, #efe6d6 52%, #eadfcf);
+}}
+.shell {{
+  max-width: 1680px;
+  margin: 0 auto;
+  padding: 24px;
+}}
+.hero {{
+  display: grid;
+  grid-template-columns: 1.25fr 1fr;
+  gap: 18px;
+  margin-bottom: 20px;
+}}
+.panel {{
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}}
+.panel.alt {{ background: var(--panel-2); }}
+.hero-copy {{
+  padding: 24px 26px;
+}}
+h1 {{
+  margin: 0 0 8px;
+  font-size: clamp(2rem, 3vw, 3rem);
+  line-height: 0.98;
+}}
+.lede {{
+  color: var(--muted);
+  margin: 0;
+  font-size: 1.03rem;
+}}
+.stats {{
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  padding: 24px;
+}}
+.stat {{
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: rgba(255,255,255,0.62);
+  border: 1px solid var(--border);
+}}
+.stat-label {{
+  color: var(--muted);
+  font-size: 0.82rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}}
+.stat-value {{
+  margin-top: 4px;
+  font-size: 1.15rem;
+}}
+.filters {{
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: 12px;
+  padding: 18px;
+  margin-bottom: 18px;
+}}
+.filter {{
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}}
+.filter label {{
+  font-size: 0.82rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}}
+select, input[type="search"] {{
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: rgba(255,255,255,0.8);
+  padding: 10px 12px;
+  font: inherit;
+  color: var(--ink);
+}}
+.toggle {{
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-top: 26px;
+}}
+.main {{
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 18px;
+  align-items: start;
+}}
+.section-head {{
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  padding: 16px 18px 0;
+}}
+.section-head.controls {{
+  align-items: center;
+}}
+.section-head h2 {{
+  margin: 0;
+  font-size: 1.2rem;
+}}
+.subtle {{
+  color: var(--muted);
+  font-size: 0.9rem;
+}}
+.toolbar {{
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}}
+.toolbar button {{
+  border: 1px solid var(--border);
+  background: rgba(255,255,255,0.82);
+  color: var(--ink);
+  border-radius: 999px;
+  padding: 8px 12px;
+  font: inherit;
+  cursor: pointer;
+}}
+.toolbar button:hover {{
+  background: rgba(255,255,255,0.96);
+}}
+.toolbar button:disabled {{
+  opacity: 0.42;
+  cursor: default;
+}}
+.zoom-readout {{
+  min-width: 64px;
+  text-align: center;
+  font-size: 0.85rem;
+  color: var(--muted);
+}}
+.timeline-wrap {{
+  padding: 16px 18px 18px;
+}}
+.timeline-scroll {{
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: linear-gradient(180deg, rgba(255,255,255,0.82), rgba(244,238,228,0.9));
+}}
+.timeline-grid {{
+  min-width: 980px;
+  position: relative;
+}}
+.timeline-axis {{
+  position: sticky;
+  top: 0;
+  z-index: 4;
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  background: rgba(245,239,226,0.97);
+  border-bottom: 1px solid var(--border);
+}}
+.axis-label, .axis-track {{
+  padding: 10px 14px;
+}}
+.axis-track {{
+  position: relative;
+  height: 42px;
+}}
+.axis-tick {{
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: rgba(48,39,23,0.15);
+}}
+.axis-tick span {{
+  position: absolute;
+  top: 12px;
+  left: 6px;
+  font-size: 0.75rem;
+  color: var(--muted);
+  white-space: nowrap;
+}}
+.bot-row {{
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  min-height: var(--bot-row);
+  border-bottom: 1px solid rgba(48,39,23,0.08);
+}}
+.bot-meta {{
+  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+  border-right: 1px solid rgba(48,39,23,0.08);
+  background: rgba(255,255,255,0.52);
+}}
+.bot-meta strong {{
+  font-size: 1rem;
+}}
+.bot-meta span {{
+  font-size: 0.82rem;
+  color: var(--muted);
+}}
+.bot-track {{
+  position: relative;
+  min-height: var(--bot-row);
+}}
+.track-caption {{
+  position: absolute;
+  left: 8px;
+  font-size: 0.68rem;
+  color: rgba(29,29,27,0.58);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  pointer-events: none;
+}}
+.track-caption.behavior {{
+  top: 2px;
+}}
+.track-caption.action {{
+  top: 19px;
+}}
+.track-line {{
+  position: absolute;
+  inset: 0;
+  background-image: linear-gradient(to right, rgba(48,39,23,0.08) 1px, transparent 1px);
+  background-size: 12.5% 100%;
+}}
+.span {{
+  position: absolute;
+  top: 12px;
+  height: 40px;
+  border-radius: 12px;
+  border: 1px solid rgba(0,0,0,0.18);
+  display: flex;
+  align-items: center;
+  padding: 0 10px;
+  overflow: hidden;
+  cursor: pointer;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.22);
+}}
+.span-label {{
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 0.83rem;
+}}
+.span.selected, .event-row.selected {{
+  outline: 3px solid rgba(19,93,102,0.34);
+  outline-offset: 1px;
+}}
+.failure-marker {{
+  position: absolute;
+  top: 22px;
+  width: 14px;
+  height: 14px;
+  margin-left: -7px;
+  border-radius: 50%;
+  background: #7e0f12;
+  border: 2px solid #fff9f2;
+  box-shadow: 0 0 0 1px rgba(0,0,0,0.15);
+  cursor: pointer;
+}}
+.table-wrap {{
+  padding: 14px 18px 18px;
+}}
+.table-toolbar {{
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}}
+.event-header, .event-row {{
+  display: grid;
+  grid-template-columns: 88px 170px 88px 132px 92px 148px 148px 220px 56px 92px;
+  gap: 0;
+  font-size: 0.92rem;
+}}
+.event-header {{
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: rgba(245,239,226,0.98);
+  border-bottom: 1px solid var(--border);
+}}
+.event-header div {{
+  padding: 10px 8px;
+  font-weight: 600;
+}}
+.event-viewport {{
+  position: relative;
+  max-height: 540px;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: rgba(255,255,255,0.7);
+}}
+.event-spacer {{
+  position: relative;
+}}
+.event-rows {{
+  position: absolute;
+  inset: 0 0 auto 0;
+}}
+.event-row {{
+  position: absolute;
+  left: 0;
+  right: 0;
+  min-height: 40px;
+  align-items: start;
+  border-bottom: 1px solid rgba(48,39,23,0.08);
+  cursor: pointer;
+  background: rgba(255,255,255,0.45);
+}}
+.event-row:hover {{
+  background: rgba(255,255,255,0.82);
+}}
+.event-row > div {{
+  padding: 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}}
+.mono {{
+  font-family: var(--font-mono);
+  font-size: 0.84rem;
+}}
+.pill {{
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 4px 8px;
+  background: rgba(19,93,102,0.12);
+  font-size: 0.78rem;
+}}
+.inspector {{
+  padding: 16px 18px 18px;
+}}
+.main > aside.panel.alt {{
+  position: sticky;
+  top: 24px;
+  max-height: calc(100vh - 48px);
+  overflow: auto;
+}}
+.inspector-card {{
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: rgba(255,255,255,0.72);
+  padding: 14px 16px;
+  margin-bottom: 12px;
+}}
+.kv {{
+  display: grid;
+  grid-template-columns: 110px 1fr;
+  gap: 8px 12px;
+  font-size: 0.92rem;
+}}
+.kv dt {{
+  color: var(--muted);
+}}
+.context-list {{
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}}
+.context-item {{
+  border: 1px solid rgba(48,39,23,0.08);
+  border-radius: 12px;
+  padding: 10px 12px;
+  background: rgba(250,247,240,0.92);
+  cursor: pointer;
+}}
+.hidden {{ display: none !important; }}
+.bot-track-canvas {{
+  display: block;
+  width: 100%;
+  cursor: crosshair;
+}}
+@media (max-width: 1180px) {{
+  .hero, .main {{ grid-template-columns: 1fr; }}
+  .filters {{ grid-template-columns: repeat(2, minmax(0, 1fr)); }}
+}}
+@media (max-width: 720px) {{
+  .shell {{ padding: 14px; }}
+  .filters {{ grid-template-columns: 1fr; }}
+  .timeline-axis, .bot-row {{ grid-template-columns: 160px 1fr; }}
+  .bot-meta {{ padding: 8px 10px; }}
+}}
+</style>
+</head>
+<body>
+<div class="shell">
+  <section class="hero">
+    <div class="panel hero-copy">
+      <h1>Bot Transition Trace</h1>
+      <p class="lede" id="run-lede"></p>
+    </div>
+    <div class="panel alt">
+      <div class="stats" id="stats"></div>
+    </div>
+  </section>
+
+  <section class="panel filters">
+    <div class="filter"><label for="filter-bot">Bot</label><select id="filter-bot"></select></div>
+    <div class="filter"><label for="filter-team">Team</label><select id="filter-team"></select></div>
+    <div class="filter"><label for="filter-behavior">Behavior</label><select id="filter-behavior"></select></div>
+    <div class="filter"><label for="filter-kind">Event kind</label><select id="filter-kind"></select></div>
+    <div class="filter"><label for="filter-status">Status</label><select id="filter-status"></select></div>
+    <div class="filter"><label for="filter-state-kind">State kind</label><select id="filter-state-kind"></select></div>
+    <div class="filter"><label for="filter-action">Action / state</label><select id="filter-action"></select></div>
+    <div class="filter">
+      <label for="filter-search">Search</label>
+      <input id="filter-search" type="search" placeholder="bot, action, source, status">
+    </div>
+    <div class="toggle">
+      <input id="filter-failures" type="checkbox">
+      <label for="filter-failures">Failures only</label>
+    </div>
+  </section>
+
+  <section class="main">
+    <div class="panel">
+      <div class="section-head controls">
+        <h2>Timeline</h2>
+        <div class="toolbar">
+          <button id="zoom-out" type="button">Zoom Out</button>
+          <button id="zoom-reset" type="button">Reset</button>
+          <button id="zoom-in" type="button">Zoom In</button>
+          <div class="zoom-readout" id="zoom-readout">100%</div>
+          <div class="subtle" id="timeline-count"></div>
+        </div>
+      </div>
+      <div class="timeline-wrap">
+        <div class="timeline-scroll">
+          <div id="timeline" class="timeline-grid"></div>
+        </div>
+      </div>
+      <div class="section-head">
+        <h2>Raw Events</h2>
+        <div class="subtle" id="table-count"></div>
+      </div>
+      <div class="table-wrap">
+        <div class="table-toolbar">
+          <div class="subtle" id="table-page-info"></div>
+        </div>
+        <div class="event-header">
+          <div>Time</div>
+          <div>Bot</div>
+          <div>Team</div>
+          <div>Behavior</div>
+          <div>Event</div>
+          <div>Previous</div>
+          <div>Current</div>
+          <div>Source</div>
+          <div>Line</div>
+          <div>Status</div>
+        </div>
+        <div class="event-viewport" id="event-viewport">
+          <div class="event-spacer" id="event-spacer">
+            <div class="event-rows" id="event-table"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <aside class="panel alt">
+      <div class="section-head">
+        <h2>Inspector</h2>
+        <div class="subtle" id="selection-type">Nothing selected</div>
+      </div>
+      <div class="inspector">
+        <div class="inspector-card" id="selection-summary">Select a span or event.</div>
+        <div class="inspector-card">
+          <h3>Details</h3>
+          <dl class="kv" id="selection-details"></dl>
+        </div>
+        <div class="inspector-card">
+          <h3>Bot Context</h3>
+          <div class="context-list" id="selection-context"></div>
+        </div>
+      </div>
+    </aside>
+  </section>
+</div>
+
+<script>
+const REPORT = __REPORT_PAYLOAD__;
+
+const state = {{
+  selectedType: null,
+  selectedId: null,
+  zoom: 1,
+  tableScrollTop: 0,
+  filters: {{
+    bot: "",
+    team: "",
+    behavior: "",
+    kind: "",
+    status: "",
+    stateKind: "",
+    action: "",
+    search: "",
+    failuresOnly: false,
+  }},
+}};
+
+const byEventId = new Map(REPORT.events.map(item => [item.id, item]));
+const bySpanId = new Map(REPORT.spans.map(item => [item.id, item]));
+const ZOOM_MIN = 0.5;
+const ZOOM_MAX = 16;
+const ZOOM_STEP = 1.6;
+const BOT_LABEL_WIDTH = 220;
+const ROW_HEIGHT = 40;
+const TABLE_OVERSCAN = 20;
+const MIN_SPAN_PX = 7;
+const TRACK_HEIGHT = 56;
+const ROOT_BAND_TOP = 8;
+const ROOT_BAND_HEIGHT = 12;
+const ACTION_BAND_TOP = 24;
+const ACTION_BAND_HEIGHT = 20;
+const TRACK_GRID_COLOR = "rgba(48,39,23,0.08)";
+const TRACK_TEXT_COLOR = "#1d1d1b";
+const TRACK_SELECTED_STROKE = "rgba(19,93,102,0.9)";
+const botEvents = REPORT.events.reduce((acc, event) => {{
+  event.botKey = `${{event.botClientNum}}:${{event.botDisplayName}}`;
+  event.action = event.current && event.current.action ? event.current.action : (event.current ? event.current.kind : "");
+  event.previousAction = event.previous && event.previous.action ? event.previous.action : (event.previous ? event.previous.kind : "");
+  event.source = event.current ? (event.current.source || "") : "";
+  event.line = event.current ? (event.current.line || 0) : 0;
+  event.searchText = [
+    event.botDisplayName,
+    event.team,
+    event.behavior,
+    event.backend,
+    event.event,
+    event.status,
+    event.action,
+    event.previousAction,
+    event.current ? event.current.kind : "",
+    event.source,
+    event.line,
+  ].filter(part => part !== "" && part !== null && part !== undefined).join(" ").toLowerCase();
+  (acc[event.botKey] ||= []).push(event);
+  return acc;
+}}, {{}});
+const botSpans = REPORT.spans.reduce((acc, span) => {{
+  const key = `${{span.botClientNum}}:${{span.botDisplayName}}`;
+  span.botKey = key;
+  span.searchText = [
+    span.botDisplayName,
+    span.team,
+    span.behavior,
+    span.kind,
+    span.action,
+    span.source,
+    span.line,
+  ].filter(part => part !== "" && part !== null && part !== undefined).join(" ").toLowerCase();
+  (acc[key] ||= []).push(span);
+  return acc;
+}}, {{}});
+const botBehaviorSpans = REPORT.behaviorSpans.reduce((acc, span) => {{
+  (acc[span.botKey] ||= []).push(span);
+  return acc;
+}}, {{}});
+const botFailures = REPORT.events.reduce((acc, event) => {{
+  if (event.event === "failure") {{
+    (acc[event.botKey] ||= []).push(event);
+  }}
+  return acc;
+}}, {{}});
+const timelineHitRegions = new Map();
+
+function uniqueSorted(items) {{
+  return Array.from(new Set(items.filter(Boolean))).sort((a, b) => a.localeCompare(b));
+}}
+
+function fillSelect(id, values, allLabel) {{
+  const select = document.getElementById(id);
+  select.innerHTML = "";
+  const all = document.createElement("option");
+  all.value = "";
+  all.textContent = allLabel;
+  select.appendChild(all);
+  for (const value of values) {{
+    const option = document.createElement("option");
+    option.value = value;
+    option.textContent = value;
+    select.appendChild(option);
+  }}
+}}
+
+function summarizeRun() {{
+  const run = REPORT.run;
+  document.getElementById("run-lede").textContent =
+    `${{run.map}} · ${{run.eventCount}} events · ${{run.botCount}} bots · ` +
+    `${{run.firstTime}} to ${{run.lastTime}} ms`;
+  const stats = [
+    ["Map", run.map],
+    ["Time Range", `${{run.firstTime}} to ${{run.lastTime}} ms`],
+    ["Behaviors", run.behaviors.join(", ") || "n/a"],
+    ["Backends", run.backends.join(", ") || "n/a"],
+    ["Teams", run.teams.join(", ") || "n/a"],
+    ["Events", String(run.eventCount)],
+  ];
+  document.getElementById("stats").innerHTML = stats.map(([label, value]) => `
+    <div class="stat"><div class="stat-label">${{escapeHtml(label)}}</div><div class="stat-value">${{escapeHtml(value)}}</div></div>
+  `).join("");
+}}
+
+function escapeHtml(value) {{
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;");
+}}
+
+function colorForSpan(span) {{
+  if (span.kind === "root_success") return "linear-gradient(135deg,#5f8f6b,#9cc8ac)";
+  if (span.kind === "root_failure") return "linear-gradient(135deg,#9c3535,#d98d7f)";
+  const palette = [
+    ["#1d6f78", "#7cc8bf"],
+    ["#9f5f14", "#efc57a"],
+    ["#6e3d8b", "#d4a7e4"],
+    ["#2c5f2d", "#8ec78f"],
+    ["#a0402b", "#e7a576"],
+    ["#355c9c", "#88abd9"],
+  ];
+  const text = `${{span.action}}|${{span.source}}|${{span.behavior}}`;
+  let hash = 0;
+  for (const ch of text) hash = ((hash * 31) + ch.charCodeAt(0)) >>> 0;
+  const pair = palette[hash % palette.length];
+  return `linear-gradient(135deg,${{pair[0]}},${{pair[1]}})`;
+}}
+
+function matchesFiltersForEvent(event) {{
+  const currentKind = event.current ? event.current.kind : "";
+  const currentAction = event.current && event.current.action ? event.current.action : currentKind;
+  if (state.filters.bot && event.botDisplayName !== state.filters.bot) return false;
+  if (state.filters.team && event.team !== state.filters.team) return false;
+  if (state.filters.behavior && event.behavior !== state.filters.behavior) return false;
+  if (state.filters.kind && event.event !== state.filters.kind) return false;
+  if (state.filters.status && event.status !== state.filters.status) return false;
+  if (state.filters.stateKind && currentKind !== state.filters.stateKind) return false;
+  if (state.filters.action && currentAction !== state.filters.action) return false;
+  if (state.filters.failuresOnly && event.event !== "failure") return false;
+  if (state.filters.search && !event.searchText.includes(state.filters.search)) return false;
+  return true;
+}}
+
+function matchesFiltersForSpan(span) {{
+  if (state.filters.bot && span.botDisplayName !== state.filters.bot) return false;
+  if (state.filters.team && span.team !== state.filters.team) return false;
+  if (state.filters.behavior && span.behavior !== state.filters.behavior) return false;
+  if (state.filters.kind && state.filters.kind !== "transition") return false;
+  if (state.filters.status && span.status !== state.filters.status) return false;
+  if (state.filters.stateKind && span.kind !== state.filters.stateKind) return false;
+  const action = span.action || span.kind;
+  if (state.filters.action && action !== state.filters.action) return false;
+  if (state.filters.failuresOnly && span.failureCountWithinSpan < 1) return false;
+  if (state.filters.search && !span.searchText.includes(state.filters.search)) return false;
+  return true;
+}}
+
+function filteredEvents() {{
+  return REPORT.events.filter(matchesFiltersForEvent);
+}}
+
+function filteredSpans() {{
+  return REPORT.spans.filter(matchesFiltersForSpan);
+}}
+
+function matchesFiltersForBehaviorSpan(span) {{
+  if (state.filters.bot && span.botDisplayName !== state.filters.bot) return false;
+  if (state.filters.team && span.team !== state.filters.team) return false;
+  if (state.filters.behavior && span.behavior !== state.filters.behavior) return false;
+  if (state.filters.status) return false;
+  if (state.filters.stateKind && state.filters.stateKind !== "behavior") return false;
+  if (state.filters.failuresOnly) return false;
+  if (state.filters.search) {{
+    const blob = `${{span.botDisplayName}} ${{span.team}} ${{span.behavior}}`.toLowerCase();
+    if (!blob.includes(state.filters.search)) return false;
+  }}
+  return true;
+}}
+
+function timelineWidthPx() {{
+  return Math.max(980, Math.round(980 * state.zoom));
+}}
+
+function setZoom(nextZoom) {{
+  state.zoom = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, nextZoom));
+  render();
+}}
+
+function resetTableWindow() {{
+  state.tableScrollTop = 0;
+  const viewport = document.getElementById("event-viewport");
+  if (viewport) viewport.scrollTop = 0;
+}}
+
+function spanFillColor(span) {{
+  if (span.kind === "root_success") return "#79ab85";
+  if (span.kind === "root_failure") return "#bf665d";
+  const palette = [
+    "#2d7a83",
+    "#bd7a27",
+    "#81519c",
+    "#3e7f3f",
+    "#b65941",
+    "#4871b0",
+  ];
+  const text = `${{span.action}}|${{span.source}}|${{span.behavior}}`;
+  let hash = 0;
+  for (const ch of text) hash = ((hash * 31) + ch.charCodeAt(0)) >>> 0;
+  return palette[hash % palette.length];
+}}
+
+function computeTrackLayout(actionSpans, behaviorSpans, failures, start, duration, width) {{
+  const items = [];
+  for (const span of behaviorSpans) {{
+    const x = ((span.startTime - start) / duration) * width;
+    const x2 = ((Math.max(span.endTime, span.startTime + 1) - start) / duration) * width;
+    const drawWidth = Math.max(MIN_SPAN_PX, x2 - x);
+    items.push({{
+      type: "behavior",
+      id: span.id,
+      behaviorSpan: span,
+      x,
+      width: drawWidth,
+      y: ROOT_BAND_TOP,
+      height: ROOT_BAND_HEIGHT,
+    }});
+  }}
+  for (const span of actionSpans) {{
+    const x = ((span.startTime - start) / duration) * width;
+    const x2 = ((Math.max(span.endTime, span.startTime + 1) - start) / duration) * width;
+    const drawWidth = Math.max(MIN_SPAN_PX, x2 - x);
+    items.push({{
+      type: "span",
+      id: span.id,
+      span,
+      x,
+      width: drawWidth,
+      y: ACTION_BAND_TOP,
+      height: ACTION_BAND_HEIGHT,
+    }});
+  }}
+  for (const event of failures) {{
+    const x = ((event.time - start) / duration) * width;
+    items.push({{
+      type: "event",
+      id: event.id,
+      event,
+      x,
+      y: 2,
+      radius: 4,
+    }});
+  }}
+  return {{
+    items,
+    height: TRACK_HEIGHT,
+  }};
+}}
+
+function roundRect(ctx, x, y, width, height, radius) {{
+  const r = Math.min(radius, width / 2, height / 2);
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + width, y, x + width, y + height, r);
+  ctx.arcTo(x + width, y + height, x, y + height, r);
+  ctx.arcTo(x, y + height, x, y, r);
+  ctx.arcTo(x, y, x + width, y, r);
+  ctx.closePath();
+}}
+
+function drawTrackCanvas(canvas, layout, width) {{
+  const ratio = window.devicePixelRatio || 1;
+  const height = layout.height;
+  canvas.width = Math.max(1, Math.round(width * ratio));
+  canvas.height = Math.max(1, Math.round(height * ratio));
+  canvas.style.height = `${{height}}px`;
+  const ctx = canvas.getContext("2d");
+  ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+  ctx.clearRect(0, 0, width, height);
+
+  for (let i = 1; i < 8; i += 1) {{
+    const x = (width * i) / 8;
+    ctx.strokeStyle = TRACK_GRID_COLOR;
+    ctx.beginPath();
+    ctx.moveTo(x + 0.5, 0);
+    ctx.lineTo(x + 0.5, height);
+    ctx.stroke();
+  }}
+
+  const hitRegions = [];
+  for (const item of layout.items) {{
+    if (item.type === "behavior") {{
+      const span = item.behaviorSpan;
+      roundRect(ctx, item.x, item.y, item.width, item.height, 5);
+      ctx.fillStyle = "#d9c9a4";
+      ctx.fill();
+      ctx.lineWidth = 1;
+      ctx.strokeStyle = "rgba(76,57,20,0.25)";
+      ctx.stroke();
+      if (item.width >= 56) {{
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(item.x + 4, item.y, Math.max(0, item.width - 8), item.height);
+        ctx.clip();
+        ctx.fillStyle = TRACK_TEXT_COLOR;
+        ctx.font = "11px SFMono-Regular, Consolas, Liberation Mono, monospace";
+        ctx.textBaseline = "middle";
+        ctx.fillText(span.behavior, item.x + 6, item.y + item.height / 2);
+        ctx.restore();
+      }}
+    }} else if (item.type === "span") {{
+      const span = item.span;
+      roundRect(ctx, item.x, item.y, item.width, item.height, 6);
+      ctx.fillStyle = spanFillColor(span);
+      ctx.fill();
+      ctx.lineWidth = state.selectedType === "span" && state.selectedId === span.id ? 2.5 : 1;
+      ctx.strokeStyle = state.selectedType === "span" && state.selectedId === span.id ? TRACK_SELECTED_STROKE : "rgba(0,0,0,0.18)";
+      ctx.stroke();
+      if (span.openEnded) {{
+        ctx.save();
+        ctx.setLineDash([4, 4]);
+        ctx.beginPath();
+        ctx.moveTo(item.x + item.width - 0.5, item.y + 2);
+        ctx.lineTo(item.x + item.width - 0.5, item.y + item.height - 2);
+        ctx.strokeStyle = "rgba(255,255,255,0.95)";
+        ctx.stroke();
+        ctx.restore();
+      }}
+      if (item.width >= 46) {{
+        const label = span.action || span.kind;
+        if (item.height >= 16) {{
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(item.x + 6, item.y, Math.max(0, item.width - 12), item.height);
+        ctx.clip();
+        ctx.fillStyle = TRACK_TEXT_COLOR;
+        ctx.font = "12px Iowan Old Style, Palatino Linotype, Book Antiqua, serif";
+        ctx.textBaseline = "middle";
+        ctx.fillText(label, item.x + 8, item.y + item.height / 2);
+        ctx.restore();
+        }}
+      }}
+      hitRegions.push({{
+        type: "span",
+        id: span.id,
+        x: item.x,
+        y: item.y,
+        width: item.width,
+        height: item.height,
+      }});
+    }} else {{
+      const event = item.event;
+      ctx.beginPath();
+      ctx.arc(item.x, item.y + 5, item.radius, 0, Math.PI * 2);
+      ctx.fillStyle = "#7e0f12";
+      ctx.fill();
+      ctx.lineWidth = state.selectedType === "event" && state.selectedId === event.id ? 2 : 1;
+      ctx.strokeStyle = "#fff9f2";
+      ctx.stroke();
+      hitRegions.push({{
+        type: "event",
+        id: event.id,
+        x: item.x - item.radius - 3,
+        y: 0,
+        width: item.radius * 2 + 6,
+        height: 12,
+      }});
+    }}
+  }}
+  timelineHitRegions.set(canvas, hitRegions);
+}}
+
+function renderTimeline() {{
+  const timeline = document.getElementById("timeline");
+  const bots = [];
+  const start = REPORT.run.firstTime;
+  const end = Math.max(REPORT.run.lastTime, start + 1);
+  const duration = end - start;
+  const tickCount = 8;
+  const trackWidth = timelineWidthPx();
+  timeline.style.width = `${{BOT_LABEL_WIDTH + trackWidth}}px`;
+  const rowLayouts = [];
+
+  for (const bot of REPORT.bots) {{
+    const rowSpans = (botSpans[bot.botKey] || []).filter(matchesFiltersForSpan);
+    const rowBehaviorSpans = (botBehaviorSpans[bot.botKey] || []).filter(matchesFiltersForBehaviorSpan);
+    const rowFailures = (botFailures[bot.botKey] || []).filter(matchesFiltersForEvent);
+    if (!rowSpans.length && !rowBehaviorSpans.length && !rowFailures.length) continue;
+    const layout = computeTrackLayout(rowSpans, rowBehaviorSpans, rowFailures, start, duration, trackWidth);
+    bots.push(bot);
+    rowLayouts.push({{ bot, rowSpans, rowBehaviorSpans, rowFailures, layout }});
+  }}
+
+  const axisTicks = Array.from({{length: tickCount + 1}}, (_, idx) => {{
+    const ratio = idx / tickCount;
+    const left = ratio * 100;
+    const value = Math.round(start + duration * ratio);
+    return `<div class="axis-tick" style="left:${{left}}%"><span>${{value}}</span></div>`;
+  }}).join("");
+
+  const rows = rowLayouts.map((row, index) => {{
+    return `
+      <div class="bot-row">
+        <div class="bot-meta">
+          <strong>${{escapeHtml(row.bot.botDisplayName)}}</strong>
+          <span>${{escapeHtml(row.bot.team)}} · backend ${{escapeHtml(row.bot.backend)}}</span>
+          <span>#${{row.bot.botClientNum}} · ${{row.bot.failureCount}} failures</span>
+        </div>
+        <div class="bot-track">
+          <div class="track-caption behavior">behavior</div>
+          <div class="track-caption action">action</div>
+          <canvas class="bot-track-canvas" data-row-index="${{index}}"></canvas>
+        </div>
+      </div>`;
+  }}).join("");
+
+  timeline.innerHTML = `
+    <div class="timeline-axis">
+      <div class="axis-label mono">bot / behavior</div>
+      <div class="axis-track">${{axisTicks}}</div>
+    </div>
+    ${{rows || '<div class="bot-row"><div class="bot-meta"><strong>No matching bots</strong></div><div class="bot-track"></div></div>'}}
+  `;
+  document.getElementById("timeline-count").textContent =
+    `${{rowLayouts.reduce((sum, row) => sum + row.rowSpans.length, 0)}} spans across ${{bots.length}} bots`;
+  document.getElementById("zoom-readout").textContent = `${{Math.round(state.zoom * 100)}}%`;
+  document.getElementById("zoom-out").disabled = state.zoom <= ZOOM_MIN + 1e-9;
+  document.getElementById("zoom-in").disabled = state.zoom >= ZOOM_MAX - 1e-9;
+
+  timeline.querySelectorAll(".bot-track-canvas").forEach((canvas) => {{
+    const row = rowLayouts[Number(canvas.dataset.rowIndex)];
+    drawTrackCanvas(canvas, row.layout, trackWidth);
+  }});
+}}
+
+function renderTable() {{
+  const rows = filteredEvents();
+  const table = document.getElementById("event-table");
+  const viewport = document.getElementById("event-viewport");
+  const spacer = document.getElementById("event-spacer");
+  const viewportHeight = viewport.clientHeight || 540;
+  const totalHeight = rows.length * ROW_HEIGHT;
+  const startIndex = Math.max(0, Math.floor(state.tableScrollTop / ROW_HEIGHT) - TABLE_OVERSCAN);
+  const endIndex = Math.min(rows.length, Math.ceil((state.tableScrollTop + viewportHeight) / ROW_HEIGHT) + TABLE_OVERSCAN);
+  const visibleRows = rows.slice(startIndex, endIndex);
+  spacer.style.height = `${{totalHeight}}px`;
+  table.innerHTML = visibleRows.map((event, offset) => {{
+    const prev = event.previous ? (event.previous.action || event.previous.kind) : "∅";
+    const curr = event.current ? (event.current.action || event.current.kind) : "∅";
+    const classes = ["event-row"];
+    if (state.selectedType === "event" && state.selectedId === event.id) classes.push("selected");
+    const top = (startIndex + offset) * ROW_HEIGHT;
+    return `<div class="${{classes.join(" ")}}" data-kind="event" data-id="${{event.id}}" style="top:${{top}}px">
+      <div class="mono">${{event.time}}</div>
+      <div>${{escapeHtml(event.botDisplayName)}}</div>
+      <div>${{escapeHtml(event.team)}}</div>
+      <div>${{escapeHtml(event.behavior)}}</div>
+      <div><span class="pill">${{escapeHtml(event.event)}}</span></div>
+      <div>${{escapeHtml(prev)}}</div>
+      <div>${{escapeHtml(curr)}}</div>
+      <div class="mono">${{escapeHtml(event.source || "")}}</div>
+      <div class="mono">${{event.line || ""}}</div>
+      <div>${{escapeHtml(event.status)}}</div>
+    </div>`;
+  }}).join("");
+  document.getElementById("table-count").textContent = `${{rows.length}} matching events`;
+  document.getElementById("table-page-info").textContent =
+    rows.length ? `Rows ${{startIndex + 1}}-${{endIndex}} of ${{rows.length}}` : "No matching rows";
+}}
+
+function contextForBot(botKey, centerIndex) {{
+  const events = botEvents[botKey] || [];
+  const idx = Math.max(0, events.findIndex(event => event.index === centerIndex));
+  const start = Math.max(0, idx - 2);
+  return events.slice(start, Math.min(events.length, idx + 3));
+}}
+
+function renderInspector() {{
+  const summary = document.getElementById("selection-summary");
+  const details = document.getElementById("selection-details");
+  const context = document.getElementById("selection-context");
+  const selectionType = document.getElementById("selection-type");
+
+  if (!state.selectedType || !state.selectedId) {{
+    selectionType.textContent = "Nothing selected";
+    summary.textContent = "Select a span or event.";
+    details.innerHTML = "";
+    context.innerHTML = "";
+    return;
+  }}
+
+  if (state.selectedType === "span") {{
+    const span = bySpanId.get(state.selectedId);
+    if (!span) return;
+    selectionType.textContent = "Span";
+    summary.innerHTML = `<strong>${{escapeHtml(span.botDisplayName)}}</strong> · ${{escapeHtml(span.action || span.kind)}}`;
+    const entries = [
+      ["Team", span.team],
+      ["Behavior", span.behavior],
+      ["Backend", span.backend],
+      ["Kind", span.kind],
+      ["Action", span.action || "n/a"],
+      ["Source", span.source || "n/a"],
+      ["Line", span.line || "n/a"],
+      ["Start", `${{span.startTime}} ms`],
+      ["End", `${{span.endTime}} ms`],
+      ["Duration", `${{span.duration}} ms`],
+      ["Failures", String(span.failureCountWithinSpan)],
+      ["Open Ended", span.openEnded ? "yes" : "no"],
+    ];
+    details.innerHTML = entries.map(([k, v]) => `<dt>${{escapeHtml(k)}}</dt><dd>${{escapeHtml(v)}}</dd>`).join("");
+    const sourceEvent = byEventId.get(span.startEventId);
+    const items = contextForBot(`${{span.botClientNum}}:${{span.botDisplayName}}:${{span.behavior}}`, sourceEvent ? sourceEvent.index : 0);
+    context.innerHTML = items.map(event => `
+      <button class="context-item" data-kind="event" data-id="${{event.id}}">
+        <div><strong>${{event.time}} ms</strong> · ${{escapeHtml(event.event)}}</div>
+        <div class="subtle">${{escapeHtml((event.current && (event.current.action || event.current.kind)) || "n/a")}}</div>
+      </button>`).join("");
+    return;
+  }}
+
+  const event = byEventId.get(state.selectedId);
+  if (!event) return;
+  selectionType.textContent = "Event";
+  summary.innerHTML = `<strong>${{escapeHtml(event.botDisplayName)}}</strong> · ${{escapeHtml(event.event)}} at ${{event.time}} ms`;
+  const prev = event.previous ? (event.previous.action || event.previous.kind) : "n/a";
+  const curr = event.current ? (event.current.action || event.current.kind) : "n/a";
+  const entries = [
+    ["Team", event.team],
+    ["Behavior", event.behavior],
+    ["Backend", event.backend],
+    ["Event", event.event],
+    ["Status", event.status],
+    ["Previous", prev],
+    ["Current", curr],
+    ["Source", event.source || "n/a"],
+    ["Line", event.line || "n/a"],
+    ["Span", event.spanId || "n/a"],
+  ];
+  details.innerHTML = entries.map(([k, v]) => `<dt>${{escapeHtml(k)}}</dt><dd>${{escapeHtml(v)}}</dd>`).join("");
+  context.innerHTML = contextForBot(event.botKey, event.index).map(item => `
+    <button class="context-item" data-kind="event" data-id="${{item.id}}">
+      <div><strong>${{item.time}} ms</strong> · ${{escapeHtml(item.event)}}</div>
+      <div class="subtle">${{escapeHtml((item.current && (item.current.action || item.current.kind)) || "n/a")}}</div>
+    </button>`).join("");
+}}
+
+function bindInteractions() {{
+  document.body.addEventListener("click", event => {{
+    const target = event.target.closest("[data-kind][data-id]");
+    if (!target) return;
+    state.selectedType = target.dataset.kind;
+    state.selectedId = target.dataset.id;
+    render();
+  }});
+
+  const selectors = [
+    ["filter-bot", "bot"],
+    ["filter-team", "team"],
+    ["filter-behavior", "behavior"],
+    ["filter-kind", "kind"],
+    ["filter-status", "status"],
+    ["filter-state-kind", "stateKind"],
+    ["filter-action", "action"],
+  ];
+  for (const [id, key] of selectors) {{
+    document.getElementById(id).addEventListener("change", event => {{
+      state.filters[key] = event.target.value;
+      resetTableWindow();
+      render();
+    }});
+  }}
+  document.getElementById("filter-search").addEventListener("input", event => {{
+    state.filters.search = event.target.value.trim().toLowerCase();
+    resetTableWindow();
+    render();
+  }});
+  document.getElementById("filter-failures").addEventListener("change", event => {{
+    state.filters.failuresOnly = event.target.checked;
+    resetTableWindow();
+    render();
+  }});
+  document.getElementById("zoom-in").addEventListener("click", () => {{
+    setZoom(state.zoom * ZOOM_STEP);
+  }});
+  document.getElementById("zoom-out").addEventListener("click", () => {{
+    setZoom(state.zoom / ZOOM_STEP);
+  }});
+  document.getElementById("zoom-reset").addEventListener("click", () => {{
+    setZoom(1);
+  }});
+  document.getElementById("event-viewport").addEventListener("scroll", event => {{
+    state.tableScrollTop = event.target.scrollTop;
+    renderTable();
+  }});
+  document.getElementById("timeline").addEventListener("click", event => {{
+    const canvas = event.target.closest(".bot-track-canvas");
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const x = event.clientX - rect.left;
+    const y = event.clientY - rect.top;
+    const hit = (timelineHitRegions.get(canvas) || []).find(region =>
+      x >= region.x && x <= region.x + region.width && y >= region.y && y <= region.y + region.height
+    );
+    if (!hit) return;
+    state.selectedType = hit.type;
+    state.selectedId = hit.id;
+    render();
+  }});
+}}
+
+function populateFilters() {{
+  fillSelect("filter-bot", REPORT.bots.map(bot => bot.botDisplayName), "All bots");
+  fillSelect("filter-team", REPORT.run.teams, "All teams");
+  fillSelect("filter-behavior", REPORT.run.behaviors, "All behaviors");
+  fillSelect("filter-kind", ["transition", "failure"], "All event kinds");
+  fillSelect(
+    "filter-status",
+    uniqueSorted(REPORT.events.map(event => event.status)),
+    "All statuses"
+  );
+  fillSelect(
+    "filter-state-kind",
+    ["behavior", ...uniqueSorted(REPORT.events.map(event => event.current ? event.current.kind : "").filter(Boolean))],
+    "All state kinds"
+  );
+  fillSelect(
+    "filter-action",
+    uniqueSorted([
+      ...REPORT.spans.map(span => span.action || span.kind),
+      ...REPORT.events.map(event => event.current ? (event.current.action || event.current.kind) : ""),
+    ]),
+    "All actions / states"
+  );
+}
+
+function render() {{
+  renderTimeline();
+  renderTable();
+  renderInspector();
+}}
+
+summarizeRun();
+populateFilters();
+bindInteractions();
+render();
+</script>
+</body>
+</html>
+"""
+    template = template.replace("{{", "{").replace("}}", "}")
+    return template.replace("__REPORT_PAYLOAD__", payload)
+
+
+def main():
+    args = parse_args()
+    trace_path = Path(args.trace_file)
+    output_path = Path(args.output) if args.output else default_output_path(trace_path)
+
+    events = load_events(trace_path)
+    spans = reconstruct_spans(events)
+    report = build_report_data(events, spans)
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(html_report(report), encoding="utf-8")
+
+    if args.export_events:
+      write_json(Path(args.export_events), events)
+    if args.export_spans:
+      write_json(Path(args.export_spans), spans)
+
+    print(f"Wrote HTML report: {output_path}")
+    if args.export_events:
+      print(f"Wrote normalized events: {args.export_events}")
+    if args.export_spans:
+      print(f"Wrote spans: {args.export_spans}")
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except Exception as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        sys.exit(1)
