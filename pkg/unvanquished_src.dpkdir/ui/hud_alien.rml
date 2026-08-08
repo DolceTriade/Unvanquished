@@ -190,6 +190,22 @@
 			health_cross {
 				z-index: 1;
 			}
+
+		progress#health-crescent {
+			display: block;
+			position: relative;
+			margin-left: auto;
+			margin-right: auto;
+			top: 2%;
+			width: 1%;
+			height: 5%;
+			transform: rotate(-90deg);
+			opacity: .55;
+			fill-image: /ui/assets/neutral/crescent;
+			margin: auto;
+			image-color: #c61b27ee;
+		}
+
 		</style>
 	</head>
 	<body id="hud_alien">
@@ -198,6 +214,9 @@
 			<usable_buildable>
 				<img src="/ui/assets/neutral/use" />
 			</usable_buildable>
+		</div>
+		<div id="crosshair">
+			<progress src="health" id="health-crescent" direction="bottom" />
 		</div>
 		<div id="left">
 			<img class="bg sides" src="/ui/assets/alien/bg-l" />
