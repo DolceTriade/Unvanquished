@@ -221,6 +221,35 @@
 			scanner.active {
 				decorator: image("/ui/assets/human/scanner");
 			}
+			progress#health-crescent {
+				display: block;
+				position: absolute;
+				margin-left: auto;
+				margin-right: auto;
+				top: 0%;
+				right: 2em;
+				width: 1%;
+				height: 5%;
+				opacity: .55;
+				fill-image: /ui/assets/neutral/crescent;
+				margin: auto;
+				image-color: #c61b27ee;
+			}
+			progress#ammo-crescent {
+				display: block;
+				position: absolute;
+				margin-left: auto;
+				margin-right: auto;
+				right: -2em;
+				top: 0%;
+				width: 1%;
+				height: 5%;
+				opacity: .55;
+				transform: rotate(180deg);
+				fill-image: /ui/assets/neutral/crescent;
+				margin: auto;
+				image-color: #aaffffff;
+			}
 	</style>
 	</head>
 	<body id="hud_human">
@@ -255,6 +284,10 @@
 		<div id="scanner">
 			<scanner />
 		</div>
+	</div>
+	<div id="crosshair">
+		<progress src="health" id="health-crescent" direction="top" />
+		<progress src="ammo" id="ammo-crescent" direction="bottom" />
 	</div>
 	</body>
 </rml>
