@@ -44,12 +44,6 @@ Maryland 20850 USA.
 
 namespace Lua
 {
-struct AIBotActionWrapper
-{
-	bool used;
-	AIActionNode_t action;
-};
-
 struct AILuaNode_t
 {
 	// Must match AIGenericNode_t
@@ -57,17 +51,6 @@ struct AILuaNode_t
 	AINodeRunner run;
 	// Custom properties.
 	int ref;
-};
-
-struct BotBehaviorState
-{
-	AILuaNode_t *ownerNode = nullptr;
-	AIBotActionWrapper actions[ 2 ];
-	int activeAction = 0;
-	char activeActionName[ MAX_QPATH ] = "";
-	char activeActionSource[ MAX_QPATH ] = "";
-	int activeActionLine = 0;
-	BotActionTraceInfo traceInfo = { activeActionName, activeActionSource, 0 };
 };
 
 struct BotContext
@@ -207,12 +190,7 @@ static void DestroyActionWrapper( AIBotActionWrapper& wrapper )
 
 static BotBehaviorState& GetBotBehaviorState( botMemory_t& memory, AILuaNode_t *node )
 {
-	if ( !memory.luaBehaviorState )
-	{
-		memory.luaBehaviorState = new BotBehaviorState();
-	}
-
-	BotBehaviorState& state = *memory.luaBehaviorState;
+	BotBehaviorState& state = memory.luaBehaviorState;
 	if ( state.ownerNode != node )
 	{
 		for ( AIBotActionWrapper& wrapper : state.actions )
@@ -220,7 +198,7 @@ static BotBehaviorState& GetBotBehaviorState( botMemory_t& memory, AILuaNode_t *
 			DestroyActionWrapper( wrapper );
 		}
 
-		state = {};
+		ResetStruct( state );
 		state.ownerNode = node;
 	}
 
@@ -927,12 +905,12 @@ const BotActionTraceInfo *GetBotActionTraceInfo( const botMemory_t& memory )
 {
 	static const BotActionTraceInfo emptyTraceInfo = { "", "", 0 };
 
-	if ( !memory.luaBehaviorState || !memory.luaBehaviorState->activeActionName[ 0 ] )
+	if ( !memory.luaBehaviorState.activeActionName[ 0 ] )
 	{
 		return &emptyTraceInfo;
 	}
 
-	return &memory.luaBehaviorState->traceInfo;
+	return &memory.luaBehaviorState.traceInfo;
 }
 
 AINodeStatus_t runLuaBehavior( gentity_t *self, AIGenericNode_t *node )
@@ -1055,18 +1033,12 @@ void FreeLuaActionNode( AIGenericNode_t *node )
 
 void ResetBotBehaviorState( botMemory_t& memory )
 {
-	if ( !memory.luaBehaviorState )
-	{
-		return;
-	}
-
-	for ( AIBotActionWrapper& wrapper : memory.luaBehaviorState->actions )
+	for ( AIBotActionWrapper& wrapper : memory.luaBehaviorState.actions )
 	{
 		DestroyActionWrapper( wrapper );
 	}
 
-	delete memory.luaBehaviorState;
-	memory.luaBehaviorState = nullptr;
+	ResetStruct( memory.luaBehaviorState );
 }
 
 }  // namespace Lua

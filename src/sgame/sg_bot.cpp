@@ -366,6 +366,7 @@ bool G_BotSetDefaults( int clientNum, team_t team, Str::StringRef behavior )
 	botMemory_t *botMind;
 	gentity_t *self = &g_entities[ clientNum ];
 	botMind = self->botMind = &g_botMind[clientNum];
+	G_Bot_ResetBehaviorState( *botMind );
 	ResetStruct( *botMind );
 
 	if ( !G_BotSetBehavior( botMind, team, behavior ) )
