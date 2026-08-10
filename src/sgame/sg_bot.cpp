@@ -361,22 +361,23 @@ bool G_BotSetBehavior( botMemory_t *botMind, team_t team, Str::StringRef behavio
 	return true;
 }
 
-bool G_BotSetDefaults( int clientNum, team_t team, Str::StringRef behavior )
+static void G_InitBotMind( int clientNum )
 {
-	botMemory_t *botMind;
 	gentity_t *self = &g_entities[ clientNum ];
-	botMind = self->botMind = &g_botMind[clientNum];
+	botMemory_t *botMind = self->botMind = &g_botMind[ clientNum ];
 	G_Bot_ResetBehaviorState( *botMind );
 	ResetStruct( *botMind );
+}
+
+bool G_BotSetDefaults( int clientNum, team_t team, Str::StringRef behavior )
+{
+	gentity_t *self = &g_entities[ clientNum ];
+	G_InitBotMind( clientNum );
+	botMemory_t *botMind = self->botMind;
 
 	if ( !G_BotSetBehavior( botMind, team, behavior ) )
 	{
 		return false;
-	}
-
-	if ( team != TEAM_NONE )
-	{
-		self->client->sess.restartTeam = team;
 	}
 
 	self->pain = BotPain;
@@ -408,8 +409,9 @@ bool G_BotAdd( const char *name, team_t team, int skill, const char *behavior, b
 		autoname = name != nullptr;
 	}
 
-	//default bot data
-	bool okay = G_BotSetDefaults( clientNum, team, behavior );
+	// ClientBotConnect calls CalculateRanks, which expects connected bots to have botMind.
+	G_InitBotMind( clientNum );
+	bool okay = true;
 
 	// register user information
 	userinfo[0] = '\0';
@@ -444,6 +446,12 @@ bool G_BotAdd( const char *name, team_t team, int skill, const char *behavior, b
 	}
 
 	ClientBegin( clientNum );
+	okay = G_BotSetDefaults( clientNum, team, behavior );
+	if ( !okay )
+	{
+		G_BotDel( clientNum );
+		return false;
+	}
 	bot->pain = BotPain; // ClientBegin resets the pain function
 	level.clients[clientNum].pers.isFillerBot = filler;
 	G_ChangeTeam( bot, team );
