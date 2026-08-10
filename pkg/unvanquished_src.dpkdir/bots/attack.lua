@@ -188,7 +188,17 @@ local function maybe_equip_human_near_armoury(number, team, level, mind, ctx)
     return status
 end
 
-local function human_resupply_phase(client, weapon_attr, mind)
+local function human_should_equip_near_armoury(number, level, mind)
+    local retry_at = STATE.human_equip_retry_at[number]
+    if retry_at and retry_at > level.time then
+        return false
+    end
+
+    local armoury_distance = human_armoury_distance(mind)
+    return armoury_distance ~= nil and armoury_distance < 500
+end
+
+local function human_resupply_phase(number, level, client, weapon_attr, mind)
     if out_of_human_ammo(client, weapon_attr) then
         local armoury_distance = human_armoury_distance(mind)
         if armoury_distance and armoury_distance < 500 then
@@ -198,12 +208,16 @@ local function human_resupply_phase(client, weapon_attr, mind)
         return "move_to_arm"
     end
 
+    if human_should_equip_near_armoury(number, level, mind) then
+        return "opportunistic_equip"
+    end
+
     return nil
 end
 
 local ALIEN_EVOLVE_TARGETS = common.ALIEN_EVOLVE_TARGETS
 
-local function maybe_evolve(self, team, client, enemy_visible, ctx)
+local function maybe_evolve(self, team, client, enemy_visible, level, ctx)
     if not is_alien(team) then
         return STATUS_FAILURE
     end
@@ -212,7 +226,7 @@ local function maybe_evolve(self, team, client, enemy_visible, ctx)
         return STATUS_FAILURE
     end
 
-    return try_evolve_targets(self, ctx, client, ALIEN_EVOLVE_TARGETS)
+    return try_evolve_targets(self, ctx, client, level, ALIEN_EVOLVE_TARGETS)
 end
 
 local function maybe_rush(ctx)
@@ -258,7 +272,8 @@ local RESUPPLY_TASK = {
             return STATUS_FAILURE
         end
 
-        task.phase = task.phase or human_resupply_phase(state.client, state.weapon_attr, state.mind)
+        task.phase = task.phase or human_resupply_phase(
+            state.number, state.level, state.client, state.weapon_attr, state.mind)
         if task.phase == nil then
             return STATUS_FAILURE
         end
@@ -272,7 +287,8 @@ local RESUPPLY_TASK = {
                     return status
                 end
 
-                task.phase = human_resupply_phase(state.client, state.weapon_attr, state.mind)
+                task.phase = human_resupply_phase(
+                    state.number, state.level, state.client, state.weapon_attr, state.mind)
                 return task.phase and STATUS_RUNNING or STATUS_FAILURE
             end
         end
@@ -283,8 +299,13 @@ local RESUPPLY_TASK = {
                 return status
             end
 
-            task.phase = human_resupply_phase(state.client, state.weapon_attr, state.mind)
+            task.phase = human_resupply_phase(
+                state.number, state.level, state.client, state.weapon_attr, state.mind)
             return task.phase and STATUS_RUNNING or STATUS_FAILURE
+        end
+
+        if task.phase == "opportunistic_equip" then
+            return maybe_equip_human_near_armoury(state.number, state.team, state.level, state.mind, ctx)
         end
 
         return STATUS_FAILURE
@@ -309,7 +330,8 @@ local ASSAULT_TASK = {
                 return status
             end
         else
-            status = maybe_evolve(state.self, state.team, state.client, state.enemy_visible, ctx)
+            status = maybe_evolve(state.self, state.team, state.client, state.enemy_visible,
+                state.level, ctx)
             if status ~= STATUS_FAILURE then
                 return status
             end
@@ -329,7 +351,8 @@ local function select_task(state)
         return COMBAT_TASK
     end
 
-    if is_human(state.team) and human_resupply_phase(state.client, state.weapon_attr, state.mind) then
+    if is_human(state.team)
+        and human_resupply_phase(state.number, state.level, state.client, state.weapon_attr, state.mind) then
         return RESUPPLY_TASK
     end
 

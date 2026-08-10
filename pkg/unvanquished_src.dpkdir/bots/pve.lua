@@ -322,8 +322,8 @@ local function team_level(team)
     return nil
 end
 
-local function best_alien_combat_target(number, client)
-    return common.best_alien_combat_target(number, client, ALIEN_COMBAT_TARGETS)
+local function best_alien_combat_target(number, client, level)
+    return common.best_alien_combat_target(number, client, level, ALIEN_COMBAT_TARGETS)
 end
 
 local function choose_alien_enemy(number, now, enemy_target, enemy_visible, hostile_goal, level, ctx, mind)
@@ -665,7 +665,7 @@ end
 
 local maybe_fight
 
-local function maybe_retire_builder(team, number, client, builder, wants_build, ctx, mind)
+local function maybe_retire_builder(team, number, client, builder, wants_build, level, ctx, mind)
     if not builder or wants_build then
         return STATUS_FAILURE
     end
@@ -678,7 +678,7 @@ local function maybe_retire_builder(team, number, client, builder, wants_build, 
     end
 
     if is_alien(team) then
-        local target = best_alien_combat_target(number, client)
+        local target = best_alien_combat_target(number, client, level)
         if target then
             local status = ctx:evolveTo(target)
             if status ~= STATUS_FAILURE then
@@ -729,7 +729,7 @@ local function maybe_evolve(self, team, client, builder, health_frac, ctx, level
         return STATUS_FAILURE
     end
 
-    return try_evolve_targets(self, ctx, client, ALIEN_EVOLVE_TARGETS)
+    return try_evolve_targets(self, ctx, client, level, ALIEN_EVOLVE_TARGETS)
 end
 
 maybe_fight = function(team, weapon, enemy, enemy_target, hostile_goal, enemy_visible, ctx)
@@ -798,7 +798,7 @@ local function maybe_heal_or_fight_alien(number, health_frac, enemy, enemy_targe
             end
         end
 
-        return STATUS_RUNNING
+        return STATUS_FAILURE
     end
 
     if alerted then
@@ -1265,7 +1265,7 @@ return function(self, ctx)
         return status
     end
 
-    status = maybe_retire_builder(team, number, client, builder, wants_build, ctx, mind)
+    status = maybe_retire_builder(team, number, client, builder, wants_build, level, ctx, mind)
     if status ~= STATUS_FAILURE then
         clear_build_failure_state(number)
         return status
