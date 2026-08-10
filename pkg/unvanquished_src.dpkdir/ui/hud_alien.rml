@@ -196,11 +196,11 @@
 			position: relative;
 			margin-left: auto;
 			margin-right: auto;
-			top: 2%;
+			top: 1%;
 			width: 1%;
 			height: 5%;
 			transform: rotate(-90deg);
-			opacity: .55;
+			opacity: .3;
 			fill-image: /ui/assets/neutral/crescent;
 			margin: auto;
 			image-color: #c61b27ee;

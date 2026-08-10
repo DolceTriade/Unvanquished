@@ -230,7 +230,7 @@
 				right: 2em;
 				width: 1%;
 				height: 5%;
-				opacity: .55;
+				opacity: .3;
 				fill-image: /ui/assets/neutral/crescent;
 				margin: auto;
 				image-color: #c61b27ee;
@@ -244,7 +244,7 @@
 				top: 0%;
 				width: 1%;
 				height: 5%;
-				opacity: .55;
+				opacity: .3;
 				transform: rotate(180deg);
 				fill-image: /ui/assets/neutral/crescent;
 				margin: auto;
