@@ -28,6 +28,7 @@ along with Unvanquished. If not, see <http://www.gnu.org/licenses/>.
 #include "sg_local.h"
 #include "shared/bg_attributes.h"
 
+#include <functional>
 #include <string>
 #include <vector>
 
@@ -42,6 +43,7 @@ enum class effectTarget_t
 {
 	GAMEPLAY,
 	ATTRIBUTE,
+	CALLBACK,
 };
 
 enum class effectValueType_t
@@ -49,6 +51,9 @@ enum class effectValueType_t
 	INTEGER,
 	FLOAT,
 };
+
+struct overloadEffect_t;
+using overloadEffectCallback_t = std::function<void( const overloadEffect_t&, team_t, double, bool&, bool& )>;
 
 struct overloadEffect_t
 {
@@ -62,6 +67,8 @@ struct overloadEffect_t
 	double              step;
 	double              minValue;
 	double              maxValue;
+	bool                recomputeFromRanks;
+	overloadEffectCallback_t callback;
 };
 
 struct overloadPurchaseDef_t
