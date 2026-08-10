@@ -23,6 +23,8 @@ along with Unvanquished. If not, see <http://www.gnu.org/licenses/>.
 */
 
 #include "common/Common.h"
+#include "Entities.h"
+#include "components/HealthComponent.h"
 #include "sg_overload.h"
 #include "sg_local.h"
 #include "shared/bg_teamprogress.h"
@@ -38,6 +40,9 @@ static void BuildOverloadCatalog();
 static int FindUnlockThresholdField( bgAttributeFamily_t family );
 static int OverloadNextCost( const overloadPurchaseDef_t& entry, int entryIndex, team_t team );
 static int AutoDonateSpendCapacity( team_t team, int purchaseIndex );
+static void ApplyGameplayEffectCallback( const overloadEffect_t& effect, team_t team, double value, bool& gameplayDirty, bool& attributeDirty );
+static void ApplyAttributeEffectCallback( const overloadEffect_t& effect, team_t team, double value, bool& gameplayDirty, bool& attributeDirty );
+static void UpdatePlayerClassMaxHealth( team_t team );
 
 
 static bool OverloadEntryMatchesTeam( team_t team, int purchaseIndex )
@@ -845,6 +850,8 @@ static overloadEffect_t GameplayEffect( const char* gameplayVarName, double step
 	effect.step = step;
 	effect.minValue = minValue;
 	effect.maxValue = maxValue;
+	effect.recomputeFromRanks = true;
+	effect.callback = ApplyGameplayEffectCallback;
 	CaptureGameplayEffectBaseline( effect );
 	return effect;
 }
@@ -869,6 +876,8 @@ static overloadEffect_t AttributeEffect( bgAttributeFamily_t family, const char*
 	effect.step = step;
 	effect.minValue = minValue;
 	effect.maxValue = maxValue;
+	effect.recomputeFromRanks = true;
+	effect.callback = ApplyAttributeEffectCallback;
 	CaptureAttributeEffectBaseline( effect );
 	return effect;
 }
@@ -880,6 +889,45 @@ static overloadEffect_t PercentAttributeEffect( bgAttributeFamily_t family, cons
 	overloadEffect_t effect = AttributeEffect( family, objectName, fieldName, 0.0, minValue, maxValue );
 	effect.step = effect.baseline * fraction;
 	return effect;
+}
+
+static overloadEffect_t CallbackEffect( overloadEffectCallback_t callback )
+{
+	overloadEffect_t effect{};
+	effect.target = effectTarget_t::CALLBACK;
+	effect.valueType = effectValueType_t::FLOAT;
+	effect.gameplayIndex = -1;
+	effect.attributeFamily = BG_NUM_ATTRIBUTE_FAMILIES;
+	effect.attributeObject = -1;
+	effect.attributeField = -1;
+	effect.baseline = 0.0;
+	effect.step = 0.0;
+	effect.minValue = -std::numeric_limits<double>::infinity();
+	effect.maxValue = std::numeric_limits<double>::infinity();
+	effect.recomputeFromRanks = false;
+	effect.callback = std::move( callback );
+	return effect;
+}
+
+static void UpdatePlayerClassMaxHealth( team_t team )
+{
+	for ( gentity_t* ent = nullptr; ( ent = G_IterateEntities( ent ) ); )
+	{
+		if ( !ent->client || ent->client->pers.connected != CON_CONNECTED || !Entities::HasHealthComponent( ent ) )
+		{
+			continue;
+		}
+
+		const class_t currentClass = static_cast<class_t>( ent->client->ps.stats[ STAT_CLASS ] );
+		if ( currentClass == PCL_NONE || BG_ClassTeam( currentClass ) != team )
+		{
+			continue;
+		}
+
+		HealthComponent* healthComponent = ent->entity->Get<HealthComponent>();
+		const float maxHealth = BG_Class( currentClass )->health;
+		healthComponent->SetMaxHealth( maxHealth, Entities::IsAlive( ent ) );
+	}
 }
 
 static int DefaultUpgradeBaseCost( int stage )
@@ -1274,7 +1322,11 @@ static void BuildOverloadCatalog()
 	AddUpgrade( TEAM_HUMANS, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), DefaultUpgradeStepCost( OVERLOAD_STAGE3_COUNT ), OVERLOAD_UNCAPPED_RANKS, "armor", "Armour", "integrity", "armor integrity", "Armor Integrity", "Increase max health for all human armour classes.",
 	            { PercentAttributeEffect( BG_ATTR_CLASS, "human_light", "health", 0.10, 1.0 ),
 	              PercentAttributeEffect( BG_ATTR_CLASS, "human_medium", "health", 0.10, 1.0 ),
-	              PercentAttributeEffect( BG_ATTR_CLASS, "human_bsuit", "health", 0.10, 1.0 ) } );
+	              PercentAttributeEffect( BG_ATTR_CLASS, "human_bsuit", "health", 0.10, 1.0 ),
+	              CallbackEffect( []( const overloadEffect_t&, team_t team, double, bool&, bool& )
+	              {
+		              UpdatePlayerClassMaxHealth( team );
+	              } ) } );
 	AddUpgrade( TEAM_HUMANS, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), DefaultUpgradeStepCost( OVERLOAD_STAGE2_COUNT ), OVERLOAD_UNCAPPED_RANKS, "jetpack", "Jetpack", "fuel", "fuel", "Jetpack Fuel", "Increase jetpack fuel capacity.",
 	            { GameplayEffect( "JETPACK_FUEL_MAX", 2500.0, 1.0, std::numeric_limits< unsigned int >::max() ),
 	              GameplayEffect( "JETPACK_FUEL_RESTORE", 2500.0 * JETPACK_FUEL_RESTORE / JETPACK_FUEL_MAX, 1.0 ) } );
@@ -1324,7 +1376,11 @@ static void BuildOverloadCatalog()
 	              PercentAttributeEffect( BG_ATTR_CLASS, "level2upg", "health", 0.1, 1.0 ),
 	              PercentAttributeEffect( BG_ATTR_CLASS, "level3", "health", 0.1, 1.0 ),
 	              PercentAttributeEffect( BG_ATTR_CLASS, "level3upg", "health", 0.1, 1.0 ),
-	              PercentAttributeEffect( BG_ATTR_CLASS, "level4", "health", 0.1, 1.0 ) } );
+	              PercentAttributeEffect( BG_ATTR_CLASS, "level4", "health", 0.1, 1.0 ),
+	              CallbackEffect( []( const overloadEffect_t&, team_t team, double, bool&, bool& )
+	              {
+		              UpdatePlayerClassMaxHealth( team );
+	              } ) } );
 	AddUpgrade( TEAM_ALIENS, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), DefaultUpgradeStepCost( OVERLOAD_STAGE2_COUNT ), OVERLOAD_UNCAPPED_RANKS, "aliens", "Alien Lifeforms", "heal_rate", "heal rate", "Alien Heal Rate", "Increase passive healing rate for all alien classes.",
 	            { PercentAttributeEffect( BG_ATTR_CLASS, "builder", "regen_rate", 0.1, 0.001 ),
 	              PercentAttributeEffect( BG_ATTR_CLASS, "builderupg", "regen_rate", 0.1, 0.001 ),
@@ -1503,6 +1559,11 @@ static double ClampEffectValue( const overloadEffect_t& effect, double value )
 
 static bool SameEffectTarget( const overloadEffect_t& lhs, const overloadEffect_t& rhs )
 {
+	if ( !lhs.recomputeFromRanks || !rhs.recomputeFromRanks )
+	{
+		return false;
+	}
+
 	return lhs.target == rhs.target &&
 	       lhs.valueType == rhs.valueType &&
 	       lhs.gameplayIndex == rhs.gameplayIndex &&
@@ -1513,6 +1574,11 @@ static bool SameEffectTarget( const overloadEffect_t& lhs, const overloadEffect_
 
 static double EffectiveEffectValue( const overloadEffect_t& effect, team_t team )
 {
+	if ( !effect.recomputeFromRanks )
+	{
+		return ClampEffectValue( effect, effect.baseline + effect.step );
+	}
+
 	double value = effect.baseline;
 	const TeamEconomyState& economy = TeamEconomy( team );
 
@@ -1536,31 +1602,33 @@ static double EffectiveEffectValue( const overloadEffect_t& effect, team_t team 
 	return ClampEffectValue( effect, value );
 }
 
-static void ApplyEffectValue( const overloadEffect_t& effect, team_t team, bool& gameplayDirty, bool& attributeDirty )
+static void ApplyGameplayEffectCallback( const overloadEffect_t& effect, team_t, double value,
+                                         bool& gameplayDirty, bool& )
 {
-	double value = EffectiveEffectValue( effect, team );
 	std::string error;
 
-	if ( effect.target == effectTarget_t::GAMEPLAY )
+	if ( effect.valueType == effectValueType_t::INTEGER )
 	{
-		if ( effect.valueType == effectValueType_t::INTEGER )
+		if ( !BG_SetGameplayInt( effect.gameplayIndex, static_cast<int>( lround( value ) ), true, &error ) )
 		{
-			if ( !BG_SetGameplayInt( effect.gameplayIndex, static_cast<int>( lround( value ) ), true, &error ) )
-			{
-				Sys::Error( "failed to set gameplay override: %s", error.c_str() );
-			}
+			Sys::Error( "failed to set gameplay override: %s", error.c_str() );
 		}
-		else
-		{
-			if ( !BG_SetGameplayFloat( effect.gameplayIndex, static_cast<float>( value ), true, &error ) )
-			{
-				Sys::Error( "failed to set gameplay override: %s", error.c_str() );
-			}
-		}
-
-		gameplayDirty = true;
-		return;
 	}
+	else
+	{
+		if ( !BG_SetGameplayFloat( effect.gameplayIndex, static_cast<float>( value ), true, &error ) )
+		{
+			Sys::Error( "failed to set gameplay override: %s", error.c_str() );
+		}
+	}
+
+	gameplayDirty = true;
+}
+
+static void ApplyAttributeEffectCallback( const overloadEffect_t& effect, team_t, double value,
+                                          bool&, bool& attributeDirty )
+{
+	std::string error;
 
 	if ( effect.valueType == effectValueType_t::INTEGER )
 	{
@@ -1580,6 +1648,17 @@ static void ApplyEffectValue( const overloadEffect_t& effect, team_t team, bool&
 	}
 
 	attributeDirty = true;
+}
+
+static void ApplyEffectValue( const overloadEffect_t& effect, team_t team, bool& gameplayDirty, bool& attributeDirty )
+{
+	double value = EffectiveEffectValue( effect, team );
+	if ( !effect.callback )
+	{
+		Sys::Error( "overload effect is missing an apply callback" );
+	}
+
+	effect.callback( effect, team, value, gameplayDirty, attributeDirty );
 }
 
 static void ApplyEntryState( const overloadPurchaseDef_t& entry, team_t team, bool& gameplayDirty, bool& attributeDirty )
