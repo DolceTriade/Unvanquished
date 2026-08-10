@@ -35,6 +35,7 @@ This file contains the headers of the internal functions used by bot only.
 #define BOT_LOCAL_H_
 
 #include "sg_local.h"
+#include "sg_bot_ai_types.h"
 
 #include <bitset>
 
@@ -75,13 +76,30 @@ struct botMemory_t;
 
 namespace Lua
 {
-struct BotBehaviorState;
+struct AILuaNode_t;
 
 struct BotActionTraceInfo
 {
 	const char *actionName;
 	const char *sourceName;
 	int sourceLine;
+};
+
+struct AIBotActionWrapper
+{
+	bool used = false;
+	AIActionNode_t action = {};
+};
+
+struct BotBehaviorState
+{
+	AILuaNode_t *ownerNode = nullptr;
+	AIBotActionWrapper actions[ 2 ];
+	int activeAction = 0;
+	char activeActionName[ MAX_QPATH ] = "";
+	char activeActionSource[ MAX_QPATH ] = "";
+	int activeActionLine = 0;
+	BotActionTraceInfo traceInfo = { activeActionName, activeActionSource, 0 };
 };
 
 const BotActionTraceInfo *GetBotActionTraceInfo( const botMemory_t& memory );
@@ -221,7 +239,7 @@ struct botMemory_t
 	// Behavior-specific state. Reset when the bot spawns or the behavior is changed {
 		AIGenericNode_t* currentNode;
 		BoundedVector<AIGenericNode_t*, MAX_NODE_DEPTH> runningNodes;
-		Lua::BotBehaviorState* luaBehaviorState;
+		Lua::BotBehaviorState luaBehaviorState;
 		botTraceDescriptor_t previousTrace;
 		bool previousTraceInitialized;
 		botTraceDescriptor_t lastFailureTrace;
