@@ -30,6 +30,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "Entities.h"
 #include "CBSE.h"
 #include "sg_cm_world.h"
+#include "sg_bot_local.h"
 #include "sgame/lua/Hooks.h"
 #include "sgame/lua/Command.h"
 
@@ -1909,6 +1910,11 @@ void ClientDisconnect( int clientNum )
 
 	G_LogPrintf( "ClientDisconnect: %i [%s] (%s) \"%s^*\"", clientNum,
 	             ent->client->pers.ip.str, ent->client->pers.guid, ent->client->pers.netname );
+
+	if ( ent->client->pers.isBot && ent->botMind )
+	{
+		G_Bot_ResetBehaviorState( *ent->botMind );
+	}
 
 	ent->client->pers.connected = CON_DISCONNECTED;
 	ent->client->sess.spectatorState = SPECTATOR_NOT;
