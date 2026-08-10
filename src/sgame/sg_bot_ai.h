@@ -22,11 +22,12 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 ===========================================================================
 */
-#include "sg_local.h"
-#include "sg_bot_local.h"
-
 #ifndef BOT_AI_HEADER_
 #define BOT_AI_HEADER_
+
+#include "sg_local.h"
+#include "sg_bot_ai_types.h"
+#include "sg_bot_local.h"
 
 // integer constants given to the behavior tree to use as parameters
 // values E_A_SPAWN to E_H_REACTOR are meant to have the same
@@ -59,168 +60,6 @@ enum AIEntity_t
 	E_ENEMYBUILDING,    // closest alive enemy building
 	E_SELF,
 	E_USERPOS,  // User specified position
-};
-
-// all behavior tree nodes must return one of
-// these status when finished
-enum AINodeStatus_t
-{
-	STATUS_FAILURE = 0,
-	STATUS_SUCCESS,
-	STATUS_RUNNING
-};
-
-// behavior tree node types
-enum AINode_t
-{
-	SPAWN_NODE,
-	SELECTOR_NODE,
-	ACTION_NODE,
-	CONDITION_NODE,
-	BEHAVIOR_NODE,
-	DECORATOR_NODE,
-	LUA_BEHAVIOR_NODE,
-	LUA_ACTION_NODE,
-};
-
-struct AIGenericNode_t;
-using AINodeRunner = AINodeStatus_t (*)( gentity_t *self, AIGenericNode_t *node );
-
-// all behavior tree nodes must conform to this interface
-struct AIGenericNode_t
-{
-	AINode_t type;
-	AINodeRunner run;
-};
-
-#define MAX_NODE_LIST 20
-struct AINodeList_t
-{
-	AINode_t type;
-	AINodeRunner run;
-	AIGenericNode_t *list[ MAX_NODE_LIST ];
-	int numNodes;
-};
-
-struct AIBehaviorTree_t
-{
-	AINode_t     type;
-	AINodeRunner run;
-	char name[ MAX_QPATH ];
-	AIGenericNode_t *root;
-	AIGenericNode_t *classSelectionTree; // extra BT for deciding the starting class with spawnAs
-};
-
-// operations used in condition nodes
-// ordered according to precedence
-// lower values == higher precedence
-enum AIOpType_t
-{
-	OP_NOT,
-	OP_LESSTHAN,
-	OP_LESSTHANEQUAL,
-	OP_GREATERTHAN,
-	OP_GREATERTHANEQUAL,
-	OP_EQUAL,
-	OP_NEQUAL,
-	OP_AND,
-	OP_OR,
-	OP_NONE
-};
-
-// types of expressions in condition nodes
-enum AIExpType_t
-{
-	EX_OP,
-	EX_VALUE,
-	EX_FUNC
-};
-
-enum AIValueType_t
-{
-	VALUE_FLOAT,
-	VALUE_INT,
-	VALUE_STRING
-};
-
-struct AIValue_t
-{
-	AIExpType_t             expType;
-	AIValueType_t           valType;
-
-	union
-	{
-		float floatValue;
-		int   intValue;
-		char  *stringValue;
-	} l;
-};
-
-using AIFunc = AIValue_t (*)( gentity_t *self, const AIValue_t *params );
-
-struct AIValueFunc_t
-{
-	AIExpType_t   expType;
-	AIFunc        func;
-	AIValue_t     *params;
-	int           nparams;
-};
-
-// all ops must conform to this interface
-struct AIOp_t
-{
-	AIExpType_t expType;
-	AIOpType_t  opType;
-};
-
-struct AIBinaryOp_t
-{
-	AIExpType_t expType;
-	AIOpType_t  opType;
-	AIExpType_t *exp1;
-	AIExpType_t *exp2;
-};
-
-struct AIUnaryOp_t
-{
-	AIExpType_t expType;
-	AIOpType_t  opType;
-	AIExpType_t *exp;
-};
-
-struct AISpawnNode_t
-{
-	AINode_t type;
-	AINodeRunner run;
-	int selection; // class_t or weapon_t depending on team
-};
-
-struct AIConditionNode_t
-{
-	AINode_t        type;
-	AINodeRunner    run;
-	AIGenericNode_t *child;
-	AIExpType_t     *exp;
-};
-
-struct AIDecoratorNode_t
-{
-	AINode_t        type;
-	AINodeRunner    run;
-	AIGenericNode_t *child;
-	AIValue_t       *params;
-	int             nparams;
-	int             data[ MAX_CLIENTS ]; // bot specific data
-};
-
-struct AIActionNode_t
-{
-	AINode_t     type;
-	AINodeRunner run;
-	AIValue_t    *params;
-	int          nparams;
-	int lineNum; // for debugging/tracing
-	const char *name; // for debugging/tracing
 };
 
 bool isBinaryOp( AIOpType_t op );
