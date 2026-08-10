@@ -44,16 +44,6 @@ local function entity_is_alive(entity)
     return true
 end
 
-local function buildable_health_fraction(entity)
-    local buildable = entity and entity.buildable or nil
-    local attr = buildable and Unv.buildables[buildable.name] or nil
-    if not buildable or not attr or attr.health <= 0 then
-        return 1
-    end
-
-    return buildable.health / attr.health
-end
-
 local function maybe_use_medkit(team, client, ctx)
     return use_medkit_if_low(team, client, ctx, 50)
 end
@@ -68,7 +58,7 @@ end
 
 local ALIEN_EVOLVE_TARGETS = common.ALIEN_EVOLVE_TARGETS
 
-local function maybe_evolve(self, team, client, enemy_visible, ctx)
+local function maybe_evolve(self, team, client, enemy_visible, level, ctx)
     if not is_alien(team) then
         return STATUS_FAILURE
     end
@@ -77,7 +67,7 @@ local function maybe_evolve(self, team, client, enemy_visible, ctx)
         return STATUS_FAILURE
     end
 
-    return try_evolve_targets(self, ctx, client, ALIEN_EVOLVE_TARGETS)
+    return try_evolve_targets(self, ctx, client, level, ALIEN_EVOLVE_TARGETS)
 end
 
 local function maybe_heal_human(client, mind, enemy_visible, ctx)
@@ -196,13 +186,6 @@ local function maybe_fight_or_heal_alien(client, enemy_visible, ctx, mind)
             return status
         end
 
-        if overmind_distance == nil or overmind_distance > 200 then
-            status = ctx:roamInRadius("overmind", 200)
-            if status ~= STATUS_FAILURE then
-                return status
-            end
-        end
-
         if booster_distance == nil or booster_distance > 200 then
             status = ctx:roamInRadius("booster", 200)
             if status ~= STATUS_FAILURE then
@@ -210,7 +193,14 @@ local function maybe_fight_or_heal_alien(client, enemy_visible, ctx, mind)
             end
         end
 
-        return STATUS_RUNNING
+        if overmind_distance == nil or overmind_distance > 200 then
+            status = ctx:roamInRadius("overmind", 200)
+            if status ~= STATUS_FAILURE then
+                return status
+            end
+        end
+
+        return STATUS_FAILURE
     end
 
     if enemy_visible then
@@ -249,6 +239,11 @@ end
 
 local function roam_friendly_base(team, ctx)
     if is_alien(team) then
+        local status = maybe_evolve(state.self, state.team, state.client, state.enemy_visible,
+            state.level, ctx)
+        if status ~= STATUS_FAILURE then
+            return status
+        end
         local status = roam_buildings(ctx, { "overmind", "eggpod", "booster" }, 500)
         return status ~= STATUS_FAILURE and status or ctx:roam()
     end
@@ -287,14 +282,14 @@ local function defend_attack_active(state)
     end
 
     if state.enemy and state.enemy_target and state.enemy_target.distance
-        and state.enemy_target.distance <= 700 then
+        and state.enemy_target.distance <= cache.cvar_number("g_bot_aliensenseRange") then
         return true
     end
 
     return state.enemy ~= nil
         and state.mind.enemyLastSeen ~= nil
         and state.mind.enemyLastSeen > 0
-        and elapsed_since(state.level.time, state.mind.enemyLastSeen) <= 1500
+        and elapsed_since(state.level.time, state.mind.enemyLastSeen) <= 5000
 end
 
 local function alien_support_needed(client, mind)
@@ -391,7 +386,8 @@ local REPAIR_HEAL_TASK = {
                 return status
             end
 
-            status = maybe_evolve(state.self, state.team, state.client, state.enemy_visible, ctx)
+            status = maybe_evolve(state.self, state.team, state.client, state.enemy_visible,
+                state.level, ctx)
             if status ~= STATUS_FAILURE then
                 return status
             end
@@ -421,14 +417,18 @@ local REPAIR_HEAL_TASK = {
             return status
         end
 
-        status = maybe_equip(state.team, state.enemy_visible, state.level, state.mind, ctx)
-        if status == STATUS_FAILURE then
-            STATE.human_equip_retry_at[state.number] = state.level.time + 2000
-            return STATUS_FAILURE
+        if human_should_equip(state.number, state.team, state.enemy_visible, state.level, state.mind) then
+            status = maybe_equip(state.team, state.enemy_visible, state.level, state.mind, ctx)
+            if status == STATUS_FAILURE then
+                STATE.human_equip_retry_at[state.number] = state.level.time + 2000
+                return STATUS_FAILURE
+            end
+
+            STATE.human_equip_retry_at[state.number] = nil
+            return status
         end
 
-        STATE.human_equip_retry_at[state.number] = nil
-        return status
+        return STATUS_FAILURE
     end,
 }
 
