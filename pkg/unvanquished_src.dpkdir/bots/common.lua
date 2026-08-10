@@ -1,7 +1,5 @@
 local M = {}
 local RUNNING_ACTIONS = {}
-local EVOLVE_STATE = {}
-local SIDEGRADE_HYSTERESIS_MS = 15000
 
 M.ALIEN_EVOLVE_TARGETS = {
     "level4",
@@ -24,10 +22,6 @@ M.ALIEN_COMBAT_TARGETS = {
 
 local function credits_per_evo()
     return Gameplay.CREDITS_PER_EVO or 100
-end
-
-local function level_time()
-    return sgame and sgame.level and sgame.level.time or 0
 end
 
 local function bot_number(self)
@@ -209,16 +203,6 @@ function M.human_repair_target_info(mind, opts)
     }
 end
 
-function M.evolve_cost_evos(current_name, target_name)
-    local current = M.class_attr(current_name)
-    local target = M.class_attr(target_name)
-    if not current or not target then
-        return nil
-    end
-
-    return (target.price - current.price) / credits_per_evo()
-end
-
 function M.can_evolve_to_class(self, client, level, class_name)
     if class_name == nil then
         class_name = level
@@ -233,54 +217,25 @@ function M.can_evolve_to_class(self, client, level, class_name)
         return false
     end
 
-    local evolve_cost = M.evolve_cost_evos(client.class, class_name)
-    local available_evos = client.evos or 0
-    local unlock_threshold = target.unlock_threshold or 0
-    local overload_progress = level and level.overload_progress or 0
-
-    if not evolve_cost or evolve_cost <= 0 or available_evos < evolve_cost then
+    if target.price <= current.price then
         return false
     end
+
+    local available_credits = current.price + (client.evos or 0) * credits_per_evo()
+    if target.price > available_credits then
+        return false
+    end
+
+    level = level or (sgame and sgame.level) or nil
+    local unlock_threshold = target.unlock_threshold or 0
+    local overload_progress = level and level.overload_progress or 0
 
     return overload_progress >= unlock_threshold
 end
 
 function M.best_alien_evolve_target(self, client, level, targets)
-    local now = level_time()
-    local number = bot_number(self)
-    local current = M.class_attr(client.class)
-    local state = nil
-
-    if number then
-        state = EVOLVE_STATE[number]
-        if not state then
-            state = {
-                class_name = client.class,
-                sidegrade_until = 0,
-            }
-            EVOLVE_STATE[number] = state
-        elseif state.class_name ~= client.class then
-            local previous = M.class_attr(state.class_name)
-            if previous and current and previous.price == current.price then
-                state.sidegrade_until = now + SIDEGRADE_HYSTERESIS_MS
-            else
-                state.sidegrade_until = 0
-            end
-
-            state.class_name = client.class
-        end
-    end
-
     for _, class_name in ipairs(targets or M.ALIEN_EVOLVE_TARGETS) do
-        local target = M.class_attr(class_name)
-        local sidegrade_blocked = state
-            and current
-            and target
-            and client.class ~= class_name
-            and current.price == target.price
-            and state.sidegrade_until > now
-
-        if not sidegrade_blocked and M.can_evolve_to_class(self, client, level, class_name) then
+        if M.can_evolve_to_class(self, client, level, class_name) then
             return class_name
         end
     end
@@ -288,48 +243,14 @@ function M.best_alien_evolve_target(self, client, level, targets)
     return nil
 end
 
-function M.try_evolve_targets(self, ctx, client, targets)
-    local state = nil
-    local current = M.class_attr(client.class)
-    local now = level_time()
-    local number = nil
-
-    if type(self) == "number" then
-        number = self
-    elseif self then
-        number = self.number
-    end
-
-    if number then
-        state = EVOLVE_STATE[number]
-        if not state then
-            state = {
-                class_name = client.class,
-                sidegrade_until = 0,
-            }
-            EVOLVE_STATE[number] = state
-        elseif state.class_name ~= client.class then
-            local previous = M.class_attr(state.class_name)
-            if previous and current and previous.price == current.price then
-                state.sidegrade_until = now + SIDEGRADE_HYSTERESIS_MS
-            else
-                state.sidegrade_until = 0
-            end
-
-            state.class_name = client.class
-        end
+function M.try_evolve_targets(self, ctx, client, level, targets)
+    if targets == nil then
+        targets = level
+        level = nil
     end
 
     for _, class_name in ipairs(targets or M.ALIEN_EVOLVE_TARGETS) do
-        local target = M.class_attr(class_name)
-        local sidegrade_blocked = state
-            and current
-            and target
-            and client.class ~= class_name
-            and current.price == target.price
-            and state.sidegrade_until > now
-
-        if client.class ~= class_name and not sidegrade_blocked and ctx:canEvolveTo(class_name) then
+        if ctx:canEvolveTo(class_name) then
             return ctx:evolveTo(class_name)
         end
     end
@@ -504,49 +425,14 @@ function M.unstick(now, ctx, mind, enemy, enemy_visible, team, client, builder)
     return ctx:moveTo("self")
 end
 
-function M.best_alien_combat_target(self, client, targets)
-    local current = M.class_attr(client.class)
-    if not current then
-        return nil
+function M.best_alien_combat_target(self, client, level, targets)
+    if targets == nil then
+        targets = level
+        level = nil
     end
 
-    local now = level_time()
-    local number = bot_number(self)
-    local state = nil
-    if number then
-        state = EVOLVE_STATE[number]
-        if not state then
-            state = {
-                class_name = client.class,
-                sidegrade_until = 0,
-            }
-            EVOLVE_STATE[number] = state
-        elseif state.class_name ~= client.class then
-            local previous = M.class_attr(state.class_name)
-            if previous and previous.price == current.price then
-                state.sidegrade_until = now + SIDEGRADE_HYSTERESIS_MS
-            else
-                state.sidegrade_until = 0
-            end
-
-            state.class_name = client.class
-        end
-    end
-
-    local available_evos = client.evos + (current.price / credits_per_evo())
     for _, class_name in ipairs(targets or M.ALIEN_COMBAT_TARGETS) do
-        local target = M.class_attr(class_name)
-        local target_cost = target and (target.price / credits_per_evo()) or nil
-        local sidegrade_blocked = state
-            and target
-            and class_name ~= client.class
-            and current.price == target.price
-            and state.sidegrade_until > now
-
-        if target
-            and class_name ~= client.class
-            and not sidegrade_blocked
-            and available_evos >= target_cost then
+        if M.can_evolve_to_class(self, client, level, class_name) then
             return class_name
         end
     end
