@@ -2432,6 +2432,11 @@ static void Cmd_Deconstruct_f( gentity_t *ent )
 		instant = false;
 	}
 
+	if ( buildable->s.eType == entityType_t::ET_GHOST_BUILDABLE )
+	{
+		return;
+	}
+
 	if ( instant && buildable->entity->Get<BuildableComponent>()->MarkedForDeconstruction() )
 	{
 		G_DeconstructUnprotected( buildable, ent );

@@ -776,6 +776,12 @@ static void FireMarkDeconstruct( gentity_t *self )
 	{
 		return;
 	}
+
+	if ( buildable->s.eType == entityType_t::ET_GHOST_BUILDABLE )
+	{
+		return;
+	}
+
 	buildable->entity->Get<BuildableComponent>()->ToggleDeconstructionMark();
 }
 
