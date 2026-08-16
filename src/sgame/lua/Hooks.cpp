@@ -57,6 +57,7 @@ static std::vector<LuaHook> teamChangeHooks;
 static std::vector<LuaHook> playerSpawnHooks;
 static std::vector<LuaHook> gameEndHooks;
 static std::vector<LuaHook> buildableSpawnedHooks;
+static std::vector<LuaHook> missileSpawnedHooks;
 static std::vector<LuaHook> shutdownHooks;
 
 void ClearHooks( lua_State* L, std::vector<LuaHook>& hooks )
@@ -77,6 +78,7 @@ void ClearAllHooks( lua_State* L )
 	ClearHooks( L, playerSpawnHooks );
 	ClearHooks( L, gameEndHooks );
 	ClearHooks( L, buildableSpawnedHooks );
+	ClearHooks( L, missileSpawnedHooks );
 	ClearHooks( L, shutdownHooks );
 }
 
@@ -284,6 +286,37 @@ void ExecBuildableSpawnedHooks( gentity_t* ent )
 	}
 }
 
+/// Install a callback that will be called for every time a missile is spawned.
+// The callback should be function(EntityProxy).
+// @function RegisterMissileSpawnedHook
+// @tparam function callback function(EntityProxy)
+int RegisterMissileSpawnedHook( lua_State* L )
+{
+	if ( lua_isfunction( L, 1 ) )
+	{
+		int ref = luaL_ref( L, LUA_REGISTRYINDEX );
+		missileSpawnedHooks.emplace_back( L, ref );
+	}
+	return 0;
+}
+
+void ExecMissileSpawnedHooks( gentity_t* ent )
+{
+	// nullptr ent can be for console chats.
+	if ( !ent ) return;
+	for ( const auto& hook : missileSpawnedHooks )
+	{
+		lua_rawgeti( hook.first, LUA_REGISTRYINDEX, hook.second );
+		EntityProxy* proxy = Entity::CreateProxy( ent, hook.first );
+		LuaLib<EntityProxy>::push( hook.first, proxy );
+		if ( lua_pcall( hook.first, 1, 0, 0 ) != 0 )
+		{
+			Log::Warn( "Could not run lua missile spawned hook callback: %s",
+			           lua_tostring( hook.first, -1 ) );
+		}
+	}
+}
+
 /// Install a callback that will be called when the game is about to shutdown.
 // The callback should be function().
 // @function RegisterShutdownHook
@@ -346,6 +379,8 @@ void ExtraInit<::Lua::Hooks>( lua_State* L, int metatable_index )
 	lua_setfield( L, metatable_index - 1, "RegisterGameEndHook" );
 	lua_pushcfunction( L, ::Lua::RegisterBuildableSpawnedHook );
 	lua_setfield( L, metatable_index - 1, "RegisterBuildableSpawnedHook" );
+	lua_pushcfunction( L, ::Lua::RegisterMissileSpawnedHook );
+	lua_setfield( L, metatable_index - 1, "RegisterMissileSpawnedHook" );
 	lua_pushcfunction( L, ::Lua::RegisterShutdownHook );
 	lua_setfield( L, metatable_index - 1, "RegisterShutdownHook" );
 }

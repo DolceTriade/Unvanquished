@@ -35,6 +35,7 @@ Maryland 20850 USA.
 #ifndef LUA_ENTITYPROXY_H_
 #define LUA_ENTITYPROXY_H_
 
+#include <memory>
 #include <unordered_map>
 
 #include "sgame/sg_local.h"
@@ -45,9 +46,12 @@ Maryland 20850 USA.
 
 namespace Lua {
 
+struct Missile;
+
 struct EntityProxy
 {
 	EntityProxy( gentity_t *ent, lua_State *L );
+	~EntityProxy();
 	gentity_t *ent;
 	unsigned generation;
 
@@ -82,6 +86,7 @@ struct EntityProxy
     std::unique_ptr<Client> client;  // If the stored entity is a client, this will be set, else nullptr.
     std::unique_ptr<Bot> bot;  // If the stored entity is a bot, this will be set, else nullptr.
     std::unique_ptr<Buildable> buildable;  // If the stored entity is a buildable, this will be set, else nullptr.
+	std::unique_ptr<Missile> missile;  // If the stored entity is a missile, this will be set, else nullptr.
 
 	std::unordered_map<FunctionType, EntityFunction, std::hash<int>> funcs;
 	lua_State *L;

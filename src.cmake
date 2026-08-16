@@ -371,6 +371,8 @@ set(SGAMELIST
     ${GAMELOGIC_DIR}/sgame/lua/Level.h
     ${GAMELOGIC_DIR}/sgame/lua/Buildable.cpp
     ${GAMELOGIC_DIR}/sgame/lua/Buildable.h
+    ${GAMELOGIC_DIR}/sgame/lua/Missile.cpp
+    ${GAMELOGIC_DIR}/sgame/lua/Missile.h
     ${GAMELOGIC_DIR}/sgame/lua/Hooks.cpp
     ${GAMELOGIC_DIR}/sgame/lua/Hooks.h
     ${GAMELOGIC_DIR}/sgame/lua/Command.cpp

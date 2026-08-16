@@ -29,6 +29,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "sg_cm_world.h"
 #include "Entities.h"
 #include "CBSE.h"
+#include "lua/Hooks.h"
+#include "lua/Missile.h"
 
 // -----------
 // definitions
@@ -391,6 +393,12 @@ bool G_MissileImpact( gentity_t *ent, const trace2_t *trace )
 	// Play hit effects and remove the missile.
 	if ( !( impactFlags & MIF_NO_EFFECT ) )
 	{
+		gentity_t* callbackHitEnt = trace->entityNum != ENTITYNUM_NONE &&
+		                            trace->entityNum != ENTITYNUM_WORLD && hitEnt->inuse
+		                            ? hitEnt
+		                            : nullptr;
+		Lua::ExecMissileImpactCallback( ent, callbackHitEnt );
+
 		// Use the surface normal for the hit event.
 		dirAsByte = DirToByte( trace->plane.normal );
 
@@ -429,6 +437,11 @@ bool G_MissileImpact( gentity_t *ent, const trace2_t *trace )
 	// If no impact happened, check if we should continue or free ourselves.
 	else if ( !( impactFlags & MIF_NO_FREE ) )
 	{
+		gentity_t* callbackHitEnt = trace->entityNum != ENTITYNUM_NONE &&
+		                            trace->entityNum != ENTITYNUM_WORLD && hitEnt->inuse
+		                            ? hitEnt
+		                            : nullptr;
+		Lua::ExecMissileImpactCallback( ent, callbackHitEnt );
 		ent->entity->FreeAt( DeferredFreeingComponent::FREE_AFTER_THINKING );
 		return true;
 	}
@@ -483,6 +496,8 @@ void G_SetUpMissile( gentity_t *m, gentity_t *parent, const vec3_t start, const 
 		// save net bandwidth
 		SnapVector( m->s.pos.trDelta );
 	}
+
+	Lua::ExecMissileSpawnedHooks( m );
 }
 
 // a non-guided missile
