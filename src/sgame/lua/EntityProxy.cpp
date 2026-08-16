@@ -33,6 +33,7 @@ Maryland 20850 USA.
 */
 #include "sgame/lua/EntityProxy.h"
 
+#include "sgame/lua/Missile.h"
 #include "sgame/sg_local.h"
 
 #include "sgame/lua/Entity.h"
@@ -49,6 +50,7 @@ namespace Lua {
 /// Access information and interact with in game entities. Wrapper class for gentity_t.
 // @table EntityProxy
 EntityProxy::EntityProxy( gentity_t* ent, lua_State* L ) : ent( ent ), generation( ent ? ent->generation : 0 ), L( L ) {}
+EntityProxy::~EntityProxy() = default;
 
 namespace {
 
@@ -218,6 +220,26 @@ static int Getbuildable(lua_State* L)
 		proxy->buildable.reset(new Buildable(proxy->ent));
 	}
 	LuaLib<Buildable>::push(L, proxy->buildable.get());
+	return 1;
+}
+
+/// Fields related to missiles. Will be nil if the entity is not a missile.
+// @tfield Missile missile Read/Write.
+// @within EntityProxy
+// @see missile
+static int Getmissile( lua_State* L )
+{
+	EntityProxy* proxy = LuaLib<EntityProxy>::check( L, 1 );
+	if ( !IsLiveEntity( proxy ) || !HasMissileComponent( proxy->ent ) )
+	{
+		proxy->missile.reset();
+		return 0;
+	}
+	if ( !proxy->missile || proxy->missile->proxy != proxy )
+	{
+		proxy->missile.reset( new Missile( proxy ) );
+	}
+	LuaLib<Missile>::push( L, proxy->missile.get() );
 	return 1;
 }
 
@@ -527,6 +549,7 @@ luaL_Reg EntityProxyGetters[] = {
 	GETTER( client ),
 	GETTER( bot ),
 	GETTER( buildable ),
+	GETTER( missile ),
 
 	{ nullptr, nullptr }
 };

@@ -2,7 +2,7 @@
 ===========================================================================
 
 Unvanquished GPL Source Code
-Copyright (C) 2024 Unvanquished Developers
+Copyright (C) 2026 Unvanquished Developers
 
 This file is part of the Unvanquished GPL Source Code (Unvanquished Source Code).
 
@@ -32,27 +32,38 @@ Maryland 20850 USA.
 ===========================================================================
 */
 
-#ifndef LUA_HOOKS_H_
-#define LUA_HOOKS_H_
-
-#include "sgame/sg_local.h"
+#ifndef LUA_MISSILE_H_
+#define LUA_MISSILE_H_
 
 #include "shared/bg_lua.h"
+#include "sgame/sg_local.h"
 
 namespace Lua {
 
-struct Hooks
-{};
+struct EntityProxy;
 
-void ExecChatHooks( gentity_t* ent, team_t team, Str::StringRef message );
-void ExecClientConnectHooks( gentity_t* ent, bool connect );
-void ExecTeamChangeHooks( gentity_t* ent, team_t team );
-void ExecPlayerSpawnHooks( gentity_t* ent );
-void ExecBuildableSpawnedHooks( gentity_t* ent );
-void ExecMissileSpawnedHooks( gentity_t* ent );
-team_t ExecGameEndHooks();
-void ExecShutdownHooks();
+struct Missile
+{
+	enum CallbackType
+	{
+		IMPACT,
+		EXPIRE,
+	};
+
+	explicit Missile( EntityProxy* proxy );
+
+	EntityProxy* proxy;
+	int impactCallback;
+	int expireCallback;
+
+	int* CallbackRef( CallbackType type );
+	void ClearCallbacks();
+};
+
+bool HasMissileComponent( gentity_t* ent );
+void ExecMissileImpactCallback( gentity_t* missile, gentity_t* hitEnt );
+void ExecMissileExpireCallback( gentity_t* missile );
 
 }  // namespace Lua
 
-#endif  // LUA_HOOKS_H_
+#endif  // LUA_MISSILE_H_
