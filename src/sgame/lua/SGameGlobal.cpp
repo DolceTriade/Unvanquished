@@ -169,6 +169,43 @@ class SGameGlobal
 		return 1;
 	}
 
+	/// Attempt to spawn a buildable at a position.
+	// Returns nil if the requested placement is invalid.
+	// @function TrySpawnBuildableAt
+	// @tparam string buildable Name of the buildable (eg, trapper, medistat, etc)
+	// @tparam array origin Position of the buildable.
+	// @treturn buildable.BuildableProxy|nil The buildable on success, otherwise nil.
+	static int TrySpawnBuildableAt( lua_State* L )
+	{
+		vec3_t origin;
+		if ( !CheckVec3( L, 2, origin ) || !lua_isstring( L, 1 ) )
+		{
+			Log::Warn( "invalid arguments to TrySpawnBuildableAt." );
+			lua_pushnil( L );
+			return 1;
+		}
+
+		const char* buildableName = luaL_checkstring( L, 1 );
+		const buildableAttributes_t* ba = BG_BuildableByName( buildableName );
+		if ( ba->number == BA_NONE )
+		{
+			Log::Warn( "invalid buildable: %s", buildableName );
+			lua_pushnil( L );
+			return 1;
+		}
+
+		gentity_t* buildable = G_TrySpawnBuildableAt( ba->number, origin );
+		if ( !buildable )
+		{
+			lua_pushnil( L );
+			return 1;
+		}
+
+		Lua::EntityProxy* proxy = Lua::Entity::CreateProxy( buildable, L );
+		LuaLib<Lua::EntityProxy>::push( L, proxy );
+		return 1;
+	}
+
 	/// Register Client Command
 	//
 	// This allow registering commands that clients can run that executes Lua code on the server.
@@ -264,6 +301,8 @@ void ExtraInit<SGameGlobal>( lua_State* L, int metatable_index )
 	lua_setfield( L, metatable_index - 1, "SendServerCommand" );
 	lua_pushcfunction( L, SGameGlobal::SpawnBuildable );
 	lua_setfield( L, metatable_index - 1, "SpawnBuildable" );
+	lua_pushcfunction( L, SGameGlobal::TrySpawnBuildableAt );
+	lua_setfield( L, metatable_index - 1, "TrySpawnBuildableAt" );
 	lua_pushcfunction( L, SGameGlobal::RegisterClientCommand );
 	lua_setfield( L, metatable_index - 1, "RegisterClientCommand" );
 	lua_pushcfunction( L, SGameGlobal::RegisterServerCommand );
