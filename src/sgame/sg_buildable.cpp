@@ -1178,6 +1178,7 @@ static itemBuildError_t ValidateBuildPlacement( gentity_t *builder, buildable_t 
 	float            minNormal;
 	bool             invert;
 	int              contents;
+	int              tracePassEntityNum = builder && builder->client ? builder->client->ps.clientNum : ENTITYNUM_NONE;
 	team_t           buildTeam = BG_Buildable( buildable )->team;
 
 	// Stop all buildables from interacting with traces
@@ -1187,8 +1188,7 @@ static itemBuildError_t ValidateBuildPlacement( gentity_t *builder, buildable_t 
 
 	VectorMA( origin, 32.0f, normal, surfaceTraceStart );
 	VectorMA( origin, -128.0f, normal, surfaceTraceEnd );
-	trap_Trace( &surfaceTrace, surfaceTraceStart, mins, maxs, surfaceTraceEnd,
-	            builder->client->ps.clientNum, MASK_DEADSOLID, 0 );
+	trap_Trace( &surfaceTrace, surfaceTraceStart, mins, maxs, surfaceTraceEnd, tracePassEntityNum, MASK_DEADSOLID, 0 );
 	// HACK: We abuse CONTENTS_ITEM for ghost buildables so ensure we can't build over them.
 	trap_Trace( &occupancyTrace, origin, mins, maxs, origin,
 	            ignoredEntity ? ignoredEntity->num() : ENTITYNUM_NONE, MASK_PLAYERSOLID | CONTENTS_ITEM, 0 );
@@ -1352,6 +1352,87 @@ itemBuildError_t G_CanBuild( gentity_t *ent, buildable_t buildable, int /*distan
 {
 	ComputePlayerBuildPlacement( ent, buildable, origin, normal, groundEntNum );
 	return ValidateBuildPlacement( ent, buildable, origin, normal, nullptr, BuildPlacementMode::PLAYER );
+}
+
+static bool GuessBuildPlacementCandidate( buildable_t buildable, const vec3_t requestedOrigin,
+                                          const vec3_t probeNormal, vec3_t guessedOrigin,
+                                          vec3_t guessedNormal, float& distanceSquared )
+{
+	vec3_t mins, maxs;
+	vec3_t surfaceTraceStart, surfaceTraceEnd;
+	vec3_t delta;
+	trace_t surfaceTrace;
+
+	BG_BuildableBoundingBox( buildable, mins, maxs );
+	VectorMA( requestedOrigin, 32.0f, probeNormal, surfaceTraceStart );
+	VectorMA( requestedOrigin, -128.0f, probeNormal, surfaceTraceEnd );
+	trap_Trace( &surfaceTrace, surfaceTraceStart, mins, maxs, surfaceTraceEnd, ENTITYNUM_NONE, MASK_DEADSOLID, 0 );
+
+	if ( surfaceTrace.startsolid || surfaceTrace.entityNum != ENTITYNUM_WORLD )
+	{
+		return false;
+	}
+
+	if ( ValidateBuildPlacement( nullptr, buildable, surfaceTrace.endpos, surfaceTrace.plane.normal,
+	                             nullptr, BuildPlacementMode::GHOST ) != IBE_NONE )
+	{
+		return false;
+	}
+
+	VectorCopy( surfaceTrace.endpos, guessedOrigin );
+	VectorCopy( surfaceTrace.plane.normal, guessedNormal );
+	VectorSubtract( guessedOrigin, requestedOrigin, delta );
+	distanceSquared = VectorLengthSquared( delta );
+	return true;
+}
+
+static bool GuessBuildPlacement( buildable_t buildable, const vec3_t requestedOrigin,
+                                 vec3_t bestOrigin, vec3_t bestNormal )
+{
+	static const vec3_t humanProbeNormals[] = {
+		{ 0.0f, 0.0f, 1.0f }
+	};
+	static const vec3_t alienProbeNormals[] = {
+		{ 0.0f, 0.0f, 1.0f },
+		{ 0.0f, 0.0f, -1.0f },
+		{ 1.0f, 0.0f, 0.0f },
+		{ -1.0f, 0.0f, 0.0f },
+		{ 0.0f, 1.0f, 0.0f },
+		{ 0.0f, -1.0f, 0.0f }
+	};
+
+	const vec3_t* probeNormals = humanProbeNormals;
+	size_t probeCount = ARRAY_LEN( humanProbeNormals );
+	bool found = false;
+	float bestDistanceSquared = 0.0f;
+
+	if ( BG_Buildable( buildable )->team == TEAM_ALIENS )
+	{
+		probeNormals = alienProbeNormals;
+		probeCount = ARRAY_LEN( alienProbeNormals );
+	}
+
+	for ( size_t i = 0; i < probeCount; ++i )
+	{
+		vec3_t candidateOrigin;
+		vec3_t candidateNormal;
+		float candidateDistanceSquared;
+		if ( !GuessBuildPlacementCandidate( buildable, requestedOrigin, probeNormals[ i ],
+		                                    candidateOrigin, candidateNormal, candidateDistanceSquared ) )
+		{
+			continue;
+		}
+
+		if ( !found || candidateDistanceSquared < bestDistanceSquared )
+		{
+			VectorCopy( candidateOrigin, bestOrigin );
+			VectorCopy( candidateNormal, bestNormal );
+			bestDistanceSquared = candidateDistanceSquared;
+			found = true;
+		}
+	}
+
+	return found;
 }
 
 static dynMenu_t BuildFailureMenu( itemBuildError_t reason )
@@ -1921,6 +2002,26 @@ gentity_t* G_SpawnBuildableImmediately( gentity_t *ent, buildable_t buildable, b
 	gentity_t* ret = FinishSpawningBuildable( ent, force );
 	G_FreeEntity( ent );
 	return ret;
+}
+
+gentity_t* G_TrySpawnBuildableAt( buildable_t buildable, const vec3_t origin )
+{
+	vec3_t guessedOrigin;
+	vec3_t guessedNormal;
+	if ( !GuessBuildPlacement( buildable, origin, guessedOrigin, guessedNormal ) )
+	{
+		return nullptr;
+	}
+
+	gentity_t* placeholder = G_NewEntity( initEntityStyle_t::NO_CBSE );
+	placeholder->s.modelindex = buildable;
+	VectorCopy( guessedOrigin, placeholder->s.pos.trBase );
+	VectorClear( placeholder->s.angles );
+	VectorCopy( guessedNormal, placeholder->s.origin2 );
+
+	gentity_t* built = FinishSpawningBuildable( placeholder, false );
+	G_FreeEntity( placeholder );
+	return built;
 }
 
 void G_LayoutSave( const char *name )
