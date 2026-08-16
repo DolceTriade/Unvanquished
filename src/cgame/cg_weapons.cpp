@@ -2340,9 +2340,10 @@ static bool CalcMuzzlePoint( int entityNum, vec3_t muzzle )
 
 static bool CalcRangedHitMuzzlePoint( entityState_t *es, int attackerNum, vec3_t muzzle )
 {
-	if ( attackerNum == cg.predictedPlayerState.clientNum )
+	if ( attackerNum == cg.predictedPlayerState.clientNum &&
+	     CalcMuzzlePoint( attackerNum, muzzle ) )
 	{
-		return CalcMuzzlePoint( attackerNum, muzzle );
+		return true;
 	}
 
 	if ( es->origin2[ 0 ] || es->origin2[ 1 ] || es->origin2[ 2 ] )
