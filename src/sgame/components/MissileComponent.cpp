@@ -35,6 +35,7 @@ Maryland 20850 USA.
 */
 #include "MissileComponent.h"
 #include "sgame/sg_cm_world.h"
+#include "sgame/lua/Missile.h"
 
 MissileComponent::MissileComponent(Entity& entity, const missileAttributes_t* attributes, ThinkingComponent& r_ThinkingComponent)
 	: MissileComponentBase(entity, attributes, r_ThinkingComponent),
@@ -53,6 +54,7 @@ void MissileComponent::Expire(int)
 	if (dead_) return;
 
 	dead_ = true;
+	Lua::ExecMissileExpireCallback( entity.oldEnt );
 
 	if (ma_.lifeEndExplode) {
 		// turns the entity into an event and frees it later

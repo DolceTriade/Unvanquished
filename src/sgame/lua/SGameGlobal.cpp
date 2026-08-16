@@ -42,6 +42,7 @@ Maryland 20850 USA.
 #include "sgame/lua/Bot.h"
 #include "sgame/lua/Level.h"
 #include "sgame/lua/Buildable.h"
+#include "sgame/lua/Missile.h"
 #include "sgame/lua/Hooks.h"
 #include "sgame/lua/Command.h"
 #include "sgame/lua/Votes.h"
@@ -242,6 +243,7 @@ void InitializeSGameGlobal( lua_State* L )
 	LuaLib<Level>::Register( L );
 	LuaLib<TeamProxy>::Register( L );
 	LuaLib<Buildable>::Register( L );
+	LuaLib<Missile>::Register( L );
 	LuaLib<Hooks>::Register( L );
 	LuaLib<Workflow>::Register( L );
 
