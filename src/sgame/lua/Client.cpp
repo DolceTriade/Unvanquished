@@ -41,6 +41,8 @@ Maryland 20850 USA.
 #include "shared/CommonProxies.h"
 #include "shared/lua/LuaLib.h"
 
+#include <cmath>
+
 using Shared::Lua::LuaLib;
 using Shared::Lua::RegType;
 
@@ -128,6 +130,18 @@ GET_FUNC( notarget, lua_pushboolean( L, c->ent->flags& FL_NOTARGET ) )
 // @tfield integer Read only.
 // @within Client
 GET_FUNC( admin_level, lua_pushinteger( L, G_admin_admin_level( c->ent ) ) )
+/// Damage multiplier applied when this client deals damage.
+// @tfield number damage_dealt_multiplier Read/Write.
+// @within Client
+GET_FUNC( damage_dealt_multiplier, lua_pushnumber( L, c->ent->client->pers.damageDealtMultiplier ) )
+/// Damage multiplier applied when this client receives damage.
+// @tfield number damage_received_multiplier Read/Write.
+// @within Client
+GET_FUNC( damage_received_multiplier, lua_pushnumber( L, c->ent->client->pers.damageReceivedMultiplier ) )
+/// Movement speed multiplier for this client while alive.
+// @tfield number speed_multiplier Read/Write.
+// @within Client
+GET_FUNC( speed_multiplier, lua_pushnumber( L, c->ent->client->pers.speedMultiplier ) )
 
 /// The client's name without color codes or other escapes or emoticon. Useful for programatic comparisons.
 // @tfield string clean_name Read only.
@@ -439,6 +453,60 @@ int Setnotarget( lua_State* L )
 	return 0;
 }
 
+static bool CheckMultiplierValue( lua_State* L, const char* name, float& value )
+{
+	if ( !lua_isnumber( L, 2 ) )
+	{
+		Log::Warn( "Lua client.%s expected number.", name );
+		return false;
+	}
+
+	value = luaL_checknumber( L, 2 );
+	if ( !std::isfinite( value ) || value < 0.0f )
+	{
+		Log::Warn( "Lua client.%s expected finite number >= 0.", name );
+		return false;
+	}
+
+	return true;
+}
+
+int Setdamage_dealt_multiplier( lua_State* L )
+{
+	Client* c = LuaLib<Client>::check( L, 1 );
+	if ( !c ) return 0;
+
+	float value;
+	if ( !CheckMultiplierValue( L, "damage_dealt_multiplier", value ) ) return 0;
+
+	c->ent->client->pers.damageDealtMultiplier = value;
+	return 0;
+}
+
+int Setdamage_received_multiplier( lua_State* L )
+{
+	Client* c = LuaLib<Client>::check( L, 1 );
+	if ( !c ) return 0;
+
+	float value;
+	if ( !CheckMultiplierValue( L, "damage_received_multiplier", value ) ) return 0;
+
+	c->ent->client->pers.damageReceivedMultiplier = value;
+	return 0;
+}
+
+int Setspeed_multiplier( lua_State* L )
+{
+	Client* c = LuaLib<Client>::check( L, 1 );
+	if ( !c ) return 0;
+
+	float value;
+	if ( !CheckMultiplierValue( L, "speed_multiplier", value ) ) return 0;
+
+	c->ent->client->pers.speedMultiplier = value;
+	return 0;
+}
+
 }  // namespace
 
 RegType<::Lua::Client> ClientMethods[] = {
@@ -475,6 +543,9 @@ luaL_Reg ClientGetters[] = {
 	GETTER( god ),
 	GETTER( notarget ),
 	GETTER( admin_level ),
+	GETTER( damage_dealt_multiplier ),
+	GETTER( damage_received_multiplier ),
+	GETTER( speed_multiplier ),
 
 	{ nullptr, nullptr },
 };
@@ -492,6 +563,9 @@ luaL_Reg ClientSetters[] = {
 	SETTER( stamina ),
 	SETTER( god ),
 	SETTER( notarget ),
+	SETTER( damage_dealt_multiplier ),
+	SETTER( damage_received_multiplier ),
+	SETTER( speed_multiplier ),
 	{ nullptr, nullptr },
 };
 

@@ -2,11 +2,37 @@
 #include "HealthComponent.h"
 #include "math.h"
 
+#include <cmath>
+
 static Log::Logger healthLogger("sgame.health");
 
 static Cvar::Cvar<float>  g_friendlyFireAlienMultiplier("g_friendlyFireAlienMultiplier", "Damage multiplier for alien-to-alien damage (doesn't include buildings, or self)", Cvar::NONE, 0.5f);
 static Cvar::Cvar<float>  g_friendlyFireHumanMultiplier("g_friendlyFireHumanMultiplier", "Damage multiplier for human-to-human damage (doesn't include buildings, or self)", Cvar::NONE, 1.0f);
 static Cvar::Cvar<bool>   g_friendlyBuildableFire("g_friendlyBuildableFire", "Can one hurt the team's buildable?", Cvar::NONE, true);
+
+namespace {
+
+static gclient_t* GetEffectiveAttackerClient( gentity_t* source )
+{
+	if ( !source || source == &g_entities[ ENTITYNUM_WORLD ] )
+	{
+		return nullptr;
+	}
+
+	if ( source->client )
+	{
+		return source->client;
+	}
+
+	if ( source->parent && source->parent->client )
+	{
+		return source->parent->client;
+	}
+
+	return nullptr;
+}
+
+} // namespace
 
 HealthComponent::HealthComponent(Entity& entity, float maxHealth)
 	: HealthComponentBase(entity, maxHealth), health(maxHealth)
@@ -63,6 +89,12 @@ Util::optional<glm::vec3> direction, int flags, meansOfDeath_t meansOfDeath) {
 
 	// Set source to world if missing.
 	if (!source) source = &g_entities[ENTITYNUM_WORLD];
+
+	gclient_t* attackerClient = GetEffectiveAttackerClient( source );
+	if ( attackerClient && attackerClient != client && source != entity.oldEnt )
+	{
+		amount *= attackerClient->pers.damageDealtMultiplier;
+	}
 
 	// Don't handle ET_MOVER w/o die or pain function.
 	// TODO: Handle mover special casing in a dedicated component.
@@ -134,6 +166,11 @@ Util::optional<glm::vec3> direction, int flags, meansOfDeath_t meansOfDeath) {
 	// Apply damage modifiers.
 	if (!(flags & DAMAGE_PURE)) {
 		entity.ApplyDamageModifier(take, location, direction, flags, meansOfDeath);
+	}
+
+	if ( client && source != entity.oldEnt && source != &g_entities[ ENTITYNUM_WORLD ] )
+	{
+		take *= client->pers.damageReceivedMultiplier;
 	}
 
 	// if we don't actually take damage, stop here
