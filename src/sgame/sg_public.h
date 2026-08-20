@@ -162,6 +162,7 @@ const char        *ClientUserinfoChanged( int clientNum, bool forceName );
 void              ClientDisconnect( int clientNum );
 void              ClientBegin( int clientNum );
 void              ClientAdminChallenge( int clientNum );
+void              G_ResetPlayerMultipliers( gclient_t *client );
 
 // sg_clustering.c
 namespace BaseClustering {

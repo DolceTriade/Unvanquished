@@ -1130,6 +1130,7 @@ const char *ClientConnect( int clientNum, bool firstTime )
 
 	ent->client = client;
 	ResetStruct( *client );
+	G_ResetPlayerMultipliers( client );
 
 	trap_GetUserinfo( clientNum, userinfo, sizeof( userinfo ) );
 
@@ -1255,6 +1256,18 @@ const char *ClientConnect( int clientNum, bool firstTime )
 	return nullptr;
 }
 
+void G_ResetPlayerMultipliers( gclient_t *client )
+{
+	if ( !client )
+	{
+		return;
+	}
+
+	client->pers.damageDealtMultiplier = 1.0f;
+	client->pers.damageReceivedMultiplier = 1.0f;
+	client->pers.speedMultiplier = 1.0f;
+}
+
 /*
 ===========
 ClientBotConnect
@@ -1280,6 +1293,7 @@ const char *ClientBotConnect( int clientNum, bool firstTime )
 
 	ent->client = client;
 	ResetStruct( *client );
+	G_ResetPlayerMultipliers( client );
 
 	client->pers.isBot = true;
 	client->pers.localClient = true;
@@ -1650,6 +1664,7 @@ void ClientSpawn( gentity_t *ent, gentity_t *spawn, const vec3_t origin, const v
 
 	client->pers = saved;
 	client->sess = savedSess;
+	G_ResetPlayerMultipliers( client );
 	if (evolving)
 	{
 		client->ps.weaponTime = 500;
