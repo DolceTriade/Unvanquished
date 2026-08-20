@@ -2031,7 +2031,8 @@ static void ClientThink_real( gentity_t *self )
 	else
 	{
 		client->ps.speed = g_speed.Get() *
-		                   BG_Class( client->ps.stats[ STAT_CLASS ] )->speed;
+		                   BG_Class( client->ps.stats[ STAT_CLASS ] )->speed *
+		                   client->pers.speedMultiplier;
 	}
 
 	// unset creepslowed flag if it's time

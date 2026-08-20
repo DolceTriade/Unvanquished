@@ -340,6 +340,9 @@ struct clientPersistant_t
 	int               location; // player locations
 	int               teamInfo; // level.time of team overlay update (disabled = 0)
 	float             flySpeed; // for spectator/noclip moves
+	float             damageDealtMultiplier;
+	float             damageReceivedMultiplier;
+	float             speedMultiplier;
 	bool          disableBlueprintErrors; // should the buildable blueprint never be hidden from the players?
 
 	class_t           classSelection; // player class (copied to ent->client->ps.stats[ STAT_CLASS ] once spawned)
