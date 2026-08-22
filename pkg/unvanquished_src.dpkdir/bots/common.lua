@@ -20,10 +20,6 @@ M.ALIEN_COMBAT_TARGETS = {
     "level0",
 }
 
-local function credits_per_evo()
-    return Gameplay.CREDITS_PER_EVO or 100
-end
-
 local function bot_number(self)
     if type(self) == "number" then
         return self
@@ -221,16 +217,7 @@ function M.can_evolve_to_class(self, client, level, class_name)
         return false
     end
 
-    local available_credits = current.price + (client.evos or 0) * credits_per_evo()
-    if target.price > available_credits then
-        return false
-    end
-
-    level = level or (sgame and sgame.level) or nil
-    local unlock_threshold = target.unlock_threshold or 0
-    local overload_progress = level and level.overload_progress or 0
-
-    return overload_progress >= unlock_threshold
+    return true
 end
 
 function M.best_alien_evolve_target(self, client, level, targets)
@@ -249,8 +236,10 @@ function M.try_evolve_targets(self, ctx, client, level, targets)
         level = nil
     end
 
-    for _, class_name in ipairs(targets or M.ALIEN_EVOLVE_TARGETS) do
-        if ctx:canEvolveTo(class_name) then
+    local candidates = targets or M.ALIEN_EVOLVE_TARGETS
+
+    for _, class_name in ipairs(candidates) do
+        if M.can_evolve_to_class(self, client, level, class_name) and ctx:canEvolveTo(class_name) then
             return ctx:evolveTo(class_name)
         end
     end
