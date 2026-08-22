@@ -2095,6 +2095,17 @@ void BotFireWeaponAI( gentity_t *self )
 	usercmd_t *botCmdBuffer = &self->botMind->cmdBuffer;
 
 	BotResetStuckTime( self );
+
+	// BotGetIdealAimLocation requires the goal to target a live entity
+	// (it has an ASSERT and dereferences getTargetedEntity()). When the goal
+	// is empty or only coordinates (e.g. a roam point) we cannot aim, so just
+	// skip firing rather than crashing. Callers that want "always fire" should
+	// only expect firing when a valid goal entity exists.
+	if ( !self->botMind->goal.targetsValidEntity() )
+	{
+		return;
+	}
+
 	AngleVectors( VEC2GLM( self->client->ps.viewangles ), &forward, nullptr, nullptr );
 	muzzle = G_CalcMuzzlePoint( self, forward );
 	glm::vec3 targetPos = BotGetIdealAimLocation( self, self->botMind->goal, 0 );
