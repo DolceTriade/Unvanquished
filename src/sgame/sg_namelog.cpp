@@ -152,6 +152,13 @@ void G_namelog_restore( gclient_t *client )
 {
 	namelog_t *n = client->pers.namelog;
 
+	// The client may have been dropped since the namelog entry was linked
+	// (e.g. reliable command overflow), leaving the entry without a slot.
+	if ( n == nullptr || n->slot < 0 || n->slot >= level.maxclients )
+	{
+		return;
+	}
+
 	G_ChangeTeam( g_entities + n->slot, n->team );
 	client->ps.persistant[ PERS_SCORE ] = n->score;
 	client->ps.persistant[ PERS_CREDIT ] = 0;

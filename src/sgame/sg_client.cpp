@@ -1327,10 +1327,43 @@ const char *ClientBotConnect( int clientNum, bool firstTime )
 
 // Resend configstrings that could be affected by https://github.com/Unvanquished/Unvanquished/issues/1102.
 // TODO(0.57): remove since with the new version we have well-behaved clients.
+//
+// The resend is spread over multiple frames. Bursting all of them at once adds
+// hundreds of reliable commands in a single frame, which overflows the client's
+// reliable command window (dropping it) when it hasn't acknowledged the
+// previous ones yet, e.g. when a map restart happens right after connecting.
+static int configstringResendRemaining[ MAX_CLIENTS ];
+
 static void ResendPossiblyWrongConfigstrings( int clientNum )
 {
-	for ( int cs = CS_PLAYERS + level.maxclients; cs--; )
+	if ( level.clients[ clientNum ].pers.isBot )
 	{
+		return;
+	}
+
+	configstringResendRemaining[ clientNum ] = CS_PLAYERS + level.maxclients;
+}
+
+void G_ConfigstringResendFrame( int clientNum )
+{
+	if ( !configstringResendRemaining[ clientNum ] )
+	{
+		return;
+	}
+
+	if ( level.clients[ clientNum ].pers.connected == CON_DISCONNECTED )
+	{
+		configstringResendRemaining[ clientNum ] = 0;
+		return;
+	}
+
+	constexpr int RESEND_BATCH = 8; // per frame, so the client can ack between batches
+	const int end = CS_PLAYERS + level.maxclients;
+	int sent = 0;
+
+	while ( configstringResendRemaining[ clientNum ] && sent < RESEND_BATCH )
+	{
+		int cs = end - configstringResendRemaining[ clientNum ]--;
 		char configstring[ 1022 ];
 		trap_GetConfigstring( cs, configstring, sizeof( configstring ) );
 		if ( strchr( configstring, '\n' ) != nullptr )
@@ -1347,6 +1380,7 @@ static void ResendPossiblyWrongConfigstrings( int clientNum )
 		else
 		{
 			trap_SendServerCommand( clientNum, command.c_str() );
+			sent++;
 		}
 	}
 }
