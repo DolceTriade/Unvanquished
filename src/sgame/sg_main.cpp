@@ -2430,6 +2430,8 @@ void G_RunFrame( int levelTime )
 		{
 			ClientEndFrame( ent );
 		}
+
+		G_ConfigstringResendFrame( i );
 	}
 
 	// save position information for all active clients
