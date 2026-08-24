@@ -138,6 +138,10 @@ bool              G_OverloadPurchase( gentity_t *ent, const Cmd::Args& args, std
 int               G_OverloadPurchaseCount();
 bool              G_OverloadPurchaseByIndex( gentity_t *ent, int purchaseIndex, int spend, std::string* message = nullptr );
 bool              G_OverloadAutoDonate( gentity_t *ent, int spend, std::string* message = nullptr );
+bool              G_OverloadUnlockPurchasedByName( team_t team, unlockableType_t type, Str::StringRef thing );
+void              G_OverloadForceUnlockByName( team_t team, unlockableType_t type, Str::StringRef thing );
+int               G_OverloadUpgradeLevel( team_t team, Str::StringRef thing, Str::StringRef stat );
+int               G_OverloadForceUpgrade( team_t team, Str::StringRef thing, Str::StringRef stat );
 void              G_BotOverloadThink( gentity_t *ent );
 
 // sg_client.c
