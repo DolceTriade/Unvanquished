@@ -41,6 +41,7 @@ Maryland 20850 USA.
 #include "sgame/lua/Client.h"
 #include "sgame/lua/Bot.h"
 #include "sgame/lua/Level.h"
+#include "sgame/lua/Overload.h"
 #include "sgame/lua/Buildable.h"
 #include "sgame/lua/Missile.h"
 #include "sgame/lua/Hooks.h"
@@ -56,6 +57,7 @@ using Shared::Lua::CheckVec3;
 
 static Lua::Entity entity;
 static Lua::Level level;
+static Lua::Overload overload;
 static Lua::Hooks hooks;
 static Lua::Workflow workflow;
 
@@ -94,6 +96,15 @@ class SGameGlobal
 	static int GetHooks( lua_State* L )
 	{
 		LuaLib<Lua::Hooks>::push( L, &hooks );
+		return 1;
+	}
+
+	/// Get the Overload helper object.
+	// @field overload Get helper methods for Overload unlocks and upgrades.
+	// @see overload
+	static int GetOverload( lua_State* L )
+	{
+		LuaLib<Lua::Overload>::push( L, &overload );
 		return 1;
 	}
 
@@ -254,6 +265,7 @@ RegType<SGameGlobal> SGameGlobalMethods[] = {
 luaL_Reg SGameGlobalGetters[] = {
 	{ "entity", SGameGlobal::GetEntity },
 	{ "level", SGameGlobal::GetLevel },
+	{ "overload", SGameGlobal::GetOverload },
 	{ "hooks", SGameGlobal::GetHooks },
 	{ "workflow", SGameGlobal::GetWorkflow },
 
@@ -279,6 +291,7 @@ void InitializeSGameGlobal( lua_State* L )
 	LuaLib<Bot>::Register( L );
 	LuaLib<Level>::Register( L );
 	LuaLib<TeamProxy>::Register( L );
+	LuaLib<Overload>::Register( L );
 	LuaLib<Buildable>::Register( L );
 	LuaLib<Missile>::Register( L );
 	LuaLib<Hooks>::Register( L );

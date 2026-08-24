@@ -345,6 +345,121 @@ static int GetUnlockPurchaseIndex( team_t team, unlockableType_t type, int itemN
 	return -1;
 }
 
+static bgAttributeFamily_t UnlockFamilyForType( unlockableType_t type )
+{
+	switch ( type )
+	{
+		case UNLT_WEAPON: return BG_ATTR_WEAPON;
+		case UNLT_UPGRADE: return BG_ATTR_UPGRADE;
+		case UNLT_BUILDABLE: return BG_ATTR_BUILDABLE;
+		case UNLT_CLASS: return BG_ATTR_CLASS;
+		case UNLT_NUM_UNLOCKABLETYPES: break;
+	}
+
+	return BG_NUM_ATTRIBUTE_FAMILIES;
+}
+
+static int FindPurchaseIndex( team_t team, overloadPurchaseKind_t kind, Str::StringRef thing, Str::StringRef stat = "" )
+{
+	if ( !G_IsPlayableTeam( team ) )
+	{
+		return -1;
+	}
+
+	if ( thing.empty() )
+	{
+		return -1;
+	}
+
+	for ( size_t i = 0; i < overloadPurchases.size(); ++i )
+	{
+		const overloadPurchaseDef_t& entry = overloadPurchases[ i ];
+		if ( entry.kind != kind )
+		{
+			continue;
+		}
+
+		if ( entry.team != TEAM_NONE && entry.team != team )
+		{
+			continue;
+		}
+
+		if ( Q_stricmp( entry.thing.c_str(), thing.c_str() ) )
+		{
+			continue;
+		}
+
+		if ( kind == overloadPurchaseKind_t::UPGRADE && Q_stricmp( entry.stat.c_str(), stat.c_str() ) )
+		{
+			continue;
+		}
+
+		return static_cast<int>( i );
+	}
+
+	return -1;
+}
+
+static int ResolveUnlockPurchaseIndexByName( team_t team, unlockableType_t type, Str::StringRef thing )
+{
+	if ( !G_IsPlayableTeam( team ) )
+	{
+		Log::Warn( "Overload API received invalid team %d while resolving unlock '%s'", team, thing.c_str() );
+		return -1;
+	}
+
+	const int purchaseIndex = FindPurchaseIndex( team, overloadPurchaseKind_t::UNLOCK, thing );
+	if ( purchaseIndex < 0 )
+	{
+		Log::Warn( "Overload API could not find an unlock purchase for team %d, type %d, thing '%s'",
+		           team, type, thing.c_str() );
+		return -1;
+	}
+
+	const bgAttributeFamily_t expectedFamily = UnlockFamilyForType( type );
+	if ( expectedFamily == BG_NUM_ATTRIBUTE_FAMILIES )
+	{
+		Log::Warn( "Overload API received invalid unlock type %d for thing '%s'", type, thing.c_str() );
+		return -1;
+	}
+
+	const overloadPurchaseDef_t& entry = overloadPurchases[ purchaseIndex ];
+	if ( entry.unlockFamily != expectedFamily )
+	{
+		Log::Warn( "Overload API unlock type mismatch for team %d, type %d, thing '%s'",
+		           team, type, thing.c_str() );
+		return -1;
+	}
+
+	return purchaseIndex;
+}
+
+static int ResolveUpgradePurchaseIndexByName( team_t team, Str::StringRef thing, Str::StringRef stat )
+{
+	if ( !G_IsPlayableTeam( team ) )
+	{
+		Log::Warn( "Overload API received invalid team %d while resolving upgrade '%s/%s'",
+		           team, thing.c_str(), stat.c_str() );
+		return -1;
+	}
+
+	if ( thing.empty() || stat.empty() )
+	{
+		Log::Warn( "Overload API received an invalid upgrade selector '%s/%s'",
+		           thing.c_str(), stat.c_str() );
+		return -1;
+	}
+
+	const int purchaseIndex = FindPurchaseIndex( team, overloadPurchaseKind_t::UPGRADE, thing, stat );
+	if ( purchaseIndex < 0 )
+	{
+		Log::Warn( "Overload API could not find an upgrade purchase for team %d, thing '%s', stat '%s'",
+		           team, thing.c_str(), stat.c_str() );
+	}
+
+	return purchaseIndex;
+}
+
 constexpr int OVERLOAD_UNCAPPED_RANKS = std::numeric_limits<int>::max();
 
 int G_InitialBudgetForTeam( team_t team )
@@ -1422,47 +1537,33 @@ static void BuildOverloadCatalog()
 	overloadCatalogReady = true;
 }
 
-static bool EntryMatches( const overloadPurchaseDef_t& entry, const Cmd::Args& args )
-{
-	if ( entry.kind == overloadPurchaseKind_t::BP_BUNDLE )
-	{
-		return args.Argc() >= 2 && !Q_stricmp( args.Argv( 1 ).c_str(), entry.thing.c_str() );
-	}
-
-	if ( entry.kind == overloadPurchaseKind_t::UNLOCK )
-	{
-		return args.Argc() >= 3 &&
-		       !Q_stricmp( args.Argv( 1 ).c_str(), "unlock" ) &&
-		       !Q_stricmp( args.Argv( 2 ).c_str(), entry.thing.c_str() );
-	}
-
-	return args.Argc() >= 4 &&
-	       !Q_stricmp( args.Argv( 1 ).c_str(), "upgrade" ) &&
-	       !Q_stricmp( args.Argv( 2 ).c_str(), entry.thing.c_str() ) &&
-	       !Q_stricmp( args.Argv( 3 ).c_str(), entry.stat.c_str() );
-}
-
 static const overloadPurchaseDef_t* FindPurchase( team_t team, const Cmd::Args& args, int* purchaseIndex = nullptr )
 {
-	for ( size_t i = 0; i < overloadPurchases.size(); ++i )
+	int resolvedIndex = -1;
+	if ( args.Argc() >= 3 && !Q_stricmp( args.Argv( 1 ).c_str(), "unlock" ) )
 	{
-		const overloadPurchaseDef_t& entry = overloadPurchases[ i ];
-		if ( entry.team != TEAM_NONE && entry.team != team )
-		{
-			continue;
-		}
-
-		if ( EntryMatches( entry, args ) )
-		{
-			if ( purchaseIndex )
-			{
-				*purchaseIndex = i;
-			}
-			return &entry;
-		}
+		resolvedIndex = FindPurchaseIndex( team, overloadPurchaseKind_t::UNLOCK, args.Argv( 2 ) );
+	}
+	else if ( args.Argc() >= 4 && !Q_stricmp( args.Argv( 1 ).c_str(), "upgrade" ) )
+	{
+		resolvedIndex = FindPurchaseIndex( team, overloadPurchaseKind_t::UPGRADE, args.Argv( 2 ), args.Argv( 3 ) );
+	}
+	else if ( args.Argc() >= 2 )
+	{
+		resolvedIndex = FindPurchaseIndex( team, overloadPurchaseKind_t::BP_BUNDLE, args.Argv( 1 ) );
 	}
 
-	return nullptr;
+	if ( resolvedIndex < 0 )
+	{
+		return nullptr;
+	}
+
+	if ( purchaseIndex )
+	{
+		*purchaseIndex = resolvedIndex;
+	}
+
+	return &overloadPurchases[ resolvedIndex ];
 }
 
 bool EntryIsAvailable( team_t team, const overloadPurchaseDef_t& entry )
@@ -1865,6 +1966,12 @@ bool G_OverloadUnlockPurchased( team_t team, unlockableType_t type, int itemNum 
 	return purchaseIndex >= 0 && TeamEconomy( team ).ownedPurchases[ purchaseIndex ];
 }
 
+bool G_OverloadUnlockPurchasedByName( team_t team, unlockableType_t type, Str::StringRef thing )
+{
+	const int purchaseIndex = ResolveUnlockPurchaseIndexByName( team, type, thing );
+	return purchaseIndex >= 0 && TeamEconomy( team ).ownedPurchases[ purchaseIndex ];
+}
+
 bool G_OverloadHasUnlockEntry( team_t team, unlockableType_t type, int itemNum )
 {
 	if ( !G_IsPlayableTeam( team ) )
@@ -1905,6 +2012,74 @@ void G_OverloadUnlockAll( team_t team )
 	ApplyAllOverloadState();
 	SyncOverloadProgress( team );
 	G_PublishOverloadState( team );
+}
+
+void G_OverloadForceUnlockByName( team_t team, unlockableType_t type, Str::StringRef thing )
+{
+	const int purchaseIndex = ResolveUnlockPurchaseIndexByName( team, type, thing );
+	if ( purchaseIndex < 0 )
+	{
+		return;
+	}
+
+	TeamEconomyState& economy = TeamEconomy( team );
+	if ( economy.ownedPurchases[ purchaseIndex ] )
+	{
+		return;
+	}
+
+	const int oldCompletedPurchases = economy.completedPurchases;
+	economy.ownedPurchases[ purchaseIndex ] = true;
+	economy.repeatCounts[ purchaseIndex ] = 1;
+	economy.investedCredits[ purchaseIndex ] = 0;
+	economy.completedPurchases += 1;
+
+	ApplyAllOverloadState();
+	SyncOverloadProgress( team );
+	G_PublishOverloadState( team );
+	NotifyLegacyStageSensors( team, oldCompletedPurchases, economy.completedPurchases );
+}
+
+int G_OverloadUpgradeLevel( team_t team, Str::StringRef thing, Str::StringRef stat )
+{
+	const int purchaseIndex = ResolveUpgradePurchaseIndexByName( team, thing, stat );
+	return purchaseIndex < 0 ? 0 : TeamEconomy( team ).repeatCounts[ purchaseIndex ];
+}
+
+int G_OverloadForceUpgrade( team_t team, Str::StringRef thing, Str::StringRef stat )
+{
+	const int purchaseIndex = ResolveUpgradePurchaseIndexByName( team, thing, stat );
+	if ( purchaseIndex < 0 )
+	{
+		return 0;
+	}
+
+	const overloadPurchaseDef_t& entry = overloadPurchases[ purchaseIndex ];
+	TeamEconomyState& economy = TeamEconomy( team );
+	if ( entry.maxRanks != OVERLOAD_UNCAPPED_RANKS && economy.repeatCounts[ purchaseIndex ] >= entry.maxRanks )
+	{
+		return economy.repeatCounts[ purchaseIndex ];
+	}
+
+	const int oldCompletedPurchases = economy.completedPurchases;
+	bool gameplayDirty = false;
+	bool attributeDirty = false;
+	ApplyPurchaseToTeamState( entry, purchaseIndex, team, 1, gameplayDirty, attributeDirty );
+
+	if ( gameplayDirty )
+	{
+		BG_PublishGameplayConfig();
+	}
+
+	if ( attributeDirty )
+	{
+		BG_PublishAttributeConfig();
+	}
+
+	SyncOverloadProgress( team );
+	G_PublishOverloadState( team );
+	NotifyLegacyStageSensors( team, oldCompletedPurchases, economy.completedPurchases );
+	return economy.repeatCounts[ purchaseIndex ];
 }
 
 bool G_OverloadPurchase( gentity_t *ent, const Cmd::Args& args, std::string* message )
