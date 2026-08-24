@@ -134,6 +134,7 @@ bool              G_OverloadUnlockPurchased( team_t team, unlockableType_t type,
 bool              G_OverloadHasUnlockEntry( team_t team, unlockableType_t type, int itemNum );
 void              G_OverloadUnlockAll( team_t team );
 void              G_PublishOverloadState( team_t team );
+void              G_OverloadEmitEndGameSummary();
 bool              G_OverloadPurchase( gentity_t *ent, const Cmd::Args& args, std::string* message = nullptr );
 int               G_OverloadPurchaseCount();
 bool              G_OverloadPurchaseByIndex( gentity_t *ent, int purchaseIndex, int spend, std::string* message = nullptr );

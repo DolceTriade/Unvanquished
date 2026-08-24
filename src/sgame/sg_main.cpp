@@ -1817,6 +1817,7 @@ void LogExit( const char *string )
 	gclient_t *cl;
 
 	G_LogPrintf( "Exit: %s", string );
+	G_OverloadEmitEndGameSummary();
 
 	level.intermissionQueued = level.time;
 
