@@ -606,6 +606,98 @@ static void PublishAllTeamEconomyStates()
 	}
 }
 
+static void AppendWrappedSummaryLine( std::vector<std::string>& lines, const std::string& prefix,
+                                      const std::vector<std::string>& items, const char* emptyValue,
+                                      size_t maxLineLength )
+{
+	std::string current = prefix;
+
+	if ( items.empty() )
+	{
+		current += emptyValue;
+		lines.push_back( current );
+		return;
+	}
+
+	for ( size_t i = 0; i < items.size(); ++i )
+	{
+		const std::string& item = items[ i ];
+		const std::string separator = current == prefix ? "" : ", ";
+
+		if ( current.size() + separator.size() + item.size() > maxLineLength && current != prefix )
+		{
+			lines.push_back( current );
+			current = prefix + item;
+			continue;
+		}
+
+		current += separator;
+		current += item;
+	}
+
+	lines.push_back( current );
+}
+
+static std::vector<std::string> BuildOverloadSummaryLines( team_t team )
+{
+	static constexpr size_t MAX_SUMMARY_LINE_LENGTH = 160;
+
+	std::vector<std::string> lines;
+	if ( !G_IsPlayableTeam( team ) )
+	{
+		return lines;
+	}
+
+	const TeamEconomyState& economy = TeamEconomy( team );
+	std::vector<std::string> unlocks;
+	std::vector<std::string> upgrades;
+
+	lines.push_back( Str::Format( "Overload Summary - %s", BG_TeamName( team ) ) );
+	lines.push_back( Str::Format( "  BP purchased: %d", economy.bpPurchased ) );
+
+	for ( size_t i = 0; i < overloadPurchases.size(); ++i )
+	{
+		const overloadPurchaseDef_t& entry = overloadPurchases[ i ];
+		if ( entry.team != TEAM_NONE && entry.team != team )
+		{
+			continue;
+		}
+
+		if ( entry.kind == overloadPurchaseKind_t::UNLOCK && economy.ownedPurchases[ i ] )
+		{
+			unlocks.push_back( entry.displayName );
+			continue;
+		}
+
+		if ( entry.kind == overloadPurchaseKind_t::UPGRADE && economy.repeatCounts[ i ] > 0 )
+		{
+			upgrades.push_back( Str::Format( "%s x%d", entry.displayName, economy.repeatCounts[ i ] ) );
+		}
+	}
+
+	AppendWrappedSummaryLine( lines, "  Unlocks: ", unlocks, "none", MAX_SUMMARY_LINE_LENGTH );
+	AppendWrappedSummaryLine( lines, "  Upgrades: ", upgrades, "none", MAX_SUMMARY_LINE_LENGTH );
+	return lines;
+}
+
+static void EmitOverloadSummaryLineToPlayers( const std::string& line )
+{
+	trap_SendServerCommand( -1, va( "print %s", Quote( line.c_str() ) ) );
+}
+
+void G_OverloadEmitEndGameSummary()
+{
+	for ( team_t team = TEAM_NONE; ( team = G_IterateTeams( team ) ); )
+	{
+		const std::vector<std::string> lines = BuildOverloadSummaryLines( team );
+		for ( const std::string& line : lines )
+		{
+			G_LogPrintf( "OverloadSummary: %s", line.c_str() );
+			EmitOverloadSummaryLineToPlayers( line );
+		}
+	}
+}
+
 static void UpdateOverloadCostScalingInternal()
 {
 	for ( team_t team = TEAM_NONE; ( team = G_IterateTeams( team ) ); )
