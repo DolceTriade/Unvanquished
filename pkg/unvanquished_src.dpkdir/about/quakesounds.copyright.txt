@@ -1,0 +1,10 @@
+Quake-style announcer sounds
+============================
+
+Attribution:
+
+Old-school arena FPS announcer voice lines by jkerman -- https://freesound.org/s/718360/ -- License: Attribution 4.0
+
+Notes:
+
+- They were re-encoded with a `+3 dB` gain bump.

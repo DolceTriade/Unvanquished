@@ -256,6 +256,8 @@ Util::optional<glm::vec3> direction, int flags, meansOfDeath_t meansOfDeath) {
 	if (health <= 0) {
 		healthLogger.Notice("Dying with %.1f health.", health);
 
+		QuakeRewards::NotifyPlayerDeath( entity.oldEnt, source, location, flags, meansOfDeath );
+
 		// Call legacy die function.
 		if (entity.oldEnt->die) entity.oldEnt->die(entity.oldEnt, source, source, meansOfDeath);
 

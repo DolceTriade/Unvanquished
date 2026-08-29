@@ -219,6 +219,14 @@ void              G_LogDestruction( gentity_t *self, gentity_t *actor, int mod )
 void              G_InitDamageLocations();
 void              G_PlayerDie( gentity_t *self, gentity_t *inflictor, gentity_t *attacker, int mod );
 
+// QuakeRewards.cpp
+namespace QuakeRewards
+{
+	void Init();
+	void NotifyPlayerDeath( gentity_t *victim, gentity_t *source, Util::optional<glm::vec3> location,
+	                        int flags, meansOfDeath_t meansOfDeath );
+}
+
 // sg_main.c
 void              G_InitSpawnQueue( spawnQueue_t *sq );
 int               G_GetSpawnQueueLength( spawnQueue_t *sq );

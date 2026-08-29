@@ -203,6 +203,7 @@ set(SGAMELIST
     ${GAMELOGIC_DIR}/sgame/BaseClustering.cpp
     ${GAMELOGIC_DIR}/sgame/Entities.cpp
     ${GAMELOGIC_DIR}/sgame/Entities.h
+    ${GAMELOGIC_DIR}/sgame/QuakeRewards.cpp
     ${GAMELOGIC_DIR}/sgame/sg_active.cpp
     ${GAMELOGIC_DIR}/sgame/sg_admin.cpp
     ${GAMELOGIC_DIR}/sgame/sg_admin.h
