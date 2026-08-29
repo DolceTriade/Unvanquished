@@ -737,10 +737,6 @@ maybe_fight = function(team, weapon, enemy, enemy_target, hostile_goal, enemy_vi
         return STATUS_FAILURE
     end
 
-    if is_human(team) and weapon == "ckit" then
-        return STATUS_FAILURE
-    end
-
     if enemy_visible then
         return ctx:fight()
     end
@@ -778,6 +774,14 @@ local function maybe_heal_or_fight_alien(number, health_frac, enemy, enemy_targe
         return ctx:suicide()
     end
 
+    if alerted then
+        local status = maybe_fight("aliens", nil, enemy, enemy_target, hostile_goal, enemy_visible, ctx)
+        if status ~= STATUS_FAILURE then
+            note_alien_combat(number, level.time, 1500)
+        end
+        return status
+    end
+
     if needs_healing and not recently_attacked then
         local status = ctx:heal()
         if status ~= STATUS_FAILURE then
@@ -799,24 +803,6 @@ local function maybe_heal_or_fight_alien(number, health_frac, enemy, enemy_targe
         end
 
         return STATUS_FAILURE
-    end
-
-    if alerted then
-        if not low_tier_alien and health_frac < 0.4
-            and not in_safe_heal_area
-            and not recently_attacked
-            and base_rush_score < 1.0 then
-            local status = ctx:heal()
-            if status ~= STATUS_FAILURE then
-                return status
-            end
-        end
-
-        local status = maybe_fight("aliens", nil, enemy, enemy_target, hostile_goal, enemy_visible, ctx)
-        if status ~= STATUS_FAILURE then
-            note_alien_combat(number, level.time, 1500)
-        end
-        return status
     end
 
     if not low_tier_alien and health_frac < 0.4 and not in_safe_heal_area and not recently_attacked then
@@ -891,20 +877,36 @@ local function maybe_equip(team, number, level, ctx, mind, enemy_visible)
     return ctx:equip()
 end
 
-local function maybe_flee_human(team, weapon, enemy_visible, ctx)
-    if not is_human(team) or weapon ~= "ckit" or not enemy_visible then
-        return STATUS_FAILURE
-    end
-
-    return ctx:flee()
-end
-
 local function maybe_rush(builder, base_rush_score, ctx)
     if builder or base_rush_score <= 0.5 then
         return STATUS_FAILURE
     end
 
     return ctx:rush()
+end
+
+local function timed_rush_score(level)
+    local timelimit_minutes = cache.cvar_number("g_timelimit")
+    if timelimit_minutes <= 0 or not level or not level.time then
+        return 0
+    end
+
+    local timelimit_ms = timelimit_minutes * 60 * 1000
+    if timelimit_ms <= 0 then
+        return 0
+    end
+
+    local progress = level.time / timelimit_ms
+    if progress <= 0.5 then
+        return 0
+    end
+
+    local rush_score = (progress - 0.5) * 2
+    if rush_score > 1 then
+        return 1
+    end
+
+    return rush_score
 end
 
 local function combat_active(state)
@@ -1022,7 +1024,7 @@ local function run_builder_task(task, state, ctx)
         end
     end
 
-    if is_human(state.team) and state.client.weapon == "ckit" and state.enemy_visible then
+    if is_human(state.team) and state.builder and state.client.weapon == "ckit" and state.enemy_visible then
         status = ctx:flee()
         if status ~= STATUS_FAILURE then
             return status
@@ -1161,11 +1163,6 @@ local function run_roam_task(task, state, ctx)
         return status
     end
 
-    status = maybe_flee_human(state.team, state.weapon, state.enemy_visible, ctx)
-    if status ~= STATUS_FAILURE then
-        return status
-    end
-
     if state.builder then
         status = maybe_build(state.builder, state.selected_buildable, state.level, state.mind, state.number, ctx)
         if status ~= STATUS_FAILURE then
@@ -1252,7 +1249,7 @@ return function(self, ctx)
 
     local health_frac = health_fraction(client)
     local builder_elapsed = elapsed_since(level.time, mind.stuckTimer)
-    local base_rush_score = ctx.baseRushScore or 0
+    local base_rush_score = math.max(ctx.baseRushScore or 0, timed_rush_score(level))
 
     if not wants_build then
         mind.stuckTimer = level.time

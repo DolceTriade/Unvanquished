@@ -26,6 +26,7 @@ local OBSERVED_CVARS = {
     "g_bot_aliensenseRange",
     "g_bot_humansenseRange",
     "g_maxMiners",
+    "g_timelimit",
 }
 
 local function entity_ref(ent)
