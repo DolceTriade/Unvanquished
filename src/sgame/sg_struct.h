@@ -387,6 +387,14 @@ struct clientPersistant_t
 	bool            hasWarnings;
 
 	bool isFillerBot;
+
+	struct
+	{
+		int spreeCount;
+		int multikillCount;
+		int lastKillTime;
+		int lastVictimClientNum;
+	} quakeRewards;
 };
 
 struct unlagged_t
@@ -592,6 +600,7 @@ struct level_locals_t
 	int      sortedClients[ MAX_CLIENTS ]; // sorted by score
 
 	int      snd_fry; // sound index for standing in lava
+	bool     quakeFirstBloodClaimed;
 
 	// spawn variables
 	bool spawning; // the G_Spawn*() functions are valid
