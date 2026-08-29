@@ -660,6 +660,7 @@ void G_InitGame( int levelTime, int randomSeed, bool inClient )
 	G_CheckPmoveParamChanges();
 
 	G_InitDamageLocations();
+	QuakeRewards::Init();
 
 	G_InitMapRotations();
 
