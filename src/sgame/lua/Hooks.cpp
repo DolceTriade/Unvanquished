@@ -37,49 +37,87 @@ Maryland 20850 USA.
 #include "sgame/sg_local.h"
 
 #include "sgame/lua/Entity.h"
+#include "sgame/lua/Interpreter.h"
 #include "shared/lua/LuaLib.h"
 
 using Shared::Lua::LuaLib;
 using Shared::Lua::RegType;
 
 /// Register hooks to install callbacks on various game events.
-// Multiple callbacks can be registered for each event; however,
-// no callbacks may be unregistered.
+// Multiple callbacks can be registered for each event.
 /// @module hooks
 
 namespace Lua {
 
-using LuaHook = std::pair<lua_State*, int>;
+using HookList = std::vector<int>;
 
-static std::vector<LuaHook> chatHooks;
-static std::vector<LuaHook> clientConnectHooks;
-static std::vector<LuaHook> teamChangeHooks;
-static std::vector<LuaHook> playerSpawnHooks;
-static std::vector<LuaHook> gameEndHooks;
-static std::vector<LuaHook> buildableSpawnedHooks;
-static std::vector<LuaHook> missileSpawnedHooks;
-static std::vector<LuaHook> shutdownHooks;
+static HookList chatHooks;
+static HookList clientConnectHooks;
+static HookList teamChangeHooks;
+static HookList playerSpawnHooks;
+static HookList gameEndHooks;
+static HookList buildableSpawnedHooks;
+static HookList missileSpawnedHooks;
+static HookList shutdownHooks;
 
-void ClearHooks( lua_State* L, std::vector<LuaHook>& hooks )
+static int RegisterHook( lua_State* L, HookList& hooks )
 {
-	for ( const auto& hook : hooks )
+	if ( lua_isfunction( L, 1 ) )
 	{
-		luaL_unref( L, LUA_REGISTRYINDEX, hook.second );
+		lua_pushvalue( L, 1 );
+		int ref = luaL_ref( L, LUA_REGISTRYINDEX );
+		hooks.push_back( ref );
+		lua_pushinteger( L, ref );
+		return 1;
 	}
+	return 0;
+}
 
+static bool UnregisterHook( HookList& hooks, lua_Integer token )
+{
+	lua_State* L = State();
+	for ( int& ref : hooks )
+	{
+		if ( ref == token )
+		{
+			luaL_unref( L, LUA_REGISTRYINDEX, ref );
+			ref = LUA_REFNIL;
+			return true;
+		}
+	}
+	return false;
+}
+
+static int UnregisterHook( lua_State* L, HookList& hooks )
+{
+	lua_Integer token = luaL_checkinteger( L, 1 );
+	lua_pushboolean( L, UnregisterHook( hooks, token ) );
+	return 1;
+}
+
+static void ClearHooks( HookList& hooks )
+{
+	lua_State* L = State();
+	for ( int ref : hooks )
+	{
+		if ( ref != LUA_REFNIL )
+		{
+			luaL_unref( L, LUA_REGISTRYINDEX, ref );
+		}
+	}
 	hooks.clear();
 }
 
-void ClearAllHooks( lua_State* L )
+void ClearAllHooks()
 {
-	ClearHooks( L, chatHooks );
-	ClearHooks( L, clientConnectHooks );
-	ClearHooks( L, teamChangeHooks );
-	ClearHooks( L, playerSpawnHooks );
-	ClearHooks( L, gameEndHooks );
-	ClearHooks( L, buildableSpawnedHooks );
-	ClearHooks( L, missileSpawnedHooks );
-	ClearHooks( L, shutdownHooks );
+	ClearHooks( chatHooks );
+	ClearHooks( clientConnectHooks );
+	ClearHooks( teamChangeHooks );
+	ClearHooks( playerSpawnHooks );
+	ClearHooks( gameEndHooks );
+	ClearHooks( buildableSpawnedHooks );
+	ClearHooks( missileSpawnedHooks );
+	ClearHooks( shutdownHooks );
 }
 
 /// Install a callback that will be called for every chat message.
@@ -88,30 +126,37 @@ void ClearAllHooks( lua_State* L )
 // and message is just the message including any quake3 colors.
 // @function RegisterChatHook
 // @tparam function callback function(EntityProxy, team, message)
+// @treturn integer Opaque token for unregistering the hook.
 int RegisterChatHook( lua_State* L )
 {
-	if ( lua_isfunction( L, 1 ) )
-	{
-		int ref = luaL_ref( L, LUA_REGISTRYINDEX );
-		chatHooks.emplace_back( L, ref );
-	}
-	return 0;
+	return RegisterHook( L, chatHooks );
+}
+
+/// Unregister a chat hook previously returned by RegisterChatHook.
+// @function UnregisterChatHook
+// @tparam integer token Opaque hook token returned by RegisterChatHook.
+// @treturn boolean True if the hook was removed.
+int UnregisterChatHook( lua_State* L )
+{
+	return UnregisterHook( L, chatHooks );
 }
 
 void ExecChatHooks( gentity_t* ent, team_t team, Str::StringRef message )
 {
 	// nullptr ent can be for console chats.
 	if ( !ent ) return;
-	for ( const auto& hook : chatHooks )
+	lua_State* L = State();
+	for ( int ref : chatHooks )
 	{
-		lua_rawgeti( hook.first, LUA_REGISTRYINDEX, hook.second );
-		EntityProxy* proxy = Entity::CreateProxy( ent, hook.first );
-		LuaLib<EntityProxy>::push( hook.first, proxy );
-		lua_pushstring( hook.first, BG_TeamName( team ) );
-		lua_pushstring( hook.first, message.c_str() );
-		if ( lua_pcall( hook.first, 3, 0, 0 ) != 0 )
+		if ( ref == LUA_REFNIL ) continue;
+		lua_rawgeti( L, LUA_REGISTRYINDEX, ref );
+		EntityProxy* proxy = Entity::CreateProxy( ent, L );
+		LuaLib<EntityProxy>::push( L, proxy );
+		lua_pushstring( L, BG_TeamName( team ) );
+		lua_pushstring( L, message.c_str() );
+		if ( lua_pcall( L, 3, 0, 0 ) != 0 )
 		{
-			Log::Warn( "Could not run lua chat hook callback: %s", lua_tostring( hook.first, -1 ) );
+			Log::Warn( "Could not run lua chat hook callback: %s", lua_tostring( L, -1 ) );
 		}
 	}
 }
@@ -121,30 +166,37 @@ void ExecChatHooks( gentity_t* ent, team_t team, Str::StringRef message )
 // where connect = true for connect and false for disconnect.
 // @function RegisterClientConnectHook
 // @tparam function callback function(EntityProxy, connect)
+// @treturn integer Opaque token for unregistering the hook.
 int RegisterClientConnectHook( lua_State* L )
 {
-	if ( lua_isfunction( L, 1 ) )
-	{
-		int ref = luaL_ref( L, LUA_REGISTRYINDEX );
-		clientConnectHooks.emplace_back( L, ref );
-	}
-	return 0;
+	return RegisterHook( L, clientConnectHooks );
+}
+
+/// Unregister a client connect hook previously returned by RegisterClientConnectHook.
+// @function UnregisterClientConnectHook
+// @tparam integer token Opaque hook token returned by RegisterClientConnectHook.
+// @treturn boolean True if the hook was removed.
+int UnregisterClientConnectHook( lua_State* L )
+{
+	return UnregisterHook( L, clientConnectHooks );
 }
 
 void ExecClientConnectHooks( gentity_t* ent, bool connect )
 {
 	// nullptr ent can be for console chats.
 	if ( !ent ) return;
-	for ( const auto& hook : clientConnectHooks )
+	lua_State* L = State();
+	for ( int ref : clientConnectHooks )
 	{
-		lua_rawgeti( hook.first, LUA_REGISTRYINDEX, hook.second );
-		EntityProxy* proxy = Entity::CreateProxy( ent, hook.first );
-		LuaLib<EntityProxy>::push( hook.first, proxy );
-		lua_pushboolean( hook.first, connect );
-		if ( lua_pcall( hook.first, 2, 0, 0 ) != 0 )
+		if ( ref == LUA_REFNIL ) continue;
+		lua_rawgeti( L, LUA_REGISTRYINDEX, ref );
+		EntityProxy* proxy = Entity::CreateProxy( ent, L );
+		LuaLib<EntityProxy>::push( L, proxy );
+		lua_pushboolean( L, connect );
+		if ( lua_pcall( L, 2, 0, 0 ) != 0 )
 		{
 			Log::Warn( "Could not run lua client connect hook callback: %s",
-			           lua_tostring( hook.first, -1 ) );
+			           lua_tostring( L, -1 ) );
 		}
 	}
 }
@@ -154,30 +206,37 @@ void ExecClientConnectHooks( gentity_t* ent, bool connect )
 // where newTeam will be 'alien', 'human', 'spectator'.
 // @function RegisterTeamChangeHook
 // @tparam function callback function(EntityProxy, newTeam)
+// @treturn integer Opaque token for unregistering the hook.
 int RegisterTeamChangeHook( lua_State* L )
 {
-	if ( lua_isfunction( L, 1 ) )
-	{
-		int ref = luaL_ref( L, LUA_REGISTRYINDEX );
-		teamChangeHooks.emplace_back( L, ref );
-	}
-	return 0;
+	return RegisterHook( L, teamChangeHooks );
+}
+
+/// Unregister a team change hook previously returned by RegisterTeamChangeHook.
+// @function UnregisterTeamChangeHook
+// @tparam integer token Opaque hook token returned by RegisterTeamChangeHook.
+// @treturn boolean True if the hook was removed.
+int UnregisterTeamChangeHook( lua_State* L )
+{
+	return UnregisterHook( L, teamChangeHooks );
 }
 
 void ExecTeamChangeHooks( gentity_t* ent, team_t team )
 {
 	// nullptr ent can be for console chats.
 	if ( !ent ) return;
-	for ( const auto& hook : teamChangeHooks )
+	lua_State* L = State();
+	for ( int ref : teamChangeHooks )
 	{
-		lua_rawgeti( hook.first, LUA_REGISTRYINDEX, hook.second );
-		EntityProxy* proxy = Entity::CreateProxy( ent, hook.first );
-		LuaLib<EntityProxy>::push( hook.first, proxy );
-		lua_pushstring( hook.first, BG_TeamName( team ) );
-		if ( lua_pcall( hook.first, 2, 0, 0 ) != 0 )
+		if ( ref == LUA_REFNIL ) continue;
+		lua_rawgeti( L, LUA_REGISTRYINDEX, ref );
+		EntityProxy* proxy = Entity::CreateProxy( ent, L );
+		LuaLib<EntityProxy>::push( L, proxy );
+		lua_pushstring( L, BG_TeamName( team ) );
+		if ( lua_pcall( L, 2, 0, 0 ) != 0 )
 		{
 			Log::Warn( "Could not run lua team change hook callback: %s",
-			           lua_tostring( hook.first, -1 ) );
+			           lua_tostring( L, -1 ) );
 		}
 	}
 }
@@ -187,29 +246,36 @@ void ExecTeamChangeHooks( gentity_t* ent, team_t team )
 // The callback should be  function(EntityProxy).
 // @function RegisterPlayerSpawnHook
 // @tparam function callback function(EntityProxy)
+// @treturn integer Opaque token for unregistering the hook.
 int RegisterPlayerSpawnHook( lua_State* L )
 {
-	if ( lua_isfunction( L, 1 ) )
-	{
-		int ref = luaL_ref( L, LUA_REGISTRYINDEX );
-		playerSpawnHooks.emplace_back( L, ref );
-	}
-	return 0;
+	return RegisterHook( L, playerSpawnHooks );
+}
+
+/// Unregister a player spawn hook previously returned by RegisterPlayerSpawnHook.
+// @function UnregisterPlayerSpawnHook
+// @tparam integer token Opaque hook token returned by RegisterPlayerSpawnHook.
+// @treturn boolean True if the hook was removed.
+int UnregisterPlayerSpawnHook( lua_State* L )
+{
+	return UnregisterHook( L, playerSpawnHooks );
 }
 
 void ExecPlayerSpawnHooks( gentity_t* ent )
 {
 	// nullptr ent can be for console chats.
 	if ( !ent ) return;
-	for ( const auto& hook : playerSpawnHooks )
+	lua_State* L = State();
+	for ( int ref : playerSpawnHooks )
 	{
-		lua_rawgeti( hook.first, LUA_REGISTRYINDEX, hook.second );
-		EntityProxy* proxy = Entity::CreateProxy( ent, hook.first );
-		LuaLib<EntityProxy>::push( hook.first, proxy );
-		if ( lua_pcall( hook.first, 1, 0, 0 ) != 0 )
+		if ( ref == LUA_REFNIL ) continue;
+		lua_rawgeti( L, LUA_REGISTRYINDEX, ref );
+		EntityProxy* proxy = Entity::CreateProxy( ent, L );
+		LuaLib<EntityProxy>::push( L, proxy );
+		if ( lua_pcall( L, 1, 0, 0 ) != 0 )
 		{
 			Log::Warn( "Could not run lua player spawn hook callback: %s",
-			           lua_tostring( hook.first, -1 ) );
+			           lua_tostring( L, -1 ) );
 		}
 	}
 }
@@ -220,36 +286,47 @@ void ExecPlayerSpawnHooks( gentity_t* ent )
 // return false.
 // @function RegisterGameEndHook
 // @tparam function callback function()
+// @treturn integer Opaque token for unregistering the hook.
 int RegisterGameEndHook( lua_State* L )
 {
-	if ( lua_isfunction( L, 1 ) )
-	{
-		int ref = luaL_ref( L, LUA_REGISTRYINDEX );
-		gameEndHooks.emplace_back( L, ref );
-	}
-	return 0;
+	return RegisterHook( L, gameEndHooks );
+}
+
+/// Unregister a game end hook previously returned by RegisterGameEndHook.
+// @function UnregisterGameEndHook
+// @tparam integer token Opaque hook token returned by RegisterGameEndHook.
+// @treturn boolean True if the hook was removed.
+int UnregisterGameEndHook( lua_State* L )
+{
+	return UnregisterHook( L, gameEndHooks );
 }
 
 team_t ExecGameEndHooks()
 {
-	for ( const auto& hook : gameEndHooks )
+	lua_State* L = State();
+	for ( int ref : gameEndHooks )
 	{
-		lua_rawgeti( hook.first, LUA_REGISTRYINDEX, hook.second );
-		if ( lua_pcall( hook.first, 0, 1, 0 ) != 0 )
+		if ( ref == LUA_REFNIL ) continue;
+		lua_rawgeti( L, LUA_REGISTRYINDEX, ref );
+		if ( lua_pcall( L, 0, 1, 0 ) != 0 )
 		{
 			Log::Warn( "Could not run lua game end hook callback: %s",
-			           lua_tostring( hook.first, -1 ) );
+			           lua_tostring( L, -1 ) );
 		}
-		if ( lua_toboolean( hook.first, -1 ) )
+		if ( lua_toboolean( L, -1 ) )
 		{
-			const char* teamName = luaL_checkstring( hook.first, -1 );
+			const char* teamName = luaL_checkstring( L, -1 );
 			team_t team = BG_PlayableTeamFromString( teamName );
 			if ( team != TEAM_NONE )
 			{
-				lua_pop( hook.first, -1 );
+				lua_pop( L, 1 );
 				return team;
 			}
-			lua_pop( hook.first, -1 );
+			lua_pop( L, 1 );
+		}
+		else
+		{
+			lua_pop( L, 1 );
 		}
 	}
 	return TEAM_NONE;
@@ -259,29 +336,36 @@ team_t ExecGameEndHooks()
 // The callback should be function(EntityProxy).
 // @function RegisterBuildableSpawnedHook
 // @tparam function callback function(EntityProxy)
+// @treturn integer Opaque token for unregistering the hook.
 int RegisterBuildableSpawnedHook( lua_State* L )
 {
-	if ( lua_isfunction( L, 1 ) )
-	{
-		int ref = luaL_ref( L, LUA_REGISTRYINDEX );
-		buildableSpawnedHooks.emplace_back( L, ref );
-	}
-	return 0;
+	return RegisterHook( L, buildableSpawnedHooks );
+}
+
+/// Unregister a buildable spawned hook previously returned by RegisterBuildableSpawnedHook.
+// @function UnregisterBuildableSpawnedHook
+// @tparam integer token Opaque hook token returned by RegisterBuildableSpawnedHook.
+// @treturn boolean True if the hook was removed.
+int UnregisterBuildableSpawnedHook( lua_State* L )
+{
+	return UnregisterHook( L, buildableSpawnedHooks );
 }
 
 void ExecBuildableSpawnedHooks( gentity_t* ent )
 {
 	// nullptr ent can be for console chats.
 	if ( !ent ) return;
-	for ( const auto& hook : buildableSpawnedHooks )
+	lua_State* L = State();
+	for ( int ref : buildableSpawnedHooks )
 	{
-		lua_rawgeti( hook.first, LUA_REGISTRYINDEX, hook.second );
-		EntityProxy* proxy = Entity::CreateProxy( ent, hook.first );
-		LuaLib<EntityProxy>::push( hook.first, proxy );
-		if ( lua_pcall( hook.first, 1, 0, 0 ) != 0 )
+		if ( ref == LUA_REFNIL ) continue;
+		lua_rawgeti( L, LUA_REGISTRYINDEX, ref );
+		EntityProxy* proxy = Entity::CreateProxy( ent, L );
+		LuaLib<EntityProxy>::push( L, proxy );
+		if ( lua_pcall( L, 1, 0, 0 ) != 0 )
 		{
 			Log::Warn( "Could not run lua buildable spawned hook callback: %s",
-			           lua_tostring( hook.first, -1 ) );
+			           lua_tostring( L, -1 ) );
 		}
 	}
 }
@@ -290,29 +374,36 @@ void ExecBuildableSpawnedHooks( gentity_t* ent )
 // The callback should be function(EntityProxy).
 // @function RegisterMissileSpawnedHook
 // @tparam function callback function(EntityProxy)
+// @treturn integer Opaque token for unregistering the hook.
 int RegisterMissileSpawnedHook( lua_State* L )
 {
-	if ( lua_isfunction( L, 1 ) )
-	{
-		int ref = luaL_ref( L, LUA_REGISTRYINDEX );
-		missileSpawnedHooks.emplace_back( L, ref );
-	}
-	return 0;
+	return RegisterHook( L, missileSpawnedHooks );
+}
+
+/// Unregister a missile spawned hook previously returned by RegisterMissileSpawnedHook.
+// @function UnregisterMissileSpawnedHook
+// @tparam integer token Opaque hook token returned by RegisterMissileSpawnedHook.
+// @treturn boolean True if the hook was removed.
+int UnregisterMissileSpawnedHook( lua_State* L )
+{
+	return UnregisterHook( L, missileSpawnedHooks );
 }
 
 void ExecMissileSpawnedHooks( gentity_t* ent )
 {
 	// nullptr ent can be for console chats.
 	if ( !ent ) return;
-	for ( const auto& hook : missileSpawnedHooks )
+	lua_State* L = State();
+	for ( int ref : missileSpawnedHooks )
 	{
-		lua_rawgeti( hook.first, LUA_REGISTRYINDEX, hook.second );
-		EntityProxy* proxy = Entity::CreateProxy( ent, hook.first );
-		LuaLib<EntityProxy>::push( hook.first, proxy );
-		if ( lua_pcall( hook.first, 1, 0, 0 ) != 0 )
+		if ( ref == LUA_REFNIL ) continue;
+		lua_rawgeti( L, LUA_REGISTRYINDEX, ref );
+		EntityProxy* proxy = Entity::CreateProxy( ent, L );
+		LuaLib<EntityProxy>::push( L, proxy );
+		if ( lua_pcall( L, 1, 0, 0 ) != 0 )
 		{
 			Log::Warn( "Could not run lua missile spawned hook callback: %s",
-			           lua_tostring( hook.first, -1 ) );
+			           lua_tostring( L, -1 ) );
 		}
 	}
 }
@@ -321,25 +412,32 @@ void ExecMissileSpawnedHooks( gentity_t* ent )
 // The callback should be function().
 // @function RegisterShutdownHook
 // @tparam function callback function()
+// @treturn integer Opaque token for unregistering the hook.
 int RegisterShutdownHook( lua_State* L )
 {
-	if ( lua_isfunction( L, 1 ) )
-	{
-		int ref = luaL_ref( L, LUA_REGISTRYINDEX );
-		shutdownHooks.emplace_back( L, ref );
-	}
-	return 0;
+	return RegisterHook( L, shutdownHooks );
+}
+
+/// Unregister a shutdown hook previously returned by RegisterShutdownHook.
+// @function UnregisterShutdownHook
+// @tparam integer token Opaque hook token returned by RegisterShutdownHook.
+// @treturn boolean True if the hook was removed.
+int UnregisterShutdownHook( lua_State* L )
+{
+	return UnregisterHook( L, shutdownHooks );
 }
 
 void ExecShutdownHooks()
 {
-	for ( const auto& hook : shutdownHooks )
+	lua_State* L = State();
+	for ( int ref : shutdownHooks )
 	{
-		lua_rawgeti( hook.first, LUA_REGISTRYINDEX, hook.second );
-		if ( lua_pcall( hook.first, 0, 0, 0 ) != 0 )
+		if ( ref == LUA_REFNIL ) continue;
+		lua_rawgeti( L, LUA_REGISTRYINDEX, ref );
+		if ( lua_pcall( L, 0, 0, 0 ) != 0 )
 		{
 			Log::Warn( "Could not run lua shutdown hook callback: %s",
-			           lua_tostring( hook.first, -1 ) );
+			           lua_tostring( L, -1 ) );
 		}
 	}
 }
@@ -366,23 +464,39 @@ LUACORETYPEDEFINE( ::Lua::Hooks )
 template <>
 void ExtraInit<::Lua::Hooks>( lua_State* L, int metatable_index )
 {
-	::Lua::ClearAllHooks( L );
+	::Lua::ClearAllHooks();
 	lua_pushcfunction( L, ::Lua::RegisterChatHook );
 	lua_setfield( L, metatable_index - 1, "RegisterChatHook" );
+	lua_pushcfunction( L, ::Lua::UnregisterChatHook );
+	lua_setfield( L, metatable_index - 1, "UnregisterChatHook" );
 	lua_pushcfunction( L, ::Lua::RegisterClientConnectHook );
 	lua_setfield( L, metatable_index - 1, "RegisterClientConnectHook" );
+	lua_pushcfunction( L, ::Lua::UnregisterClientConnectHook );
+	lua_setfield( L, metatable_index - 1, "UnregisterClientConnectHook" );
 	lua_pushcfunction( L, ::Lua::RegisterTeamChangeHook );
 	lua_setfield( L, metatable_index - 1, "RegisterTeamChangeHook" );
+	lua_pushcfunction( L, ::Lua::UnregisterTeamChangeHook );
+	lua_setfield( L, metatable_index - 1, "UnregisterTeamChangeHook" );
 	lua_pushcfunction( L, ::Lua::RegisterPlayerSpawnHook );
 	lua_setfield( L, metatable_index - 1, "RegisterPlayerSpawnHook" );
+	lua_pushcfunction( L, ::Lua::UnregisterPlayerSpawnHook );
+	lua_setfield( L, metatable_index - 1, "UnregisterPlayerSpawnHook" );
 	lua_pushcfunction( L, ::Lua::RegisterGameEndHook );
 	lua_setfield( L, metatable_index - 1, "RegisterGameEndHook" );
+	lua_pushcfunction( L, ::Lua::UnregisterGameEndHook );
+	lua_setfield( L, metatable_index - 1, "UnregisterGameEndHook" );
 	lua_pushcfunction( L, ::Lua::RegisterBuildableSpawnedHook );
 	lua_setfield( L, metatable_index - 1, "RegisterBuildableSpawnedHook" );
+	lua_pushcfunction( L, ::Lua::UnregisterBuildableSpawnedHook );
+	lua_setfield( L, metatable_index - 1, "UnregisterBuildableSpawnedHook" );
 	lua_pushcfunction( L, ::Lua::RegisterMissileSpawnedHook );
 	lua_setfield( L, metatable_index - 1, "RegisterMissileSpawnedHook" );
+	lua_pushcfunction( L, ::Lua::UnregisterMissileSpawnedHook );
+	lua_setfield( L, metatable_index - 1, "UnregisterMissileSpawnedHook" );
 	lua_pushcfunction( L, ::Lua::RegisterShutdownHook );
 	lua_setfield( L, metatable_index - 1, "RegisterShutdownHook" );
+	lua_pushcfunction( L, ::Lua::UnregisterShutdownHook );
+	lua_setfield( L, metatable_index - 1, "UnregisterShutdownHook" );
 }
 }  // namespace Lua
 }  // namespace Shared
