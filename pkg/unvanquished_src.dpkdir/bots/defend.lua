@@ -237,18 +237,18 @@ local function maybe_defend_as_alien(client, attack_active, enemy_visible, ctx, 
     return STATUS_FAILURE
 end
 
-local function roam_friendly_base(team, ctx)
-    if is_alien(team) then
+local function roam_friendly_base(state, ctx)
+    if is_alien(state.team) then
         local status = maybe_evolve(state.self, state.team, state.client, state.enemy_visible,
             state.level, ctx)
         if status ~= STATUS_FAILURE then
             return status
         end
-        local status = roam_buildings(ctx, { "overmind", "eggpod", "booster" }, 500)
+        status = roam_buildings(ctx, { "overmind", "eggpod", "booster" }, 500)
         return status ~= STATUS_FAILURE and status or ctx:roam()
     end
 
-    if is_human(team) then
+    if is_human(state.team) then
         local status = roam_buildings(ctx, { "reactor", "telenode", "arm", "medistat" }, 500)
         return status ~= STATUS_FAILURE and status or ctx:roam()
     end
@@ -364,8 +364,13 @@ local COMBAT_TASK = {
         end
 
         if is_alien(state.team) then
-            return maybe_defend_as_alien(state.client, defend_attack_active(state),
+            status = maybe_defend_as_alien(state.client, defend_attack_active(state),
                 state.enemy_visible, ctx, state.mind)
+            if status ~= STATUS_FAILURE then
+                return status
+            end
+
+            return roam_friendly_base(state, ctx)
         end
 
         return maybe_fight_human(state.team, state.client, state.enemy_visible,
@@ -437,7 +442,7 @@ local HOLD_TASK = {
         return defend_attack_active(state)
     end,
     run = function(_, state, ctx)
-        return roam_friendly_base(state.team, ctx)
+        return roam_friendly_base(state, ctx)
     end,
 }
 
@@ -517,5 +522,10 @@ return function(self, ctx)
     end
 
     task = TASKS.start(self.number, select_task(state))
-    return TASKS.run(task, state, ctx)
+    status = TASKS.run(task, state, ctx)
+    if status ~= STATUS_FAILURE then
+        return status
+    end
+
+    return ctx:roam()
 end
