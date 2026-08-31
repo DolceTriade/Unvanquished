@@ -20,6 +20,7 @@ local recently_attacked = common.recently_attacked
 local use_medkit_if_low = common.use_medkit_if_low
 local try_evolve_targets = common.try_evolve_targets
 local human_repair_target_info = common.human_repair_target_info
+local roam_buildings = common.roam_buildings
 local unstick = common.unstick
 local STATE = {
     alien_target_lock = {},
@@ -28,6 +29,7 @@ local STATE = {
     build_failures = {},
     build_retry_after = {},
     build_reposition_until = {},
+    human_equip_retry_at = {},
     tasks = {},
 }
 
@@ -38,6 +40,7 @@ local PVE_BUILD_FAILURE_MAX_DELAY_MS = 5000
 local PVE_BUILD_REPOSITION_THRESHOLD = 3
 local PVE_BUILD_REPOSITION_MS = 2000
 local PVE_HUMAN_BUILDER_SEARCH_MS = 4000
+local PVE_HUMAN_PRESSURE_RADIUS = 500
 local ALIEN_EVOLVE_TARGETS = common.ALIEN_EVOLVE_TARGETS
 local ALIEN_COMBAT_TARGETS = common.ALIEN_COMBAT_TARGETS
 local function random_choice(options)
@@ -417,7 +420,10 @@ local function choose_pve_buildable(team_name, team_snapshot)
         local arms = team_snapshot.buildables.arm or 0
         local medis = team_snapshot.buildables.medistat or 0
         local can_build_telenode = telenodes < cache.cvar_number("g_bot_buildNumTelenodes")
-        local support = nil
+        local support_options = {}
+        local defense_weight = 12
+        local spawn_weight = can_build_telenode and 9 or 0
+        local support_weight = 2
 
         if (team_snapshot.buildables.reactor or 0) == 0 then
             return "reactor"
@@ -427,17 +433,30 @@ local function choose_pve_buildable(team_name, team_snapshot)
             return "drill"
         end
 
-        if arms == 0 and medis == 0 then
-            support = random(2) == 1 and "arm" or "medistat"
-        elseif arms == 0 then
-            support = "arm"
-        elseif medis == 0 then
-            support = "medistat"
+        if arms == 0 then
+            support_options[#support_options + 1] = "arm"
+            support_weight = support_weight + 2
         end
 
-        local roll = random(10)
+        if medis == 0 then
+            support_options[#support_options + 1] = "medistat"
+            support_weight = support_weight + 2
+        end
 
-        if roll <= 6 then
+        if #support_options == 0 then
+            support_options = { "arm", "medistat" }
+        end
+
+        if telenodes == 0 then
+            spawn_weight = spawn_weight + 5
+        elseif telenodes == 1 then
+            spawn_weight = spawn_weight + 3
+        end
+
+        local total_weight = defense_weight + spawn_weight + support_weight
+        local roll = random(total_weight)
+
+        if roll <= defense_weight then
             if cache.buildable_unlocked("humans", "rocketpod")
                 and random() < cache.cvar_number("g_bot_buildProbRocketPod") then
                 return "rocketpod"
@@ -446,24 +465,12 @@ local function choose_pve_buildable(team_name, team_snapshot)
             return "mgturret"
         end
 
-        if roll <= 9 and can_build_telenode then
+        roll = roll - defense_weight
+        if can_build_telenode and roll <= spawn_weight then
             return "telenode"
         end
 
-        if support then
-            return support
-        end
-
-        if can_build_telenode then
-            return "telenode"
-        end
-
-        if cache.buildable_unlocked("humans", "rocketpod")
-            and random() < cache.cvar_number("g_bot_buildProbRocketPod") then
-            return "rocketpod"
-        end
-
-        return "mgturret"
+        return random_choice(support_options)
     end
 
     if is_alien(team_name) then
@@ -663,7 +670,54 @@ local function human_repair_target(mind)
     return info and info.target or nil
 end
 
+local function roam_enemy_base(team, ctx)
+    if is_human(team) then
+        local status = roam_buildings(ctx, { "overmind", "eggpod" }, PVE_HUMAN_PRESSURE_RADIUS)
+        return status ~= STATUS_FAILURE and status or ctx:roam()
+    end
+
+    if is_alien(team) then
+        local status = roam_buildings(ctx, { "reactor", "telenode" }, PVE_HUMAN_PRESSURE_RADIUS)
+        return status ~= STATUS_FAILURE and status or ctx:roam()
+    end
+
+    return STATUS_FAILURE
+end
+
 local maybe_fight
+
+local function has_human_ammo(client, weapon_attr)
+    if not weapon_attr or weapon_attr.ammo <= 0 then
+        return true
+    end
+
+    return (client.ammo or 0) > 0
+end
+
+local function out_of_human_ammo(client, weapon_attr)
+    if not weapon_attr or weapon_attr.ammo <= 0 then
+        return false
+    end
+
+    return (client.ammo or 0) <= 0
+end
+
+local function human_armoury_distance(mind)
+    return building_distance(mind, "arm")
+end
+
+local function human_resupply_phase(number, level, client, weapon_attr, mind)
+    if out_of_human_ammo(client, weapon_attr) then
+        local armoury_distance = human_armoury_distance(mind)
+        if armoury_distance and armoury_distance < 500 then
+            return "equip"
+        end
+
+        return "move_to_arm"
+    end
+
+    return nil
+end
 
 local function maybe_retire_builder(team, number, client, builder, wants_build, level, ctx, mind)
     if not builder or wants_build then
@@ -877,6 +931,30 @@ local function maybe_equip(team, number, level, ctx, mind, enemy_visible)
     return ctx:equip()
 end
 
+local function maybe_resupply_human(team, number, level, client, weapon_attr, mind, ctx)
+    if not is_human(team) then
+        return STATUS_FAILURE
+    end
+
+    if has_builder_assignment(number) or client.weapon == "ckit" then
+        return STATUS_FAILURE
+    end
+
+    local phase = human_resupply_phase(number, level, client, weapon_attr, mind)
+    if phase == "equip" then
+        return ctx:equip()
+    end
+
+    if phase == "move_to_arm" then
+        local status = ctx:roamInRadius("arm", PVE_HUMAN_PRESSURE_RADIUS)
+        if status ~= STATUS_FAILURE then
+            return status
+        end
+    end
+
+    return STATUS_FAILURE
+end
+
 local function maybe_rush(builder, base_rush_score, ctx)
     if builder or base_rush_score <= 0.5 then
         return STATUS_FAILURE
@@ -952,15 +1030,23 @@ local function run_builder_task(task, state, ctx)
             or human_repair_target(state.mind) then
             task.phase = "acquire"
         else
-            local status = maybe_fight(state.team, state.client.weapon, state.enemy, state.enemy_target,
-                state.hostile_goal, state.enemy_visible, ctx)
-            if status ~= STATUS_FAILURE then
-                return status
-            end
+            local status = nil
 
             status = maybe_reload(state.team, state.client, state.weapon_attr, state.level, ctx, state.mind, state.enemy_visible)
             if status ~= STATUS_FAILURE then
                 return status
+            end
+
+            status = maybe_resupply_human(state.team, state.number, state.level, state.client, state.weapon_attr, state.mind, ctx)
+            if status ~= STATUS_FAILURE then
+                return status
+            end
+
+            if state.enemy_visible then
+                status = ctx:flee()
+                if status ~= STATUS_FAILURE then
+                    return status
+                end
             end
 
             status = ctx:roam()
@@ -1047,7 +1133,7 @@ local function run_builder_task(task, state, ctx)
 end
 
 local function should_preempt_builder_task(task, state, ctx)
-    return not state.wants_build or urgent_combat(state)
+    return not state.wants_build
 end
 
 local function new_builder_task()
@@ -1163,6 +1249,11 @@ local function run_roam_task(task, state, ctx)
         return status
     end
 
+    status = maybe_resupply_human(state.team, state.number, state.level, state.client, state.weapon_attr, state.mind, ctx)
+    if status ~= STATUS_FAILURE then
+        return status
+    end
+
     if state.builder then
         status = maybe_build(state.builder, state.selected_buildable, state.level, state.mind, state.number, ctx)
         if status ~= STATUS_FAILURE then
@@ -1175,7 +1266,7 @@ local function run_roam_task(task, state, ctx)
         return status
     end
 
-    return ctx:roam()
+    return roam_enemy_base(state.team, ctx)
 end
 
 local function should_preempt_roam_task(task, state, ctx)
@@ -1192,7 +1283,7 @@ local function new_roam_task()
 end
 
 select_task = function(state)
-    if state.wants_build and not urgent_combat(state) then
+    if state.wants_build then
         return new_builder_task()
     end
 
