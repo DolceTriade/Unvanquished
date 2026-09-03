@@ -398,11 +398,6 @@ static void CG_Obituary( entityState_t *ent )
 				messageAssisted = G_( "%s%s ^*was fried by the reactor; %s%s%s^* assisted" );
 				break;
 
-			case MOD_SLOWBLOB:
-				message = G_( "%s%s ^*couldn't avoid the granger" );
-				messageAssisted = G_( "%s%s ^*couldn't avoid the granger; %s%s%s^* assisted" );
-				break;
-
 			case MOD_SWARM:
 				message = G_( "%s%s ^*was consumed by the swarm" );
 				messageAssisted = G_( "%s%s ^*was consumed by the swarm; %s%s%s^* assisted" );
@@ -519,6 +514,11 @@ static void CG_Obituary( entityState_t *ent )
 			case MOD_ABUILDER_CLAW:
 				message = G_( "%s%s ^*was gently nibbled by %s%s%s^*'s granger" );
 				messageAssisted = G_( "%s%s ^*was gently nibbled by %s%s%s^*'s granger; %s%s%s^* assisted" );
+				break;
+
+			case MOD_SLOWBLOB:
+				message = G_( "%s%s ^*couldn't avoid %s%s%s^*'s granger" );
+				messageAssisted = G_( "%s%s ^*couldn't avoid %s%s%s^*'s granger; %s%s%s^* assisted" );
 				break;
 
 			case MOD_LEVEL0_BITE:

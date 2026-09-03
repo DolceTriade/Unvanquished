@@ -118,11 +118,6 @@ gentity_t *GetEffectiveAttackerEntity( gentity_t *source )
 	return nullptr;
 }
 
-bool IsGrangerClass( class_t pcl )
-{
-	return pcl == PCL_ALIEN_BUILDER0 || pcl == PCL_ALIEN_BUILDER0_UPG;
-}
-
 bool IsHumiliationKill( gentity_t *attacker, meansOfDeath_t meansOfDeath )
 {
 	if ( !attacker || !attacker->client )
@@ -130,14 +125,8 @@ bool IsHumiliationKill( gentity_t *attacker, meansOfDeath_t meansOfDeath )
 		return false;
 	}
 
-	class_t attackerClass = static_cast<class_t>( attacker->client->ps.stats[ STAT_CLASS ] );
 
-	if ( meansOfDeath == MOD_BLASTER )
-	{
-		return G_Team( attacker ) == TEAM_HUMANS;
-	}
-
-	return meansOfDeath == MOD_ABUILDER_CLAW && IsGrangerClass( attackerClass );
+	return meansOfDeath == MOD_ABUILDER_CLAW || meansOfDeath == MOD_SLOWBLOB || meansOfDeath == MOD_BLASTER;
 }
 
 Reward MakeReward( RewardKind kind, int soundIndex, const char *label, bool globalText = false, bool negative = false )
