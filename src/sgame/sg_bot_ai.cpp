@@ -704,6 +704,52 @@ AINodeStatus_t BotActionFireWeapon( gentity_t *self, AIGenericNode_t* )
 	return STATUS_SUCCESS;
 }
 
+static AINodeStatus_t BotActionFireExact( gentity_t *self, weaponMode_t mode )
+{
+	if ( WeaponIsEmpty( BG_GetPlayerWeapon( &self->client->ps ), &self->client->ps ) && G_Team( self ) == TEAM_HUMANS )
+	{
+		G_ForceWeaponChange( self, WP_BLASTER );
+	}
+
+	if ( BG_GetPlayerWeapon( &self->client->ps ) == WP_HBUILD )
+	{
+		G_ForceWeaponChange( self, WP_BLASTER );
+	}
+
+	if ( self->botMind->goal.isValid() )
+	{
+		if ( self->botMind->goal.targetsValidEntity()
+		  && ( G_Team( self->botMind->goal.getTargetedEntity() ) != G_Team( self ) ) )
+		{
+			BotAimAtEnemy( self );
+		}
+		else
+		{
+			glm::vec3 pos = self->botMind->goal.getPos();
+			BotSlowAim( self, pos, 0.5 );
+			BotAimAtLocation( self, pos );
+		}
+	}
+
+	BotFireWeapon( mode, &self->botMind->cmdBuffer );
+	return STATUS_SUCCESS;
+}
+
+AINodeStatus_t BotActionFirePrimary( gentity_t *self, AIGenericNode_t* )
+{
+	return BotActionFireExact( self, WPM_PRIMARY );
+}
+
+AINodeStatus_t BotActionFireSecondary( gentity_t *self, AIGenericNode_t* )
+{
+	return BotActionFireExact( self, WPM_SECONDARY );
+}
+
+AINodeStatus_t BotActionFireTertiary( gentity_t *self, AIGenericNode_t* )
+{
+	return BotActionFireExact( self, WPM_TERTIARY );
+}
+
 AINodeStatus_t BotActionTeleport( gentity_t *self, AIGenericNode_t *node )
 {
 	AIActionNode_t *action = ( AIActionNode_t * ) node;
@@ -805,6 +851,19 @@ AINodeStatus_t BotActionMoveInDir( gentity_t *self, AIGenericNode_t *node )
 	}
 	BotMoveInDir( self, dir );
 	return STATUS_SUCCESS;
+}
+
+AINodeStatus_t BotActionJumpInDir( gentity_t *self, AIGenericNode_t *node )
+{
+	AIActionNode_t *a = ( AIActionNode_t * ) node;
+	int dir = AIUnBoxInt( a->params[ 0 ] );
+	if ( a->nparams == 2 )
+	{
+		dir |= AIUnBoxInt( a->params[ 1 ] );
+	}
+
+	BotMoveInDir( self, dir );
+	return BotJump( self ) ? STATUS_SUCCESS : STATUS_FAILURE;
 }
 
 AINodeStatus_t BotActionStrafeDodge( gentity_t *self, AIGenericNode_t* )

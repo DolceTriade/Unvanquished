@@ -951,6 +951,45 @@ static float BotAimAngle( gentity_t *self, const glm::vec3 &pos )
 	return glm::degrees( glm::angle( glm::normalize( forward ), glm::normalize( ideal ) ) );
 }
 
+bool BotEnemyIsAbandoned( const gentity_t *self, const gentity_t *enemy )
+{
+	if ( !self || !self->botMind || !enemy )
+	{
+		return false;
+	}
+
+	if ( self->botMind->abandonedEnemyUntil <= level.time )
+	{
+		return false;
+	}
+
+	const gentity_t *abandonedEnemy = self->botMind->abandonedEnemy.get();
+	return abandonedEnemy && abandonedEnemy == enemy;
+}
+
+void BotAbandonEnemy( gentity_t *self, const gentity_t *enemy, int durationMs, bool clearGoal )
+{
+	if ( !self || !self->botMind || !enemy )
+	{
+		return;
+	}
+
+	self->botMind->abandonedEnemy = enemy;
+	self->botMind->abandonedEnemyUntil = level.time + std::max( 0, durationMs );
+
+	if ( self->botMind->bestEnemy.goal.getTargetedEntity() == enemy )
+	{
+		self->botMind->bestEnemy.goal.clear();
+		self->botMind->bestEnemy.distance = std::numeric_limits<float>::max();
+	}
+
+	if ( clearGoal && self->botMind->goal.getTargetedEntity() == enemy )
+	{
+		self->botMind->goal.clear();
+		self->botMind->clearNav();
+	}
+}
+
 gentity_t* BotFindBestEnemy( gentity_t *self )
 {
 	float bestVisibleEnemyScore = 0.0f;
@@ -967,6 +1006,11 @@ gentity_t* BotFindBestEnemy( gentity_t *self )
 		float newScore;
 
 		if ( !BotEntityIsValidEnemyTarget( self, target ) )
+		{
+			continue;
+		}
+
+		if ( BotEnemyIsAbandoned( self, target ) )
 		{
 			continue;
 		}
@@ -2619,7 +2663,15 @@ void BotPain( gentity_t *self, gentity_t *attacker, int )
 		&& attacker->s.eType == entityType_t::ET_PLAYER
 		&& self->botMind->skillSet[BOT_B_PAIN] )
 	{
+		if ( BotEnemyIsAbandoned( self, attacker ) )
+		{
+			self->botMind->abandonedEnemy = nullptr;
+			self->botMind->abandonedEnemyUntil = 0;
+		}
+
 		self->botMind->painTime = level.time;
+		self->botMind->bestEnemy.goal = attacker;
+		self->botMind->bestEnemy.distance = Distance( self->s.origin, attacker->s.origin );
 
 		BotPushEnemy( &self->botMind->enemyQueue, attacker );
 	}
@@ -2634,7 +2686,7 @@ void BotSearchForEnemy( gentity_t *self )
 	do
 	{
 		enemy = BotPopEnemy( queue );
-	} while ( enemy && !BotEntityIsValidEnemyTarget( self, enemy ) );
+	} while ( enemy && ( !BotEntityIsValidEnemyTarget( self, enemy ) || BotEnemyIsAbandoned( self, enemy ) ) );
 
 	self->botMind->bestEnemy.goal = enemy;
 

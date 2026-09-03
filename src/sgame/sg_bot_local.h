@@ -230,6 +230,8 @@ struct botMemory_t
 
 		enemyQueue_t enemyQueue;
 		int enemyLastSeen;
+		GentityConstRef abandonedEnemy;
+		int abandonedEnemyUntil;
 		int painTime; // level.time of the last time the bot was shot
 		int seenEnemyTime; // level.time of the last time the bot had a visible enemy
 

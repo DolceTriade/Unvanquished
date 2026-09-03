@@ -1372,10 +1372,11 @@ static bool GuessBuildPlacementCandidate( buildable_t buildable, const vec3_t re
 	{
 		return false;
 	}
-
-	if ( ValidateBuildPlacement( nullptr, buildable, surfaceTrace.endpos, surfaceTrace.plane.normal,
-	                             nullptr, BuildPlacementMode::GHOST ) != IBE_NONE )
+	auto reason = IBE_NONE;
+	if ( ( reason = ValidateBuildPlacement( nullptr, buildable, surfaceTrace.endpos, surfaceTrace.plane.normal,
+	                             nullptr, BuildPlacementMode::GHOST ) ) != IBE_NONE )
 	{
+		Log::Warn("Could not place because: %d", reason);
 		return false;
 	}
 
@@ -1384,6 +1385,47 @@ static bool GuessBuildPlacementCandidate( buildable_t buildable, const vec3_t re
 	VectorSubtract( guessedOrigin, requestedOrigin, delta );
 	distanceSquared = VectorLengthSquared( delta );
 	return true;
+}
+
+static bool GuessBuildPlacementPlayable( buildable_t buildable, const vec3_t requestedOrigin,
+                                         const vec3_t guessedOrigin, const vec3_t guessedNormal )
+{
+	vec3_t buildableMins, buildableMaxs;
+	vec3_t playerMins, playerMaxs;
+	vec3_t accessPoint;
+	trace_t trace;
+	float buildableRadius, playerRadius, displacement;
+
+	BG_BuildableBoundingBox( buildable, buildableMins, buildableMaxs );
+
+	// Use the owning team's builder hull as a conservative proxy for "a player can stand here".
+	if ( BG_Buildable( buildable )->team == TEAM_ALIENS )
+	{
+		BG_ClassBoundingBox( PCL_ALIEN_BUILDER0_UPG, playerMins, playerMaxs, nullptr, nullptr, nullptr );
+	}
+	else
+	{
+		BG_ClassBoundingBox( PCL_HUMAN_NAKED, playerMins, playerMaxs, nullptr, nullptr, nullptr );
+	}
+
+	buildableRadius = std::max( VectorLength( buildableMins ), VectorLength( buildableMaxs ) );
+	playerRadius = std::max( VectorLength( playerMins ), VectorLength( playerMaxs ) );
+	displacement = buildableRadius + playerRadius + 1.0f;
+
+	VectorMA( guessedOrigin, displacement, guessedNormal, accessPoint );
+
+	// Reject placements that require crossing solid space from the requested point to the
+	// candidate's playable side. This keeps the guesser from snapping through walls into sealed
+	// pockets or backfaces of inaccessible rooms.
+	trap_Trace( &trace, requestedOrigin, nullptr, nullptr, accessPoint, ENTITYNUM_NONE, MASK_PLAYERSOLID, 0 );
+	if ( trace.startsolid || trace.fraction < 1.0f )
+	{
+		return false;
+	}
+
+	// Also require a player-sized hull to fit at that access point.
+	trap_Trace( &trace, accessPoint, playerMins, playerMaxs, accessPoint, ENTITYNUM_NONE, MASK_PLAYERSOLID, 0 );
+	return !trace.startsolid && trace.fraction == 1.0f;
 }
 
 static bool GuessBuildPlacement( buildable_t buildable, const vec3_t requestedOrigin,
@@ -1419,6 +1461,11 @@ static bool GuessBuildPlacement( buildable_t buildable, const vec3_t requestedOr
 		float candidateDistanceSquared;
 		if ( !GuessBuildPlacementCandidate( buildable, requestedOrigin, probeNormals[ i ],
 		                                    candidateOrigin, candidateNormal, candidateDistanceSquared ) )
+		{
+			continue;
+		}
+
+		if ( !GuessBuildPlacementPlayable( buildable, requestedOrigin, candidateOrigin, candidateNormal ) )
 		{
 			continue;
 		}
