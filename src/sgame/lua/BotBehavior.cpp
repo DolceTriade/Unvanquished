@@ -443,7 +443,8 @@ static bool BoxLuaActionValue( lua_State *L, const char *actionName, int index, 
 			return true;
 		}
 
-		if ( !Q_stricmp( actionName, "moveInDir" ) )
+		if ( !Q_stricmp( actionName, "moveInDir" ) ||
+		     !Q_stricmp( actionName, "jumpInDir" ) )
 		{
 			int dir = 0;
 			if ( !ParseMoveDir( name, dir ) )
@@ -650,6 +651,9 @@ DEFINE_BOT_ACTION_METHOD( equip, BotActionBuy, 0, 0 )
 DEFINE_BOT_ACTION_METHOD( evolve, BotActionEvolve, 0, 0 )
 DEFINE_BOT_ACTION_METHOD( evolveTo, BotActionEvolveTo, 1, 1 )
 DEFINE_BOT_ACTION_METHOD( extinguishFire, BotActionExtinguishFire, 0, 0 )
+DEFINE_BOT_ACTION_METHOD( fire, BotActionFirePrimary, 0, 0 )
+DEFINE_BOT_ACTION_METHOD( fireSecondary, BotActionFireSecondary, 0, 0 )
+DEFINE_BOT_ACTION_METHOD( fireTertiary, BotActionFireTertiary, 0, 0 )
 DEFINE_BOT_ACTION_METHOD( fight, BotActionFight, 0, 0 )
 DEFINE_BOT_ACTION_METHOD( fireWeapon, BotActionFireWeapon, 0, 0 )
 DEFINE_BOT_ACTION_METHOD( flee, BotActionFlee, 0, 0 )
@@ -657,6 +661,7 @@ DEFINE_BOT_ACTION_METHOD( follow, BotActionFollow, 1, 1 )
 DEFINE_BOT_ACTION_METHOD( gesture, BotActionGesture, 0, 0 )
 DEFINE_BOT_ACTION_METHOD( heal, BotActionHeal, 0, 0 )
 DEFINE_BOT_ACTION_METHOD( jump, BotActionJump, 0, 0 )
+DEFINE_BOT_ACTION_METHOD( jumpInDir, BotActionJumpInDir, 1, 2 )
 DEFINE_BOT_ACTION_METHOD( moveInDir, BotActionMoveInDir, 1, 2 )
 DEFINE_BOT_ACTION_METHOD( moveTo, BotActionMoveTo, 1, 2 )
 DEFINE_BOT_ACTION_METHOD( moveToGoal, BotActionMoveToGoal, 0, 0 )
@@ -753,6 +758,49 @@ static int MethoddistanceToEntity( lua_State *L, BotContext *ctx )
 	return 1;
 }
 
+static int MethodabandonEnemy( lua_State *L, BotContext *ctx )
+{
+	constexpr int defaultDurationMs = 4000;
+
+	const gentity_t *enemy = ctx->self->botMind->bestEnemy.goal.getTargetedEntity();
+	int durationMs = defaultDurationMs;
+
+	int nargs = lua_gettop( L );
+	if ( nargs >= 1 )
+	{
+		if ( lua_isinteger( L, 1 ) )
+		{
+			durationMs = lua_tointeger( L, 1 );
+		}
+		else
+		{
+			EntityProxy *proxy = CheckEntityProxyArg( L, 1 );
+			enemy = proxy->ent;
+		}
+	}
+
+	if ( nargs >= 2 )
+	{
+		if ( !lua_isinteger( L, 2 ) )
+		{
+			Log::Warn( "lua query 'abandonEnemy' optional second argument must be an integer duration" );
+			lua_pushboolean( L, false );
+			return 1;
+		}
+		durationMs = lua_tointeger( L, 2 );
+	}
+
+	if ( !enemy )
+	{
+		lua_pushboolean( L, false );
+		return 1;
+	}
+
+	BotAbandonEnemy( ctx->self, enemy, durationMs, true );
+	lua_pushboolean( L, true );
+	return 1;
+}
+
 static int MethoddistanceToPosition( lua_State *L, BotContext *ctx )
 {
 	glm::vec3 position = CheckPositionArg( L, 1 );
@@ -842,11 +890,15 @@ RegType<BotContext> BotContextMethods[] =
 	{ "changeBehavior", MethodchangeBehavior },
 	{ "changeGoal", MethodchangeGoal },
 	{ "classDodge", MethodclassDodge },
+	{ "abandonEnemy", MethodabandonEnemy },
 	{ "deactivateUpgrade", MethoddeactivateUpgrade },
 	{ "equip", Methodequip },
 	{ "evolve", Methodevolve },
 	{ "evolveTo", MethodevolveTo },
 	{ "extinguishFire", MethodextinguishFire },
+	{ "fire", Methodfire },
+	{ "fireSecondary", MethodfireSecondary },
+	{ "fireTertiary", MethodfireTertiary },
 	{ "fight", Methodfight },
 	{ "fireWeapon", MethodfireWeapon },
 	{ "flee", Methodflee },
@@ -854,6 +906,7 @@ RegType<BotContext> BotContextMethods[] =
 	{ "gesture", Methodgesture },
 	{ "heal", Methodheal },
 	{ "jump", Methodjump },
+	{ "jumpInDir", MethodjumpInDir },
 	{ "moveInDir", MethodmoveInDir },
 	{ "moveTo", MethodmoveTo },
 	{ "moveToGoal", MethodmoveToGoal },

@@ -718,6 +718,8 @@ void G_BotSpectatorThink( gentity_t *self )
 	self->botMind->futureAimTimeInterval = 0;
 	BotResetEnemyQueue( &self->botMind->enemyQueue );
 	self->botMind->enemyLastSeen = -999999;
+	self->botMind->abandonedEnemy = nullptr;
+	self->botMind->abandonedEnemyUntil = 0;
 	self->botMind->exhausted = false;
 	self->botMind->buildCooldownUntil = 0;
 

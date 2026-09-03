@@ -50,6 +50,8 @@ bool   BotTeamateHasWeapon( gentity_t *self, int weapon );
 void       BotSearchForEnemy( gentity_t *self );
 void       BotPain( gentity_t *self, gentity_t *attacker, int damage );
 botGoalAndDistance_t BotGetHealTarget( const gentity_t *self );
+void       BotAbandonEnemy( gentity_t *self, const gentity_t *enemy, int durationMs, bool clearGoal );
+bool       BotEnemyIsAbandoned( const gentity_t *self, const gentity_t *enemy );
 
 // aiming
 glm::vec3 BotGetIdealAimLocation( gentity_t *self, const botTarget_t &target, int lagPredictTime );
