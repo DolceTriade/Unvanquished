@@ -110,6 +110,10 @@ GET_FUNC( class, lua_pushstring( L, BG_Class( c->ent->client->ps.stats[ STAT_CLA
 // @tfield integer stamina Read/Write.
 // @within Client
 GET_FUNC( stamina, lua_pushinteger( L, c->ent->client->ps.stats[ STAT_STAMINA ] ) )
+/// The client's view angles. Array of floats starting at index 1.
+// @tfield array viewangles Read/Write.
+// @within Client
+GET_FUNC( viewangles, Shared::Lua::PushVec3( L, c->ent->client->ps.viewangles ) )
 /// Raw pm_flags from playerState_t.
 // @tfield integer pm_flags Read only.
 // @within Client
@@ -421,6 +425,23 @@ int Setstamina( lua_State* L )
 	return 0;
 }
 
+int Setviewangles( lua_State* L )
+{
+	Client* c = LuaLib<Client>::check( L, 1 );
+	if ( !c || !c->ent || !c->ent->client ) return 0;
+	if ( !lua_istable( L, 2 ) )
+	{
+		Log::Warn( "Lua client.setviewangles expected vec3 table." );
+		return 0;
+	}
+
+	vec3_t angles;
+	Shared::Lua::CheckVec3( L, 2, angles );
+	VectorCopy( angles, c->ent->client->ps.viewangles );
+	G_SetClientViewAngle( c->ent, angles );
+	return 0;
+}
+
 int Setgod( lua_State* L )
 {
 	Client* c = LuaLib<Client>::check( L, 1 );
@@ -538,6 +559,7 @@ luaL_Reg ClientGetters[] = {
 	GETTER( health ),
 	GETTER( class ),
 	GETTER( stamina ),
+	GETTER( viewangles ),
 	GETTER( pm_flags ),
 	GETTER( score ),
 	GETTER( god ),
@@ -561,6 +583,7 @@ luaL_Reg ClientSetters[] = {
 	SETTER( evos ),
 	SETTER( health ),
 	SETTER( stamina ),
+	SETTER( viewangles ),
 	SETTER( god ),
 	SETTER( notarget ),
 	SETTER( damage_dealt_multiplier ),

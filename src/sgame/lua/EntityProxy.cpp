@@ -36,6 +36,7 @@ Maryland 20850 USA.
 #include "sgame/lua/Missile.h"
 #include "sgame/sg_local.h"
 
+#include "sgame/Entities.h"
 #include "sgame/lua/Entity.h"
 #include "shared/lua/LuaLib.h"
 
@@ -241,6 +242,54 @@ static int Getmissile( lua_State* L )
 	}
 	LuaLib<Missile>::push( L, proxy->missile.get() );
 	return 1;
+}
+
+/// Kill this entity instantly.
+// @function kill
+// @tparam string|integer|nil mod Optional means-of-death, e.g. "MOD_SLOWBLOB".
+// @tparam EntityProxy|nil source Optional source entity to attribute the kill to.
+// @usage ent:kill("MOD_SLOWBLOB", attacker)
+// @within EntityProxy
+static int Methodkill( lua_State* L, EntityProxy* proxy )
+{
+	if ( !IsLiveEntity( proxy ) )
+	{
+		Log::Warn( "trying to kill a stale entity!" );
+		return 0;
+	}
+
+	meansOfDeath_t mod = MOD_SUICIDE;
+	if ( lua_gettop( L ) >= 1 && !lua_isnil( L, 1 ) )
+	{
+		if ( lua_isinteger( L, 1 ) )
+		{
+			mod = static_cast<meansOfDeath_t>( lua_tointeger( L, 1 ) );
+		}
+		else if ( lua_isstring( L, 1 ) )
+		{
+			mod = BG_MeansOfDeathByName( lua_tostring( L, 1 ) );
+		}
+		else
+		{
+			Log::Warn( "EntityProxy.kill expected mod as string, integer, or nil." );
+			return 0;
+		}
+	}
+
+	gentity_t* source = nullptr;
+	if ( lua_gettop( L ) >= 2 && !lua_isnil( L, 2 ) )
+	{
+		EntityProxy* sourceProxy = LuaLib<EntityProxy>::check( L, 2 );
+		if ( !IsLiveEntity( sourceProxy ) )
+		{
+			Log::Warn( "EntityProxy.kill expected a live source entity." );
+			return 0;
+		}
+		source = sourceProxy->ent;
+	}
+
+	Entities::Kill( proxy->ent, source, mod );
+	return 0;
 }
 
 static int Setorigin( lua_State* L )
@@ -523,6 +572,7 @@ ExecFunc(
     die, DIE, ( gentity_t * self, gentity_t* inflictor, gentity_t* attacker, int mod ), 4, self, inflictor, attacker, mod )
 
 RegType<::Lua::EntityProxy> EntityProxyMethods[] = {
+	{ "kill", Methodkill },
 	{ nullptr, nullptr },
 };
 

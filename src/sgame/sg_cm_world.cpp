@@ -244,8 +244,8 @@ struct worldSector_t
 	worldEntity_t        *entities;
 };
 
-#define AREA_DEPTH 4
-#define AREA_NODES 64
+#define AREA_DEPTH 6
+#define AREA_NODES 255
 
 worldSector_t sv_worldSectors[ AREA_NODES ];
 int           sv_numworldSectors;
