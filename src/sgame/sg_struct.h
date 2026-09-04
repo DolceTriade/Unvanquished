@@ -343,6 +343,7 @@ struct clientPersistant_t
 	float             damageDealtMultiplier;
 	float             damageReceivedMultiplier;
 	float             speedMultiplier;
+	bool              ignoreSelfDamage;
 	bool          disableBlueprintErrors; // should the buildable blueprint never be hidden from the players?
 
 	class_t           classSelection; // player class (copied to ent->client->ps.stats[ STAT_CLASS ] once spawned)

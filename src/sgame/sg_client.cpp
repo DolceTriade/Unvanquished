@@ -1266,6 +1266,7 @@ void G_ResetPlayerMultipliers( gclient_t *client )
 	client->pers.damageDealtMultiplier = 1.0f;
 	client->pers.damageReceivedMultiplier = 1.0f;
 	client->pers.speedMultiplier = 1.0f;
+	client->pers.ignoreSelfDamage = false;
 }
 
 /*
