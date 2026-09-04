@@ -465,7 +465,7 @@ local function choose_pve_buildable(team_name, team_snapshot)
         end
 
         roll = roll - defense_weight
-        if can_build_telenode and roll <= spawn_weight then
+        if roll <= spawn_weight then
             return "telenode"
         end
 
