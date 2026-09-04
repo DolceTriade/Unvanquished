@@ -419,10 +419,9 @@ local function choose_pve_buildable(team_name, team_snapshot)
         local telenodes = team_snapshot.buildables.telenode or 0
         local arms = team_snapshot.buildables.arm or 0
         local medis = team_snapshot.buildables.medistat or 0
-        local can_build_telenode = telenodes < cache.cvar_number("g_bot_buildNumTelenodes")
         local support_options = {}
         local defense_weight = 12
-        local spawn_weight = can_build_telenode and 9 or 0
+        local spawn_weight = 9
         local support_weight = 2
 
         if (team_snapshot.buildables.reactor or 0) == 0 then
