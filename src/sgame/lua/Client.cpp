@@ -146,6 +146,10 @@ GET_FUNC( damage_received_multiplier, lua_pushnumber( L, c->ent->client->pers.da
 // @tfield number speed_multiplier Read/Write.
 // @within Client
 GET_FUNC( speed_multiplier, lua_pushnumber( L, c->ent->client->pers.speedMultiplier ) )
+/// Ignore self-inflicted damage on this client.
+// @tfield bool ignore_self_damage Read/Write.
+// @within Client
+GET_FUNC( ignore_self_damage, lua_pushboolean( L, c->ent->client->pers.ignoreSelfDamage ) )
 
 /// The client's name without color codes or other escapes or emoticon. Useful for programatic comparisons.
 // @tfield string clean_name Read only.
@@ -528,6 +532,15 @@ int Setspeed_multiplier( lua_State* L )
 	return 0;
 }
 
+int Setignore_self_damage( lua_State* L )
+{
+	Client* c = LuaLib<Client>::check( L, 1 );
+	if ( !c ) return 0;
+
+	c->ent->client->pers.ignoreSelfDamage = lua_toboolean( L, 2 );
+	return 0;
+}
+
 }  // namespace
 
 RegType<::Lua::Client> ClientMethods[] = {
@@ -568,6 +581,7 @@ luaL_Reg ClientGetters[] = {
 	GETTER( damage_dealt_multiplier ),
 	GETTER( damage_received_multiplier ),
 	GETTER( speed_multiplier ),
+	GETTER( ignore_self_damage ),
 
 	{ nullptr, nullptr },
 };
@@ -589,6 +603,7 @@ luaL_Reg ClientSetters[] = {
 	SETTER( damage_dealt_multiplier ),
 	SETTER( damage_received_multiplier ),
 	SETTER( speed_multiplier ),
+	SETTER( ignore_self_damage ),
 	{ nullptr, nullptr },
 };
 

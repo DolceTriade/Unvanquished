@@ -91,6 +91,12 @@ Util::optional<glm::vec3> direction, int flags, meansOfDeath_t meansOfDeath) {
 	if (!source) source = &g_entities[ENTITYNUM_WORLD];
 
 	gclient_t* attackerClient = GetEffectiveAttackerClient( source );
+
+	if ( client && client->pers.ignoreSelfDamage && attackerClient == client )
+	{
+		return;
+	}
+
 	if ( attackerClient && attackerClient != client && source != entity.oldEnt )
 	{
 		amount *= attackerClient->pers.damageDealtMultiplier;
