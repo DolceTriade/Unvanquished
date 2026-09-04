@@ -1374,7 +1374,7 @@ static bool GuessBuildPlacementCandidate( buildable_t buildable, const vec3_t re
 	}
 	auto reason = IBE_NONE;
 	if ( ( reason = ValidateBuildPlacement( nullptr, buildable, surfaceTrace.endpos, surfaceTrace.plane.normal,
-	                             nullptr, BuildPlacementMode::GHOST ) ) != IBE_NONE )
+	                             nullptr, BuildPlacementMode::GHOST ) ) != IBE_NONE && reason != IBE_NOALIENBP && reason != IBE_NOHUMANBP )
 	{
 		Log::Warn("Could not place because: %d", reason);
 		return false;
