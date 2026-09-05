@@ -51,6 +51,7 @@
     sessionName = server.screenSessionName;
     startScript = pkgs.writeShellScript "unvanquished-${name}-start" ''
       cd ${escapeShellArg stateDir}
+      cp ${configFile} ${escapeShellArg stateDir}/config/server.cfg
       exec ${screenBin} -U -DmS ${escapeShellArg sessionName} \
         ${escapeShellArg "${server.package}/bin/daemonded"} \
         -homepath ${escapeShellArg stateDir} \
