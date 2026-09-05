@@ -73,6 +73,7 @@ set(GAMESHAREDLIST
     ${GAMELOGIC_DIR}/shared/bg_parse.cpp
     ${GAMELOGIC_DIR}/shared/bg_pmove.cpp
     ${GAMELOGIC_DIR}/shared/bg_public.h
+	${GAMELOGIC_DIR}/shared/bg_quakerewards.h
     ${GAMELOGIC_DIR}/shared/bg_teamprogress.cpp
     ${GAMELOGIC_DIR}/shared/bg_utilities.cpp
     ${GAMELOGIC_DIR}/shared/bg_voice.cpp
@@ -137,6 +138,7 @@ set(CGAMELIST
     ${GAMELOGIC_DIR}/cgame/cg_players.cpp
     ${GAMELOGIC_DIR}/cgame/cg_playerstate.cpp
     ${GAMELOGIC_DIR}/cgame/cg_predict.cpp
+	${GAMELOGIC_DIR}/cgame/cg_quakerewards.cpp
     ${GAMELOGIC_DIR}/cgame/cg_rocket.cpp
     ${GAMELOGIC_DIR}/cgame/cg_rocket_dataformatter.cpp
     ${GAMELOGIC_DIR}/cgame/cg_rocket_datasource.cpp
@@ -203,7 +205,7 @@ set(SGAMELIST
     ${GAMELOGIC_DIR}/sgame/BaseClustering.cpp
     ${GAMELOGIC_DIR}/sgame/Entities.cpp
     ${GAMELOGIC_DIR}/sgame/Entities.h
-    ${GAMELOGIC_DIR}/sgame/QuakeRewards.cpp
+	${GAMELOGIC_DIR}/sgame/sg_quakerewards.cpp
     ${GAMELOGIC_DIR}/sgame/sg_active.cpp
     ${GAMELOGIC_DIR}/sgame/sg_admin.cpp
     ${GAMELOGIC_DIR}/sgame/sg_admin.h

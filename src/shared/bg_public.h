@@ -847,7 +847,7 @@ enum entity_event_t
 
   EV_HIT, // notify client of a hit
 
-  EV_UNUSED_1 // legacy unused event slot
+  EV_QUAKE_REWARD
 };
 
 enum dynMenu_t

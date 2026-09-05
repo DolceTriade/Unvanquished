@@ -1197,6 +1197,10 @@ void CG_EntityEvent( centity_t *cent, vec3_t position )
 
 			break;
 
+		case EV_QUAKE_REWARD:
+			QuakeRewards::Event( static_cast<quakeReward_t>( es->eventParm ) );
+			break;
+
 		case EV_PAIN:
 			// local player sounds are triggered in CG_CheckLocalSounds,
 			// so ignore events on the player
