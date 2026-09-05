@@ -1342,7 +1342,7 @@ static constexpr const char *const eventnames[] =
 
   "EV_HIT", // notify client of a hit
 
-  "EV_UNUSED_1" // legacy unused event slot
+  "EV_QUAKE_REWARD"
 };
 
 /*

@@ -646,6 +646,7 @@ static void CG_RegisterSounds()
 
 	cgs.media.timerBeaconExpiredSound = trap_S_RegisterSound( "sound/feedback/beacons/timer-expired", false );
 	cgs.media.killSound = trap_S_RegisterSound( "sound/feedback/damage/bell", false );
+	QuakeRewards::RegisterSounds();
 }
 
 //===================================================================================
