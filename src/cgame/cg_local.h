@@ -36,6 +36,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "engine/renderer/tr_types.h"
 #include "shared/client/cg_api.h"
 #include "shared/bg_public.h"
+#include "shared/bg_quakerewards.h"
 #include "engine/client/keycodes.h"
 #include "cg_ui.h"
 #include "cg_skeleton_modifier.h"
@@ -1674,6 +1675,7 @@ struct cgMedia_t
 
 	qhandle_t   damageIndicatorFont;
 	sfxHandle_t killSound;
+	sfxHandle_t quakeRewardSounds[ QR_NUM_REWARDS ];
 
 	qhandle_t chaingunBarrelBoneIndex;
 	qhandle_t chaingunGearBoneIndex;
@@ -2443,6 +2445,12 @@ namespace CombatFeedback
 {
   void Event(entityState_t *es);
   void DrawDamageIndicators(void);
+}
+
+namespace QuakeRewards
+{
+  void RegisterSounds();
+  void Event(quakeReward_t reward);
 }
 
 #endif
