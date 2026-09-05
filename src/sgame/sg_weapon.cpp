@@ -1284,6 +1284,7 @@ void G_FireWeapon( gentity_t *self, weapon_t weapon, weaponMode_t weaponMode )
 					break;
 
 				case WP_CHAINGUN:
+					// Spin-up affects firing rate (see PM_Weapon), not per-bullet damage.
 					FireBullet( self, CHAINGUN_SPREAD, (float)CHAINGUN_DMG, MOD_CHAINGUN, false );
 					break;
 
