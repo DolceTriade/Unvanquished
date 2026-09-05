@@ -1345,33 +1345,68 @@ CG_MachinegunSpinAngle
 ======================
 */
 #define   CHAINGUN_SPIN_SPEED 0.9f
+#define   CHAINGUN_BASE_SPIN_SPEED 0.3f
 #define   PAINSAW_SPIN_SPEED 1.8f
 #define   COAST_TIME 1000
-static float CG_MachinegunSpinAngle( centity_t *cent, float spinSpeed, bool firing )
+static float CG_MachinegunSpinAngle( centity_t *cent, float spinSpeed, bool firing, int spinUpTime )
 {
 	int   delta;
 	float angle;
-	float speed;
 
 	delta = cg.time - cent->pe.barrelTime;
 
 	if ( cent->pe.barrelSpinning )
 	{
-		angle = cent->pe.barrelAngle + delta * spinSpeed;
+		// Spinning: always turn a little immediately, then accelerate up to
+		// full speed over the spin-up time.
+		if ( spinUpTime > 0 && delta < spinUpTime )
+		{
+			float t = ( float )delta / spinUpTime;
+			angle = cent->pe.barrelAngle + CHAINGUN_BASE_SPIN_SPEED * ( float )delta +
+			        0.5f * ( spinSpeed - CHAINGUN_BASE_SPIN_SPEED ) * spinUpTime * t * t;
+		}
+		else if ( spinUpTime > 0 )
+		{
+			float rampDistance = 0.5f * ( spinSpeed + CHAINGUN_BASE_SPIN_SPEED ) * spinUpTime;
+			angle = cent->pe.barrelAngle + rampDistance +
+			        ( float )( delta - spinUpTime ) * spinSpeed;
+		}
+		else
+		{
+			angle = cent->pe.barrelAngle + delta * spinSpeed;
+		}
 	}
 	else
 	{
+		// Coasting: decelerate from the speed at which the trigger was released.
 		if ( delta > COAST_TIME )
 		{
 			delta = COAST_TIME;
 		}
 
-		speed = 0.5f * ( spinSpeed + ( float )( COAST_TIME - delta ) / COAST_TIME );
-		angle = cent->pe.barrelAngle + delta * speed;
+		// Integral of the linear speed decay: V*t - V*t^2/(2*COAST_TIME).
+		angle = cent->pe.barrelAngle + cent->pe.barrelSpinSpeed * ( float )delta *
+		        ( 1.0f - 0.5f * ( float )delta / COAST_TIME );
 	}
 
-	if ( cent->pe.barrelSpinning == !firing )
+	if ( cent->pe.barrelSpinning != firing )
 	{
+		if ( !firing )
+		{
+			// Remember the current spin speed so the coast matches how fast the
+			// barrels were actually turning when the trigger was released.
+			if ( spinUpTime > 0 )
+			{
+				float t = ( delta < spinUpTime ) ? ( float )delta / spinUpTime : 1.0f;
+				cent->pe.barrelSpinSpeed = CHAINGUN_BASE_SPIN_SPEED +
+				                           ( spinSpeed - CHAINGUN_BASE_SPIN_SPEED ) * t;
+			}
+			else
+			{
+				cent->pe.barrelSpinSpeed = spinSpeed;
+			}
+		}
+
 		cent->pe.barrelTime = cg.time;
 		cent->pe.barrelAngle = AngleNormalize360( angle );
 		cent->pe.barrelSpinning = firing;
@@ -1527,7 +1562,7 @@ void CG_AddPlayerWeapon( refEntity_t* parent, playerState_t* ps, centity_t* cent
 			// like controlling spin rate and "coasting".
 			if ( weaponNum == WP_CHAINGUN && ps )
 			{
-				float angle = CG_MachinegunSpinAngle( cent, CHAINGUN_SPIN_SPEED, firing );
+				float angle = CG_MachinegunSpinAngle( cent, CHAINGUN_SPIN_SPEED, firing, CHAINGUN_SPINUP_TIME );
 				BoneMod barrel;
 				barrel.index = cgs.media.chaingunBarrelBoneIndex;
 				QuatFromAngles( barrel.rotation, angle, 0.0f, 0.0f );
@@ -1541,7 +1576,7 @@ void CG_AddPlayerWeapon( refEntity_t* parent, playerState_t* ps, centity_t* cent
 			// Spin painsaw blade fast.
 			else if ( weaponNum == WP_PAIN_SAW && ps )
 			{
-				float angle = CG_MachinegunSpinAngle( cent, PAINSAW_SPIN_SPEED, firing );
+				float angle = CG_MachinegunSpinAngle( cent, PAINSAW_SPIN_SPEED, firing, 0 );
 				BoneMod blade;
 				blade.index = cgs.media.painsawBladeBoneIndex;
 				QuatFromAngles( blade.rotation, 0.0f, -angle, 0.0f );
@@ -1590,7 +1625,7 @@ void CG_AddPlayerWeapon( refEntity_t* parent, playerState_t* ps, centity_t* cent
 			vec3_t angles;
 			angles[ YAW ] = 0;
 			angles[ PITCH ] = 0;
-			angles[ ROLL ] = CG_MachinegunSpinAngle( cent, CHAINGUN_SPIN_SPEED, firing );
+			angles[ ROLL ] = CG_MachinegunSpinAngle( cent, CHAINGUN_SPIN_SPEED, firing, CHAINGUN_SPINUP_TIME );
 			AnglesToAxis( angles, barrel.axis );
 
 			CG_PositionRotatedEntityOnTag( &barrel, ents.size() - 1, "tag_barrel");

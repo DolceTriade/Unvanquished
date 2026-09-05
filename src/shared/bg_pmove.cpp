@@ -3779,6 +3779,34 @@ static void PM_Weapon()
 		}
 	}
 
+	// Spin up / cool down the chaingun barrels.
+	if ( pm->ps->weapon == WP_CHAINGUN )
+	{
+		if ( usercmdButtonPressed( pm->cmd.buttons, BTN_ATTACK ) &&
+		     !( pm->ps->pm_flags & PMF_RESPAWNED ) && pm->ps->pm_type != PM_INTERMISSION &&
+		     ( ( pm->ps->ammo > 0 || pm->ps->clips > 0 ) ||
+		       BG_Weapon( pm->ps->weapon )->infiniteAmmo ) )
+		{
+			pm->ps->weaponCharge += pml.msec;
+
+			if ( pm->ps->weaponCharge >= CHAINGUN_SPINUP_TIME )
+			{
+				pm->ps->weaponCharge = CHAINGUN_SPINUP_TIME;
+			}
+		}
+		else
+		{
+			// Wind the spin down over roughly the same time as the visual
+			// barrel coast (barrelTime/COAST_TIME) so gameplay matches the animation.
+			pm->ps->weaponCharge -= ( pm->ps->weaponCharge + 999 ) / 1000 * pml.msec;
+
+			if ( pm->ps->weaponCharge < 0 )
+			{
+				pm->ps->weaponCharge = 0;
+			}
+		}
+	}
+
 	if ( pm->ps->weapon == WP_ABUILD || pm->ps->weapon == WP_ABUILD2 || pm->ps->weapon == WP_HBUILD )
 	{
 		HandleDeconstructButton();
@@ -4062,6 +4090,18 @@ static void PM_Weapon()
 		pm->ps->generic1 = WPM_PRIMARY;
 		PM_AddEvent( EV_FIRE_WEAPON );
 		addTime = BG_Weapon( pm->ps->weapon )->repeatRate1;
+
+		// Chaingun spin-up: fire less often until the barrels reach full spin.
+		if ( pm->ps->weapon == WP_CHAINGUN && CHAINGUN_SPINUP_TIME > 0 )
+		{
+			int spin = pm->ps->weaponCharge;
+
+			if ( spin < CHAINGUN_SPINUP_TIME && CHAINGUN_SPINUP_RATE > addTime )
+			{
+				addTime = CHAINGUN_SPINUP_RATE +
+				          ( addTime - CHAINGUN_SPINUP_RATE ) * spin / CHAINGUN_SPINUP_TIME;
+			}
+		}
 	}
 
 	// fire events for autohit weapons

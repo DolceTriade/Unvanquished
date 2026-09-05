@@ -611,6 +611,7 @@ struct playerEntity_t
 	float    barrelAngle;
 	int      barrelTime;
 	bool barrelSpinning;
+	float    barrelSpinSpeed;
 
 	vec3_t   lastNormal;
 	vec3_t   lastAxis[ 3 ];
