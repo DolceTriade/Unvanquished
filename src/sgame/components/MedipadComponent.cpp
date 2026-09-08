@@ -110,10 +110,13 @@ void MedipadComponent::Think(int timeDelta)
 			client->ps.stats[STAT_STATE] &= ~SS_POISONED;
 		}
 
-		bool fullHealth = player->entity->Get<HealthComponent>()->FullHealth();
+		const HealthComponent* health = player->entity->Get<HealthComponent>();
+		bool enoughHealth = health->HealthFraction() >= MEDISTAT_MEDKIT_HEALTH_FRACTION;
+		bool medkitActive = client->ps.stats[STAT_STATE] & SS_HEALING_4X;
 
-		// give medikit to players with full health
-		if (fullHealth)
+		// Give medikits to players with at least 90% health, unless their medkit
+		// is still active.
+		if (enoughHealth && !medkitActive)
 		{
 			if (!BG_InventoryContainsUpgrade(UP_MEDKIT, player->client->ps.stats))
 			{
@@ -125,7 +128,7 @@ void MedipadComponent::Think(int timeDelta)
 		if (!newTarget || player == oldTarget)
 		{
 			if (PM_Live(client->ps.pm_type) &&
-				(!fullHealth || client->ps.stats[STAT_STAMINA] < STAMINA_MAX))
+				(!health->FullHealth() || client->ps.stats[STAT_STAMINA] < STAMINA_MAX))
 			{
 				newTarget = player;
 			}
@@ -160,8 +163,11 @@ void MedipadComponent::Think(int timeDelta)
 		// restore health
 		newTarget->entity->Heal(timeDelta * MEDISTAT_HEAL_RATE, nullptr);
 
-		// check if fully healed
-		if (newTarget->entity->Get<HealthComponent>()->FullHealth())
+		// Give a medikit once sufficiently healed, unless the current medikit is
+		// still active.
+		if (newTarget->entity->Get<HealthComponent>()->HealthFraction() >=
+				MEDISTAT_MEDKIT_HEALTH_FRACTION &&
+			!(client->ps.stats[STAT_STATE] & SS_HEALING_4X))
 		{
 			// give medikit
 			if (!BG_InventoryContainsUpgrade(UP_MEDKIT, client->ps.stats))
