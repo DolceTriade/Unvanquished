@@ -27,17 +27,12 @@ along with Unvanquished. If not, see <http://www.gnu.org/licenses/>.
 
 #include "sg_local.h"
 #include "shared/bg_attributes.h"
-
+#include "shared/bg_overload.h"
 #include <functional>
 #include <string>
 #include <vector>
 
-enum class overloadPurchaseKind_t
-{
-	BP_BUNDLE,
-	UNLOCK,
-	UPGRADE,
-};
+using OverloadNextValueFunc = std::function<double( int )>;
 
 enum class effectTarget_t
 {
@@ -64,7 +59,7 @@ struct overloadEffect_t
 	int                 attributeObject;
 	int                 attributeField;
 	double              baseline;
-	double              step;
+	OverloadNextValueFunc growth;
 	double              minValue;
 	double              maxValue;
 	bool                recomputeFromRanks;
@@ -84,8 +79,7 @@ struct overloadPurchaseDef_t
 	std::string            displayName;
 	std::string            uiDescription;
 	int                    requiredCompletedCount;
-	int                    baseCost;
-	int                    costStep;
+	OverloadNextValueFunc  costGrowth;
 	int                    bundleAmount;
 	int                    maxRanks;
 	bgAttributeFamily_t    unlockFamily;

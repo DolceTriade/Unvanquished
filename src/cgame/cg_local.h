@@ -36,6 +36,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "engine/renderer/tr_types.h"
 #include "shared/client/cg_api.h"
 #include "shared/bg_public.h"
+#include "shared/bg_overload.h"
 #include "shared/bg_quakerewards.h"
 #include "engine/client/keycodes.h"
 #include "cg_ui.h"
@@ -1459,24 +1460,23 @@ struct cgTeamEconomyState_t
 	int bpPurchased;
 	int totalBudget;
 	int spentBudget;
-	// Cost multiplier encoded in thousandths because this comes through a text configstring, not the engine's binary float netcode.
-	int costMultiplierThousandths;
 	int investedCredits[ MAX_OVERLOAD_PURCHASES ];
 	int repeatCounts[ MAX_OVERLOAD_PURCHASES ];
+	int nextCosts[ MAX_OVERLOAD_PURCHASES ];
+	int remainingCosts[ MAX_OVERLOAD_PURCHASES ];
 	bool ownedPurchases[ MAX_OVERLOAD_PURCHASES ];
 };
 
 struct cgOverloadCatalogEntry_t
 {
 	bool valid;
-	int kind;
+	overloadPurchaseKind_t kind;
 	team_t team;
-	int baseCost;
-	int costStep;
 	int bundleAmount;
 	int requiredCompletedCount;
 	int maxRanks;
 	int sortIndex;
+	bool hasUpgrade;
 	char thing[ 64 ];
 	char thingLabel[ 128 ];
 	char groupLabel[ 64 ];
