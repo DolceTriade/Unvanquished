@@ -131,7 +131,7 @@ static void CG_NotifyOverloadUpgradeCompletions( team_t team, const cgTeamEconom
 	for ( int i = 0; i < MAX_OVERLOAD_PURCHASES; ++i )
 	{
 		const cgOverloadCatalogEntry_t& entry = rocketInfo.overloadCatalog[ i ];
-		if ( !entry.valid || entry.kind != 2 )
+		if ( !entry.valid || entry.kind != overloadPurchaseKind_t::UPGRADE )
 		{
 			continue;
 		}
@@ -199,14 +199,13 @@ void CG_ParseOverloadCatalogConfig( int index, const char* config )
 	}
 
 	entry.valid = true;
-	entry.kind = !Q_stricmp( kind, "bp" ) ? 0 : !Q_stricmp( kind, "unlock" ) ? 1 : 2;
+	entry.kind = BG_OverloadPurchaseKindFromToken( kind );
 	entry.team = static_cast<team_t>( atoi( Info_ValueForKey( config, "t" ) ) );
-	entry.baseCost = atoi( Info_ValueForKey( config, "bc" ) );
-	entry.costStep = atoi( Info_ValueForKey( config, "cs" ) );
 	entry.bundleAmount = atoi( Info_ValueForKey( config, "ba" ) );
 	entry.requiredCompletedCount = atoi( Info_ValueForKey( config, "req" ) );
 	entry.maxRanks = atoi( Info_ValueForKey( config, "mr" ) );
 	entry.sortIndex = atoi( Info_ValueForKey( config, "ord" ) );
+	entry.hasUpgrade = atoi( Info_ValueForKey( config, "hu" ) ) != 0;
 	Q_strncpyz( entry.thing, Info_ValueForKey( config, "thing" ), sizeof( entry.thing ) );
 	Q_strncpyz( entry.thingLabel, Info_ValueForKey( config, "tl" ), sizeof( entry.thingLabel ) );
 	Q_strncpyz( entry.groupLabel, Info_ValueForKey( config, "grp" ), sizeof( entry.groupLabel ) );
@@ -267,15 +266,11 @@ void CG_ParseTeamEconomyConfig( team_t team, const char* config )
 			continue;
 		}
 
-		if ( key == "cm" )
+		if ( key == "ic" || key == "rc" || key == "nc" || key == "rm" )
 		{
-			state.costMultiplierThousandths = atoi( value.c_str() );
-			continue;
-		}
-
-		if ( key == "ic" || key == "rc" )
-		{
-			int* target = key == "ic" ? state.investedCredits : state.repeatCounts;
+			int* target = key == "ic" ? state.investedCredits :
+			               key == "rc" ? state.repeatCounts :
+			               key == "nc" ? state.nextCosts : state.remainingCosts;
 			std::stringstream pairs( value );
 			std::string pair;
 			while ( std::getline( pairs, pair, ',' ) )
