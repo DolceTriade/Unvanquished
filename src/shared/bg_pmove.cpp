@@ -3782,9 +3782,9 @@ static void PM_Weapon()
 	// Spin up / cool down the chaingun barrels.
 	if ( pm->ps->weapon == WP_CHAINGUN )
 	{
-		if ( usercmdButtonPressed( pm->cmd.buttons, BTN_ATTACK ) &&
-		     !( pm->ps->pm_flags & PMF_RESPAWNED ) && pm->ps->pm_type != PM_INTERMISSION &&
-		     ( ( pm->ps->ammo > 0 || pm->ps->clips > 0 ) ||
+		if ( attack1 && !(attack2 || attack3) &&
+		     !( pm->ps->pm_flags & PMF_RESPAWNED ) &&
+		     ( pm->ps->ammo > 0 ||
 		       BG_Weapon( pm->ps->weapon )->infiniteAmmo ) )
 		{
 			pm->ps->weaponCharge += pml.msec;
@@ -4096,10 +4096,10 @@ static void PM_Weapon()
 		{
 			int spin = pm->ps->weaponCharge;
 
-			if ( spin < CHAINGUN_SPINUP_TIME && CHAINGUN_SPINUP_RATE > addTime )
+			if ( spin < CHAINGUN_SPINUP_TIME && CHAINGUN_INITIAL_ATTACK_RATE > addTime )
 			{
-				addTime = CHAINGUN_SPINUP_RATE +
-				          ( addTime - CHAINGUN_SPINUP_RATE ) * spin / CHAINGUN_SPINUP_TIME;
+				addTime = CHAINGUN_INITIAL_ATTACK_RATE +
+				          ( addTime - CHAINGUN_INITIAL_ATTACK_RATE ) * spin / CHAINGUN_SPINUP_TIME;
 			}
 		}
 	}

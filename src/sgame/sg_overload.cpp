@@ -50,6 +50,16 @@ static OverloadNextValueFunc LinearGrowth( double start, double step )
 	return [ start, step ]( int rank ) { return start + step * rank; };
 }
 
+static OverloadNextValueFunc ExponentialGrowth( double first, double ratio )
+{
+	if ( ratio <= 0.0 )
+	{
+		Sys::Error( "ExponentialGrowth requires a positive ratio" );
+	}
+
+	return [ first, ratio ]( int rank ) { return first * std::pow( ratio, rank ); };
+}
+
 static OverloadNextValueFunc ConstantGrowth( double value )
 {
 	return LinearGrowth( value, 0.0 );
@@ -1555,10 +1565,10 @@ static void BuildOverloadCatalog()
 
 	// Alien lifeforms: advanced granger, dretch, mantis, marauder, advanced marauder, dragoon, advanced dragoon, tyrant.
 	AddClassUnlock( TEAM_ALIENS, PCL_ALIEN_BUILDER0_UPG );
-	AddUpgrade( TEAM_ALIENS, DefaultUpgradeBaseCost( 0 ), DefaultUpgradeStepCost( OVERLOAD_STAGE3_COUNT ), OVERLOAD_UNCAPPED_RANKS, "level0", "Dretch", "damage", "damage", "Dretch Damage", "Increase dretch bite damage.",
-	            { GameplayEffect( "LEVEL0_BITE_DMG", 5.0 ) } );
+	AddUpgrade( TEAM_ALIENS, DefaultUpgradeBaseCost( 0 ), DefaultUpgradeStepCost( 0 ), OVERLOAD_UNCAPPED_RANKS, "level0", "Dretch", "damage", "damage", "Dretch Damage", "Increase dretch bite damage.",
+	            { GameplayEffect( "LEVEL0_BITE_DMG", ExponentialGrowth( 5.0, 1.25 ) ) } );
 	AddUpgrade( TEAM_ALIENS, DefaultUpgradeBaseCost( 0 ), DefaultUpgradeStepCost( 0 ), OVERLOAD_UNCAPPED_RANKS, "level1", "Mantis", "damage", "damage", "Mantis Damage", "Increase mantis claw damage.",
-	            { GameplayEffect( "LEVEL1_CLAW_DMG", 6.0 ) } );
+	            { GameplayEffect( "LEVEL1_CLAW_DMG", ExponentialGrowth( 5.0, 1.25 ) ) } );
 	AddClassUnlock( TEAM_ALIENS, PCL_ALIEN_LEVEL2 );
 	AddClassUnlock( TEAM_ALIENS, PCL_ALIEN_LEVEL2_UPG );
 	AddClassUnlock( TEAM_ALIENS, PCL_ALIEN_LEVEL3 );
@@ -1570,9 +1580,9 @@ static void BuildOverloadCatalog()
 	// No weapon overload upgrades should live outside this block.
 
 	// Human weapons: stage 1 / always available.
-	AddUpgrade( TEAM_HUMANS, DefaultUpgradeBaseCost( OVERLOAD_STAGE3_COUNT ), DefaultUpgradeStepCost( 0 ), OVERLOAD_UNCAPPED_RANKS, "rifle", "Rifle", "damage", "damage", "Rifle Damage", "Increase rifle damage.",
+	AddUpgrade( TEAM_HUMANS, ExponentialGrowth( DefaultUpgradeBaseCost( OVERLOAD_STAGE3_COUNT ), 2.0 ), OVERLOAD_UNCAPPED_RANKS, "rifle", "Rifle", "damage", "damage", "Rifle Damage", "Increase rifle damage.",
 	            { GameplayEffect( "RIFLE_DMG", 1.0 ) } );
-	AddUpgrade( TEAM_HUMANS, DefaultUpgradeBaseCost( 0 ), DefaultUpgradeStepCost( 0 ), OVERLOAD_UNCAPPED_RANKS, "rifle", "Rifle", "ammo", "ammo", "Rifle Ammo", "Increase rifle ammo reserve.",
+	AddUpgrade( TEAM_HUMANS, ExponentialGrowth( DefaultUpgradeBaseCost( 0 ), 2.0 ), OVERLOAD_UNCAPPED_RANKS, "rifle", "Rifle", "ammo", "ammo", "Rifle Ammo", "Increase rifle ammo reserve.",
 	            { AttributeEffect( BG_ATTR_WEAPON, "rifle", "ammo", 5.0, 1.0 ) } );
 	AddUpgrade( TEAM_HUMANS, DefaultUpgradeBaseCost( 0 ), DefaultUpgradeStepCost( 0 ), OVERLOAD_UNCAPPED_RANKS, "psaw", "Pain Saw", "damage", "damage", "Pain Saw Damage", "Increase pain saw damage per hit.",
 	            { GameplayEffect( "PAINSAW_DAMAGE", 2.0, 1.0 ) } );
@@ -1602,14 +1612,14 @@ static void BuildOverloadCatalog()
 	            { AttributeEffect( BG_ATTR_WEAPON, "prifle", "ammo", 5.0, 1.0 ) } );
 
 	// Human weapons: stage 3 unlocks.
-	AddUpgrade( TEAM_HUMANS, DefaultUpgradeBaseCost( OVERLOAD_STAGE3_COUNT ),
-	            DefaultUpgradeStepCost( OVERLOAD_STAGE3_COUNT ), OVERLOAD_UNCAPPED_RANKS, "lcannon",
+	AddUpgrade( TEAM_HUMANS, DefaultUpgradeBaseCost( OVERLOAD_STAGE3_COUNT ) / 2,
+	            DefaultUpgradeStepCost( OVERLOAD_STAGE3_COUNT ) / 2, OVERLOAD_UNCAPPED_RANKS, "lcannon",
 	            "Lucifer Cannon", "damage", "damage", "Lucifer Cannon Damage",
 	            "Increase lucifer cannon damage.",
 	            { GameplayEffect( "LCANNON_DAMAGE", 15.0 ),
 	              AttributeEffect( BG_ATTR_MISSILE, "lcannon", "splash_radius", 5.0 ),
 	              AttributeEffect( BG_ATTR_MISSILE, "lcannon2", "damage", 5.0 ) } );
-	AddUpgrade( TEAM_HUMANS, DefaultUpgradeBaseCost( OVERLOAD_STAGE3_COUNT ), DefaultUpgradeStepCost( OVERLOAD_STAGE3_COUNT ), OVERLOAD_UNCAPPED_RANKS, "lcannon", "Lucifer Cannon", "ammo", "ammo", "Lucifer Cannon Ammo", "Increase lucifer cannon ammo reserve.",
+	AddUpgrade( TEAM_HUMANS, DefaultUpgradeBaseCost( OVERLOAD_STAGE3_COUNT ) / 2, DefaultUpgradeStepCost( OVERLOAD_STAGE3_COUNT ) / 2, OVERLOAD_UNCAPPED_RANKS, "lcannon", "Lucifer Cannon", "ammo", "ammo", "Lucifer Cannon Ammo", "Increase lucifer cannon ammo reserve.",
 	            { AttributeEffect( BG_ATTR_WEAPON, "lcannon", "ammo", 10.0, 1.0 ) } );
 
 	// Human equipment upgrades.
