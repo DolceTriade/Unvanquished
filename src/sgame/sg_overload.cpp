@@ -29,6 +29,7 @@ along with Unvanquished. If not, see <http://www.gnu.org/licenses/>.
 #include "sg_local.h"
 #include "shared/bg_teamprogress.h"
 
+#include <cmath>
 #include <limits>
 #include <sstream>
 #include <vector>
@@ -43,6 +44,26 @@ static int AutoDonateSpendCapacity( team_t team, int purchaseIndex );
 static void ApplyGameplayEffectCallback( const overloadEffect_t& effect, team_t team, double value, bool& gameplayDirty, bool& attributeDirty );
 static void ApplyAttributeEffectCallback( const overloadEffect_t& effect, team_t team, double value, bool& gameplayDirty, bool& attributeDirty );
 static void UpdatePlayerClassMaxHealth( team_t team );
+
+static OverloadNextValueFunc LinearGrowth( double start, double step )
+{
+	return [ start, step ]( int rank ) { return start + step * rank; };
+}
+
+static OverloadNextValueFunc ConstantGrowth( double value )
+{
+	return LinearGrowth( value, 0.0 );
+}
+
+static double SumGrowth( const OverloadNextValueFunc& growth, int rankCount )
+{
+	double total = 0.0;
+	for ( int rank = 0; growth && rank < rankCount; ++rank )
+	{
+		total += growth( rank );
+	}
+	return total;
+}
 
 
 static bool OverloadEntryMatchesTeam( team_t team, int purchaseIndex )
@@ -498,17 +519,25 @@ static int ScaleOverloadCost( team_t team, int cost )
 	}
 
 	const int64_t scaled = static_cast<int64_t>( cost ) * OverloadCostMultiplierPermille( team );
-	return static_cast<int>( ( scaled + 999 ) / 1000 );
+	return static_cast<int>( std::min<int64_t>( std::numeric_limits<int>::max(), ( scaled + 999 ) / 1000 ) );
+}
+
+static int OverloadCostAtRank( const overloadPurchaseDef_t& entry, int rank, team_t team )
+{
+	const double rawCost = entry.costGrowth( rank );
+	if ( !std::isfinite( rawCost ) || rawCost >= std::numeric_limits<int>::max() )
+	{
+		return std::numeric_limits<int>::max();
+	}
+
+	return ScaleOverloadCost( team, std::max( 0, static_cast<int>( std::lround( rawCost ) ) ) );
 }
 
 static int OverloadNextCost( const overloadPurchaseDef_t& entry, int entryIndex, team_t team )
 {
-	if ( entry.kind == overloadPurchaseKind_t::UPGRADE || entry.kind == overloadPurchaseKind_t::BP_BUNDLE )
-	{
-		return ScaleOverloadCost( team, entry.baseCost + TeamEconomy( team ).repeatCounts[ entryIndex ] * entry.costStep );
-	}
-
-	return ScaleOverloadCost( team, entry.baseCost );
+	const int rank = entry.kind == overloadPurchaseKind_t::UPGRADE || entry.kind == overloadPurchaseKind_t::BP_BUNDLE ?
+	                 TeamEconomy( team ).repeatCounts[ entryIndex ] : 0;
+	return OverloadCostAtRank( entry, rank, team );
 }
 
 static std::string FormatOverloadCurrency( int value, team_t team )
@@ -570,6 +599,23 @@ static std::string EncodeOwnedPurchases( const bool* values )
 	return stream.str();
 }
 
+static int OverloadDisplayRemainingCost( const overloadPurchaseDef_t& entry, int entryIndex, team_t team )
+{
+	const TeamEconomyState& economy = TeamEconomy( team );
+	if ( entry.kind == overloadPurchaseKind_t::UNLOCK && economy.ownedPurchases[ entryIndex ] )
+	{
+		return 0;
+	}
+
+	if ( entry.kind == overloadPurchaseKind_t::UPGRADE && entry.maxRanks != OVERLOAD_UNCAPPED_RANKS &&
+	     economy.repeatCounts[ entryIndex ] >= entry.maxRanks )
+	{
+		return 0;
+	}
+
+	return std::max( 0, OverloadNextCost( entry, entryIndex, team ) - economy.investedCredits[ entryIndex ] );
+}
+
 static void PublishOverloadStateInternal( team_t team )
 {
 	if ( !G_IsPlayableTeam( team ) )
@@ -578,14 +624,23 @@ static void PublishOverloadStateInternal( team_t team )
 	}
 
 	const TeamEconomyState& economy = TeamEconomy( team );
+	int nextCosts[ MAX_OVERLOAD_PURCHASES ] = {};
+	int remainingCosts[ MAX_OVERLOAD_PURCHASES ] = {};
+	for ( int i = 0; i < G_OverloadPurchaseCount(); ++i )
+	{
+		nextCosts[ i ] = OverloadNextCost( overloadPurchases[ i ], i, team );
+		remainingCosts[ i ] = OverloadDisplayRemainingCost( overloadPurchases[ i ], i, team );
+	}
+
 	std::ostringstream stream;
 	stream << "cp=" << economy.completedPurchases
 	       << ";bp=" << economy.bpPurchased
 	       << ";tb=" << level.team[ team ].totalBudget
 	       << ";sb=" << level.team[ team ].spentBudget
-	       << ";cm=" << OverloadCostMultiplierPermille( team )
 	       << ";ic=" << EncodeIndexValuePairs( economy.investedCredits )
 	       << ";rc=" << EncodeIndexValuePairs( economy.repeatCounts )
+	       << ";nc=" << EncodeIndexValuePairs( nextCosts )
+	       << ";rm=" << EncodeIndexValuePairs( remainingCosts )
 	       << ";op=" << EncodeOwnedPurchases( economy.ownedPurchases );
 
 	std::string config = stream.str();
@@ -712,18 +767,6 @@ static void UpdateOverloadCostScalingInternal()
 		economy.peakClientsSeen = currentClients;
 		PublishOverloadStateInternal( team );
 	}
-}
-
-static const char* PurchaseKindToken( overloadPurchaseKind_t kind )
-{
-	switch ( kind )
-	{
-		case overloadPurchaseKind_t::BP_BUNDLE: return "bp";
-		case overloadPurchaseKind_t::UNLOCK: return "unlock";
-		case overloadPurchaseKind_t::UPGRADE: return "upgrade";
-	}
-
-	Sys::Error( "unknown overload purchase kind" );
 }
 
 static std::string UnlockableDescription( unlockableType_t type, int itemNum )
@@ -857,6 +900,22 @@ static int OverloadSortIndexForThing( team_t team, const char* thing )
 
 static void PublishOverloadCatalog()
 {
+	bool unlockHasUpgrade[ MAX_OVERLOAD_PURCHASES ] = {};
+	for ( int i = 0; i < static_cast<int>( overloadPurchases.size() ); ++i )
+	{
+		const overloadPurchaseDef_t& entry = overloadPurchases[ i ];
+		if ( entry.kind != overloadPurchaseKind_t::UPGRADE )
+		{
+			continue;
+		}
+
+		const int unlockIndex = FindPurchaseIndex( entry.team, overloadPurchaseKind_t::UNLOCK, entry.thing );
+		if ( unlockIndex >= 0 )
+		{
+			unlockHasUpgrade[ unlockIndex ] = true;
+		}
+	}
+
 	for ( int i = 0; i < MAX_OVERLOAD_PURCHASES; ++i )
 	{
 		char config[ BIG_INFO_STRING ];
@@ -865,7 +924,7 @@ static void PublishOverloadCatalog()
 		if ( i < static_cast<int>( overloadPurchases.size() ) )
 		{
 			const overloadPurchaseDef_t& entry = overloadPurchases[ i ];
-			Info_SetValueForKey( config, "k", PurchaseKindToken( entry.kind ), false );
+			Info_SetValueForKey( config, "k", BG_OverloadPurchaseKindToken( entry.kind ), false );
 			Info_SetValueForKey( config, "t", va( "%d", entry.team ), false );
 			Info_SetValueForKey( config, "thing", entry.thing.c_str(), false );
 			Info_SetValueForKey( config, "tl", entry.thingLabel.c_str(), false );
@@ -875,11 +934,10 @@ static void PublishOverloadCatalog()
 			Info_SetValueForKey( config, "sl", entry.statLabel.c_str(), false );
 			Info_SetValueForKey( config, "name", entry.displayName.c_str(), false );
 			Info_SetValueForKey( config, "desc", entry.uiDescription.c_str(), false );
-			Info_SetValueForKey( config, "bc", va( "%d", entry.baseCost ), false );
-			Info_SetValueForKey( config, "cs", va( "%d", entry.costStep ), false );
 			Info_SetValueForKey( config, "ba", va( "%d", entry.bundleAmount ), false );
 			Info_SetValueForKey( config, "req", va( "%d", entry.requiredCompletedCount ), false );
 			Info_SetValueForKey( config, "mr", va( "%d", entry.maxRanks ), false );
+			Info_SetValueForKey( config, "hu", va( "%d", unlockHasUpgrade[ i ] ), false );
 
 			if ( strlen( config ) >= BIG_INFO_STRING )
 			{
@@ -1040,7 +1098,9 @@ static void CaptureAttributeEffectBaseline( overloadEffect_t& effect )
 	}
 }
 
-static overloadEffect_t GameplayEffect( const char* gameplayVarName, double step, double minValue = -std::numeric_limits<double>::infinity(), double maxValue = std::numeric_limits<double>::infinity() )
+static overloadEffect_t GameplayEffect( const char* gameplayVarName, const OverloadNextValueFunc& growth,
+                                        double minValue = -std::numeric_limits<double>::infinity(),
+                                        double maxValue = std::numeric_limits<double>::infinity() )
 {
 	int gameplayIndex = BG_FindGameplayVarByName( gameplayVarName );
 	if ( gameplayIndex < 0 )
@@ -1054,7 +1114,7 @@ static overloadEffect_t GameplayEffect( const char* gameplayVarName, double step
 	effect.attributeFamily = BG_NUM_ATTRIBUTE_FAMILIES;
 	effect.attributeObject = -1;
 	effect.attributeField = -1;
-	effect.step = step;
+	effect.growth = growth;
 	effect.minValue = minValue;
 	effect.maxValue = maxValue;
 	effect.recomputeFromRanks = true;
@@ -1063,7 +1123,15 @@ static overloadEffect_t GameplayEffect( const char* gameplayVarName, double step
 	return effect;
 }
 
-static overloadEffect_t AttributeEffect( bgAttributeFamily_t family, const char* objectName, const char* fieldName, double step,
+static overloadEffect_t GameplayEffect( const char* gameplayVarName, double step,
+                                        double minValue = -std::numeric_limits<double>::infinity(),
+                                        double maxValue = std::numeric_limits<double>::infinity() )
+{
+	return GameplayEffect( gameplayVarName, ConstantGrowth( step ), minValue, maxValue );
+}
+
+static overloadEffect_t AttributeEffect( bgAttributeFamily_t family, const char* objectName, const char* fieldName,
+                                         const OverloadNextValueFunc& growth,
                                          double minValue = -std::numeric_limits<double>::infinity(),
                                          double maxValue = std::numeric_limits<double>::infinity() )
 {
@@ -1080,7 +1148,7 @@ static overloadEffect_t AttributeEffect( bgAttributeFamily_t family, const char*
 	effect.attributeFamily = family;
 	effect.attributeObject = objectIndex;
 	effect.attributeField = fieldIndex;
-	effect.step = step;
+	effect.growth = growth;
 	effect.minValue = minValue;
 	effect.maxValue = maxValue;
 	effect.recomputeFromRanks = true;
@@ -1089,12 +1157,19 @@ static overloadEffect_t AttributeEffect( bgAttributeFamily_t family, const char*
 	return effect;
 }
 
-static overloadEffect_t PercentAttributeEffect( bgAttributeFamily_t family, const char* objectName, const char* fieldName, double fraction,
-                                                double minValue = -std::numeric_limits<double>::infinity(),
+static overloadEffect_t AttributeEffect( bgAttributeFamily_t family, const char* objectName, const char* fieldName,
+                                         double step, double minValue = -std::numeric_limits<double>::infinity(),
+                                         double maxValue = std::numeric_limits<double>::infinity() )
+{
+	return AttributeEffect( family, objectName, fieldName, ConstantGrowth( step ), minValue, maxValue );
+}
+
+static overloadEffect_t PercentAttributeEffect( bgAttributeFamily_t family, const char* objectName, const char* fieldName,
+                                                double fraction, double minValue = -std::numeric_limits<double>::infinity(),
                                                 double maxValue = std::numeric_limits<double>::infinity() )
 {
-	overloadEffect_t effect = AttributeEffect( family, objectName, fieldName, 0.0, minValue, maxValue );
-	effect.step = effect.baseline * fraction;
+	overloadEffect_t effect = AttributeEffect( family, objectName, fieldName, ConstantGrowth( 0.0 ), minValue, maxValue );
+	effect.growth = ConstantGrowth( effect.baseline * fraction );
 	return effect;
 }
 
@@ -1108,7 +1183,7 @@ static overloadEffect_t CallbackEffect( overloadEffectCallback_t callback )
 	effect.attributeObject = -1;
 	effect.attributeField = -1;
 	effect.baseline = 0.0;
-	effect.step = 0.0;
+	effect.growth = ConstantGrowth( 0.0 );
 	effect.minValue = -std::numeric_limits<double>::infinity();
 	effect.maxValue = std::numeric_limits<double>::infinity();
 	effect.recomputeFromRanks = false;
@@ -1189,7 +1264,7 @@ static int UnlockCost( unlockableType_t unlockableType, int itemNum )
 		authoredUnlockValue * g_overloadUnlockCostSlope.Get() + g_overloadUnlockCostOffset.Get() ) ) );
 }
 
-static void AddUpgrade( team_t team, int baseCost, int costStep, int maxRanks,
+static void AddUpgrade( team_t team, const OverloadNextValueFunc& costGrowth, int maxRanks,
                         const char* thing, const char* thingLabel, const char* stat, const char* statLabel,
                         const char* displayName, const char* uiDescription,
                         std::initializer_list<overloadEffect_t> effects )
@@ -1206,8 +1281,7 @@ static void AddUpgrade( team_t team, int baseCost, int costStep, int maxRanks,
 	entry.displayName = displayName;
 	entry.uiDescription = uiDescription;
 	entry.requiredCompletedCount = 0;
-	entry.baseCost = baseCost;
-	entry.costStep = costStep;
+	entry.costGrowth = costGrowth;
 	entry.bundleAmount = 0;
 	entry.maxRanks = maxRanks;
 	entry.unlockFamily = BG_NUM_ATTRIBUTE_FAMILIES;
@@ -1215,6 +1289,15 @@ static void AddUpgrade( team_t team, int baseCost, int costStep, int maxRanks,
 	entry.unlockField = -1;
 	entry.effects.assign( effects.begin(), effects.end() );
 	overloadPurchases.push_back( std::move( entry ) );
+}
+
+static void AddUpgrade( team_t team, int baseCost, int costStep, int maxRanks,
+                        const char* thing, const char* thingLabel, const char* stat, const char* statLabel,
+                        const char* displayName, const char* uiDescription,
+                        std::initializer_list<overloadEffect_t> effects )
+{
+	AddUpgrade( team, LinearGrowth( baseCost, costStep ), maxRanks, thing, thingLabel, stat, statLabel,
+	            displayName, uiDescription, effects );
 }
 
 static void AddUnlockWithCost( team_t team, unlockableType_t unlockableType, int itemNum,
@@ -1231,8 +1314,7 @@ static void AddUnlockWithCost( team_t team, unlockableType_t unlockableType, int
 	entry.displayName = displayName;
 	entry.uiDescription = uiDescription;
 	entry.requiredCompletedCount = 0;
-	entry.baseCost = baseCost;
-	entry.costStep = 0;
+	entry.costGrowth = LinearGrowth( baseCost, 0.0 );
 	entry.bundleAmount = 0;
 	entry.maxRanks = 1;
 	entry.unlockFamily = family;
@@ -1334,6 +1416,14 @@ static bool UpgradePrerequisiteMetForValidation( const overloadPurchaseDef_t& en
 
 static void ValidateOverloadGraph()
 {
+	for ( const overloadPurchaseDef_t& entry : overloadPurchases )
+	{
+		if ( !entry.costGrowth )
+		{
+			Sys::Error( "invalid overload cost growth for %s '%s'", BG_OverloadPurchaseKindToken( entry.kind ), entry.thing.c_str() );
+		}
+	}
+
 	for ( team_t team = TEAM_NONE; ( team = G_IterateTeams( team ) ); )
 	{
 		std::vector<bool> ownedUnlocks( overloadPurchases.size(), false );
@@ -1398,7 +1488,7 @@ static void ValidateOverloadGraph()
 			if ( entry.requiredCompletedCount > reachableCompletedPurchases )
 			{
 				Sys::Error( "Overload graph broken for team %d: %s '%s' requires %d completed purchases, but only %d are reachable before progression stalls",
-				            team, PurchaseKindToken( entry.kind ), entry.thing.c_str(),
+			            team, BG_OverloadPurchaseKindToken( entry.kind ), entry.thing.c_str(),
 				            entry.requiredCompletedCount, reachableCompletedPurchases );
 			}
 		}
@@ -1430,8 +1520,7 @@ static void BuildOverloadCatalog()
 	bpBundle.displayName = "BP +50";
 	bpBundle.uiDescription = "Add 50 team BP. Each bundle costs more than the last.";
 	bpBundle.requiredCompletedCount = 0;
-	bpBundle.baseCost = OVERLOAD_BP_BUNDLE_COST;
-	bpBundle.costStep = OVERLOAD_BP_BUNDLE_COST_STEP;
+	bpBundle.costGrowth = LinearGrowth( OVERLOAD_BP_BUNDLE_COST, OVERLOAD_BP_BUNDLE_COST_STEP );
 	bpBundle.bundleAmount = OVERLOAD_BP_BUNDLE_AMOUNT;
 	bpBundle.maxRanks = std::numeric_limits<int>::max();
 	bpBundle.unlockFamily = BG_NUM_ATTRIBUTE_FAMILIES;
@@ -1700,7 +1789,7 @@ int RemainingSpendCapacity( const overloadPurchaseDef_t& entry, int entryIndex, 
 	int remaining = -invested;
 	for ( int rank = currentRank; rank < entry.maxRanks; ++rank )
 	{
-		remaining += ScaleOverloadCost( team, entry.baseCost + rank * entry.costStep );
+		remaining += OverloadCostAtRank( entry, rank, team );
 	}
 
 	return std::max( 0, remaining );
@@ -1710,7 +1799,7 @@ static int RanksCompletedFromSpend( const overloadPurchaseDef_t& entry, int curr
 {
 	if ( entry.kind == overloadPurchaseKind_t::UNLOCK )
 	{
-		if ( investedCredits >= ScaleOverloadCost( team, entry.baseCost ) )
+		if ( investedCredits >= OverloadNextCost( entry, -1, team ) )
 		{
 			investedCredits = 0;
 			return 1;
@@ -1721,9 +1810,9 @@ static int RanksCompletedFromSpend( const overloadPurchaseDef_t& entry, int curr
 	if ( entry.kind == overloadPurchaseKind_t::BP_BUNDLE )
 	{
 		int completed = 0;
-		while ( investedCredits >= ScaleOverloadCost( team, entry.baseCost + ( currentRank + completed ) * entry.costStep ) )
+		while ( investedCredits >= OverloadCostAtRank( entry, currentRank + completed, team ) )
 		{
-			investedCredits -= ScaleOverloadCost( team, entry.baseCost + ( currentRank + completed ) * entry.costStep );
+			investedCredits -= OverloadCostAtRank( entry, currentRank + completed, team );
 			++completed;
 		}
 		return completed;
@@ -1732,7 +1821,7 @@ static int RanksCompletedFromSpend( const overloadPurchaseDef_t& entry, int curr
 	int completed = 0;
 	while ( currentRank + completed < entry.maxRanks )
 	{
-		int threshold = ScaleOverloadCost( team, entry.baseCost + ( currentRank + completed ) * entry.costStep );
+		int threshold = OverloadCostAtRank( entry, currentRank + completed, team );
 		if ( investedCredits < threshold )
 		{
 			break;
@@ -1769,7 +1858,7 @@ static double EffectiveEffectValue( const overloadEffect_t& effect, team_t team 
 {
 	if ( !effect.recomputeFromRanks )
 	{
-		return ClampEffectValue( effect, effect.baseline + effect.step );
+		return ClampEffectValue( effect, effect.baseline + SumGrowth( effect.growth, 1 ) );
 	}
 
 	double value = effect.baseline;
@@ -1787,7 +1876,7 @@ static double EffectiveEffectValue( const overloadEffect_t& effect, team_t team 
 		{
 			if ( SameEffectTarget( effect, candidate ) )
 			{
-				value += candidate.step * economy.repeatCounts[ i ];
+				value += SumGrowth( candidate.growth, economy.repeatCounts[ i ] );
 			}
 		}
 	}
