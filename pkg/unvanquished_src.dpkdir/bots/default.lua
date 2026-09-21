@@ -28,6 +28,11 @@ local STATE = {
     tasks = {},
 }
 
+local function enemy_seen_recently(level, mind, duration)
+    return mind.enemyLastSeen and mind.enemyLastSeen > 0
+        and elapsed_since(level.time, mind.enemyLastSeen) <= duration
+end
+
 local BUILDER_ANCHOR_RADIUS = 700
 local ALIEN_EVOLVE_TARGETS = common.ALIEN_EVOLVE_TARGETS
 local ALIEN_COMBAT_TARGETS = common.ALIEN_COMBAT_TARGETS
@@ -636,10 +641,28 @@ local function maybe_builder_behavior(team, number, client, builder, wants_build
     return ctx:roam()
 end
 
-local function maybe_use_medkit(team, client, ctx)
+local function maybe_use_medkit(team, client, ctx, enemy_visible, level, mind)
+    if not is_human(team) then
+        return STATUS_FAILURE
+    end
+
     local status = use_medkit_if_low(team, client, ctx, 50)
     if status ~= STATUS_FAILURE then
+        return status
+    end
+
+    if enemy_visible or enemy_seen_recently(level, mind, 3000)
+        or recently_attacked(level, mind, 1000) then
         return STATUS_FAILURE
+    end
+
+    -- If the medkit is unavailable or could not be activated, send an
+    -- unengaged human to a medistat instead of letting the bot resume roaming.
+    if client.health < 100 then
+        status = ctx:heal()
+        if status ~= STATUS_FAILURE then
+            return status
+        end
     end
 
     return STATUS_FAILURE
@@ -797,7 +820,7 @@ end
 local function maybe_reload(team, client, weapon_attr, level, ctx, mind, enemy_visible)
     if not is_human(team)
         or enemy_visible
-        or elapsed_since(level.time, mind.enemyLastSeen) <= 3000
+        or enemy_seen_recently(level, mind, 3000)
         or not weapon_attr
         or weapon_attr.ammo <= 0
         or (client.ammo / weapon_attr.ammo) >= 0.4 then
@@ -807,8 +830,10 @@ local function maybe_reload(team, client, weapon_attr, level, ctx, mind, enemy_v
     return ctx:reload()
 end
 
-local function maybe_equip(team, level, ctx, mind, enemy_visible)
-    if not is_human(team) or enemy_visible or elapsed_since(level.time, mind.enemyLastSeen) <= 1000 then
+local function maybe_equip(team, client, level, ctx, mind, enemy_visible)
+    if not is_human(team) or client.weapon == "ckit" or enemy_visible
+        or enemy_seen_recently(level, mind, 3000)
+        or human_repair_target(mind) then
         return STATUS_FAILURE
     end
 
@@ -954,7 +979,7 @@ local function run_roam_task(task, state, ctx)
         return status
     end
 
-    status = maybe_equip(state.team, state.level, ctx, state.mind, state.enemy_visible)
+    status = maybe_equip(state.team, state.client, state.level, ctx, state.mind, state.enemy_visible)
     if status ~= STATUS_FAILURE then
         return status
     end
@@ -1062,7 +1087,7 @@ return function(self, ctx)
         return status
     end
 
-    status = maybe_use_medkit(team, client, ctx)
+    status = maybe_use_medkit(team, client, ctx, enemy_visible, level, mind)
     if status ~= STATUS_FAILURE then
         return status
     end
@@ -1108,6 +1133,15 @@ return function(self, ctx)
                 return status
             end
         end
+    end
+
+    -- Give idle human bots a chance to complete their loadout before starting
+    -- another task.  Previously equip was only reached after the newly
+    -- started task had failed, so long-running tasks could prevent bots with
+    -- enough credits from ever attempting to buy armor or other equipment.
+    status = maybe_equip(state.team, state.client, state.level, ctx, state.mind, state.enemy_visible)
+    if status ~= STATUS_FAILURE then
+        return status
     end
 
     task = start_task(number, select_task(state))
