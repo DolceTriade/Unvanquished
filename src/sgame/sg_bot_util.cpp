@@ -673,6 +673,7 @@ int BotGetDesiredBuy( gentity_t *self, weapon_t &weapon, upgrade_t upgrades[], s
 	int usableCapital = credits + equipmentPrice;
 	size_t numUpgrades = 0;
 	int usedSlots = 0;
+	bool armorSelected = false;
 
 	unsigned int numTeamUpgrades[UP_NUM_UPGRADES] = {};
 	unsigned int numTeamWeapons[WP_NUM_WEAPONS] = {};
@@ -758,6 +759,20 @@ int BotGetDesiredBuy( gentity_t *self, weapon_t &weapon, upgrade_t upgrades[], s
 	}
 	};
 
+	auto buyRifle = [&]()
+	{
+	for ( auto const &wp : weapons )
+	{
+		if ( wp.item == WP_MACHINEGUN && wp.canBuyNow() && usableCapital >= wp.price()
+				&& ( usedSlots & wp.slots() ) == 0 )
+		{
+			weapon = wp.item;
+			usableCapital -= wp.price();
+			break;
+		}
+	}
+	};
+
 	auto buyTools = [&]()
 	{
 	for ( auto const &tool : others )
@@ -783,7 +798,18 @@ int BotGetDesiredBuy( gentity_t *self, weapon_t &weapon, upgrade_t upgrades[], s
 	{
 		// buy armor before anything else
 		buyArmors();
-		buyWeapons();
+		// Armor is a prerequisite for the armor-preferring loadout.  Do not
+		// spend the available credits on a weapon when no armor was affordable.
+		if ( armorSelected )
+		{
+			buyWeapons();
+		}
+		else
+		{
+			// Always maintain a usable fallback weapon when armor is not yet
+			// affordable; otherwise the buy action can leave the bot weaponless.
+			buyRifle();
+		}
 		buyTools();
 		buyRadar();
 	}
