@@ -68,6 +68,18 @@ using Shared::Lua::RegType;
 
 static bool botContextRegistered = false;
 
+static int LuaTraceback( lua_State *L )
+{
+	const char *message = lua_tostring( L, 1 );
+	if ( !message )
+	{
+		message = "(error object is not a string)";
+	}
+
+	luaL_traceback( L, L, message, 1 );
+	return 1;
+}
+
 static const char *StatusName( AINodeStatus_t status )
 {
 	switch ( status )
@@ -984,15 +996,19 @@ AINodeStatus_t runLuaBehavior( gentity_t *self, AIGenericNode_t *node )
 	EnsureBotContextRegistered( L );
 
 	BotContext context = { self, root, &GetBotBehaviorState( *self->botMind, root ) };
+	lua_pushcfunction( L, LuaTraceback );
+	int errorHandler = lua_gettop( L );
 	lua_rawgeti( L, LUA_REGISTRYINDEX, root->ref );
 	LuaLib<EntityProxy>::push( L, Entity::CreateProxy( self, L ) );
 	LuaLib<BotContext>::push( L, &context );
-	if ( lua_pcall( L, 2, 1, 0 ) != LUA_OK )
+	if ( lua_pcall( L, 2, 1, errorHandler ) != LUA_OK )
 	{
 		Log::Warn( "Error running lua behavior '%s': %s", bt->name, lua_tostring( L, -1 ) );
+		lua_remove( L, errorHandler );
 		lua_pop( L, 1 );
 		return STATUS_FAILURE;
 	}
+	lua_remove( L, errorHandler );
 
 	if ( !lua_isnumber( L, -1 ) )
 	{
@@ -1026,12 +1042,17 @@ AIBehaviorTree_t *LoadLuaBehavior( Str::StringRef file )
 		return nullptr;
 	}
 
-	if ( lua_pcall( L, 0, 1, 0 ) != LUA_OK )
+	int errorHandler = lua_gettop( L );
+	lua_pushcfunction( L, LuaTraceback );
+	lua_insert( L, errorHandler );
+	if ( lua_pcall( L, 0, 1, errorHandler ) != LUA_OK )
 	{
 		Log::Warn( "Error executing file '%s': %s", file, lua_tostring( L, -1 ) );
+		lua_remove( L, errorHandler );
 		lua_pop( L, 1 );
 		return nullptr;
 	}
+	lua_remove( L, errorHandler );
 
 	// Ensure that the file actually returned a function.
 	if ( !lua_isfunction( L, -1 ) )
