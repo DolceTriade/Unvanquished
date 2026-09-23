@@ -339,16 +339,19 @@ static std::string G_BotDefaultBehavior( team_t team )
 
 bool G_BotSetBehavior( botMemory_t *botMind, team_t team, Str::StringRef behavior )
 {
+	// The behavior name may point into the current Lua action state. Resetting
+	// the behavior state below can free that storage, so copy it first.
+	const std::string behaviorName( behavior );
 	G_Bot_ResetBehaviorState( *botMind );
 	botMind->blackboardTransient = 0;
 	botMind->myTimer = level.time;
 	botMind->buildCooldownUntil = 0;
 
-	botMind->behaviorTree = BotBehaviorTree( behavior );
+	botMind->behaviorTree = BotBehaviorTree( behaviorName );
 
 	if ( !botMind->behaviorTree )
 	{
-		Log::Warn( "Problem when loading behavior tree %s, trying default", behavior );
+		Log::Warn( "Problem when loading behavior tree %s, trying default", behaviorName.c_str() );
 		const std::string behaviorString = G_BotDefaultBehavior( team );
 		botMind->behaviorTree = BotBehaviorTree( behaviorString );
 
