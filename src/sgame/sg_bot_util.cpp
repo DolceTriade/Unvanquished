@@ -1966,6 +1966,335 @@ void BotFireWeapon( weaponMode_t mode, usercmd_t *botCmdBuffer )
 
 static Cvar::Cvar<int> g_bot_upwardAttackMinHeight("g_bot_upwardAttackMinHeight", "minimal height difference for bots to attack upwards.", Cvar::NONE, 9999);
 
+// Check the intended horizontal step with the player's actual bounds. Floor
+// checks alone allow bots to strafe straight into walls.
+static bool BotEvasionStepClear( gentity_t *self, glm::vec2 direction )
+{
+	if ( glm::length2( direction ) < 0.01f ) return true;
+	glm::vec3 mins, maxs;
+	BG_BoundingBox( static_cast<class_t>( self->client->ps.stats[ STAT_CLASS ] ),
+	                &mins, &maxs, nullptr, nullptr, nullptr );
+	mins.z += STEPSIZE;
+	maxs.z += STEPSIZE;
+	glm::vec3 start = VEC2GLM( self->s.origin );
+	glm::vec2 step = glm::normalize( direction ) * 72.0f;
+	glm::vec3 end = start + glm::vec3( step, 0.0f );
+	trace_t trace;
+	trap_Trace( &trace, start, mins, maxs, end, self->num(), MASK_PLAYERSOLID, 0 );
+	if ( trace.startsolid || trace.fraction < 1.0f ) return false;
+
+	// Player-solid tracing is not sufficient for every enemy entity: some
+	// targets can be non-blocking to collision while still occupying the dodge
+	// lane. Query the swept player bounds as well so a dodge does not trade a
+	// wall collision for running into a second attacker or hostile buildable.
+	glm::vec3 queryMins, queryMaxs;
+	for ( int axis = 0; axis < 3; axis++ )
+	{
+		queryMins[axis] = std::min( start[axis] + mins[axis], end[axis] + mins[axis] );
+		queryMaxs[axis] = std::max( start[axis] + maxs[axis], end[axis] + maxs[axis] );
+	}
+	int entities[ MAX_GENTITIES ];
+	int numEntities = trap_EntitiesInBox( GLM4READ( queryMins ), GLM4READ( queryMaxs ), entities, MAX_GENTITIES );
+	for ( int i = 0; i < numEntities; i++ )
+	{
+		gentity_t *other = &g_entities[ entities[i] ];
+		if ( other == self || !BotEntityIsValidTarget( other )
+			|| ( other->s.eType != entityType_t::ET_PLAYER
+			     && other->s.eType != entityType_t::ET_BUILDABLE ) )
+		{
+			continue;
+		}
+		if ( G_Team( other ) != TEAM_NONE && !G_OnSameTeam( self, other ) ) return false;
+	}
+	return true;
+}
+
+// Return the range at which the current enemy can damage this bot. This is
+// intentionally based on the enemy's attack, not on the bot's selected
+// weapon: evasion should start when the threat enters its effective range.
+static float BotEnemyAttackRange( const gentity_t *enemy )
+{
+	if ( !enemy || !enemy->client ) return 0.0f;
+
+	if ( G_Team( enemy ) == TEAM_ALIENS )
+	{
+		switch ( static_cast<class_t>( enemy->client->ps.stats[ STAT_CLASS ] ) )
+		{
+		case PCL_ALIEN_LEVEL0:
+			return LEVEL0_BITE_RANGE;
+		case PCL_ALIEN_LEVEL1:
+			return std::max( LEVEL1_CLAW_RANGE, static_cast<float>( LEVEL1_POUNCE_DISTANCE ) );
+		case PCL_ALIEN_LEVEL2:
+			return LEVEL2_CLAW_RANGE;
+		case PCL_ALIEN_LEVEL2_UPG:
+			return std::max( LEVEL2_CLAW_U_RANGE, LEVEL2_AREAZAP_RANGE );
+		case PCL_ALIEN_LEVEL3:
+			return std::max( LEVEL3_CLAW_RANGE, LEVEL3_POUNCE_RANGE );
+		case PCL_ALIEN_LEVEL3_UPG:
+			return std::max( LEVEL3_CLAW_UPG_RANGE, LEVEL3_POUNCE_UPG_RANGE );
+		case PCL_ALIEN_LEVEL4:
+			// Trample starts outside claw range and closes quickly.
+			return LEVEL4_CLAW_RANGE + 220.0f;
+		default:
+			return 0.0f;
+		}
+	}
+
+	switch ( enemy->client->ps.weapon )
+	{
+	case WP_NONE:
+	case WP_HBUILD:
+		return 0.0f;
+	// These are practical combat distances for evasion, not the maximum
+	// lifetime of a projectile or an unbounded hitscan trace. Using the latter
+	// makes every ranged weapon put the bot in evasion immediately after it
+	// acquires a target.
+	case WP_BLASTER:
+		return 1800.0f;
+	case WP_PAIN_SAW:
+		return PAINSAW_RANGE;
+	case WP_FLAMER:
+		return 700.0f;
+	case WP_SHOTGUN:
+	case WP_MACHINEGUN:
+	case WP_LAS_GUN:
+	case WP_MASS_DRIVER:
+	case WP_CHAINGUN:
+		return 1800.0f;
+	case WP_PULSE_RIFLE:
+		return 2200.0f;
+	case WP_LUCIFER_CANNON:
+		return 2400.0f;
+	case WP_ROCKETPOD:
+		return 2400.0f;
+	default:
+		return 0.0f;
+	}
+}
+
+bool BotEnemyInAttackRange( const gentity_t *self )
+{
+	if ( !self || !self->botMind ) return false;
+	const gentity_t *target = self->botMind->goal.getTargetedEntity();
+	if ( !target || !target->client ) return false;
+	float range = BotEnemyAttackRange( target );
+	return range > 0.0f
+		&& glm::distance( VEC2GLM( target->s.origin ), VEC2GLM( self->s.origin ) ) <= range;
+}
+
+bool BotCombatEvasion( gentity_t *self )
+{
+	botMemory_t *mind = self->botMind;
+	const gentity_t *target = mind->goal.getTargetedEntity();
+	if ( !target || !target->client || !( mind->skillSet[BOT_H_EVASION_ORBIT]
+	                || mind->skillSet[BOT_H_EVASION_MATADOR]
+                || mind->skillSet[BOT_H_EVASION_BURST] ) )
+	{
+		return false;
+	}
+
+	const bool orbit = mind->skillSet[BOT_H_EVASION_ORBIT];
+	const bool matador = mind->skillSet[BOT_H_EVASION_MATADOR];
+	const bool burst = mind->skillSet[BOT_H_EVASION_BURST];
+	const bool alienThreat = G_Team( self ) == TEAM_HUMANS && G_Team( target ) == TEAM_ALIENS;
+	const bool melee = self->client->ps.weapon == WP_PAIN_SAW
+		|| self->client->ps.weapon == WP_FLAMER;
+	const float weaponMinRange = melee ? 42.0f : ( orbit ? 170.0f : 130.0f );
+	const float weaponMaxRange = melee ? 85.0f : ( orbit ? 280.0f : 320.0f );
+	const glm::vec3 targetDelta = VEC2GLM( target->s.origin ) - VEC2GLM( self->s.origin );
+	const float enemyAttackRange = BotEnemyAttackRange( target );
+	const float enemyDistance = glm::length( targetDelta );
+	const float minRange = alienThreat ? enemyAttackRange + 180.0f : weaponMinRange;
+	const float maxRange = alienThreat
+		? minRange + ( orbit ? 360.0f : 280.0f ) : weaponMaxRange;
+	const float evasionTriggerRange = alienThreat ? minRange + 300.0f : enemyAttackRange;
+	if ( enemyAttackRange <= 0.0f || enemyDistance > evasionTriggerRange )
+	{
+		// Pursuit handles the long approach. Against aliens, start early enough
+		// to reach a safe minimum distance before their attack range.
+		return false;
+	}
+
+	if ( mind->evasion.targetNum != target->num() )
+	{
+		mind->evasion.targetNum = target->num();
+		mind->evasion.side = BG_random() < 0.5f ? -1 : 1;
+		mind->evasion.maneuver = BG_random() < 0.25f ? 0 : 1;
+		mind->evasion.nextSwitchTime = level.time + 1800 + static_cast<int>( 3500 * BG_random() );
+		mind->evasion.lastTargetSampleTime = level.time;
+		mind->evasion.lastJumpTime = -9999;
+		mind->evasion.lastTargetVelocity = target->client
+			? glm::vec2( target->client->ps.velocity[0], target->client->ps.velocity[1] ) : glm::vec2( 0.0f );
+		mind->evasion.targetAcceleration = {};
+	}
+
+	glm::vec2 radial2( targetDelta.x, targetDelta.y );
+	float distance = glm::length( radial2 );
+	if ( distance < 1.0f ) return true;
+	radial2 /= distance;
+	glm::vec2 tangent( -radial2.y, radial2.x );
+
+	glm::vec2 targetVelocity( target->client->ps.velocity[0], target->client->ps.velocity[1] );
+	int sampleMsec = level.time - mind->evasion.lastTargetSampleTime;
+	if ( sampleMsec > 0 )
+	{
+		glm::vec2 measuredAcceleration = ( targetVelocity - mind->evasion.lastTargetVelocity )
+			* ( 1000.0f / sampleMsec );
+		// Smooth one frame of input noise without making acceleration response
+		// sluggish enough to miss a sudden alien rush.
+		mind->evasion.targetAcceleration = mind->evasion.targetAcceleration * 0.65f
+			+ measuredAcceleration * 0.35f;
+		mind->evasion.lastTargetVelocity = targetVelocity;
+		mind->evasion.lastTargetSampleTime = level.time;
+	}
+	float lateralVelocity = glm::dot( targetVelocity, tangent );
+	int side = mind->evasion.side;
+	if ( level.time >= mind->evasion.nextSwitchTime )
+	{
+		if ( matador && std::abs( lateralVelocity ) > 100.0f )
+		{
+			// React to a meaningful target strafe once per cycle, rather than
+			// changing direction every frame in response to input noise.
+			mind->evasion.side = lateralVelocity > 0.0f ? -1 : 1;
+		}
+		else if ( orbit || matador || ( burst && mind->evasion.maneuver == 1 ) )
+		{
+			mind->evasion.side = -mind->evasion.side;
+		}
+		if ( burst || matador ) mind->evasion.maneuver = 1 - mind->evasion.maneuver;
+		// Give every lateral phase enough time to cover a real arc. Burst's
+		// short phase is deliberately the non-lateral range-correction beat.
+		int minSwitch = burst && mind->evasion.maneuver == 0 ? 900 : 1800;
+		int maxSwitch = burst && mind->evasion.maneuver == 0 ? 1800 : 4200;
+		if ( orbit ) { minSwitch = 3000; maxSwitch = 7000; }
+		if ( matador ) { minSwitch = 2500; maxSwitch = 6000; }
+		mind->evasion.nextSwitchTime = level.time + minSwitch
+			+ static_cast<int>( ( maxSwitch - minSwitch ) * BG_random() );
+		side = mind->evasion.side;
+	}
+	glm::vec2 ownVelocity( self->client->ps.velocity[0], self->client->ps.velocity[1] );
+	float targetRadialVelocity = glm::dot( targetVelocity, radial2 );
+	float ownRadialVelocity = glm::dot( ownVelocity, radial2 );
+	float maxSpeed = std::max( 1.0f, GetMaximalSpeed( self ) );
+	float preferredRange = 0.5f * ( minRange + maxRange );
+	float distanceError = distance - preferredRange;
+	float relativeRadialVelocity = targetRadialVelocity - ownRadialVelocity;
+	// Radial correction is always active, including while circling. This
+	// counters both target movement and the bot's own momentum so lateral
+	// movement does not silently turn into a retreat or an approach.
+	float radial = std::max( -1.5f, std::min( 1.5f,
+		distanceError / 120.0f + relativeRadialVelocity / maxSpeed ) );
+	float distancePriority = std::min( 1.0f, std::abs( distanceError ) / 80.0f );
+
+	// Predict where the bot will be caught rather than waiting until the
+	// alien reaches the current range. Relative speed and target acceleration
+	// make the retreat start earlier and become stronger as the attack closes.
+	float closingSpeed = -glm::dot( targetVelocity - ownVelocity, radial2 );
+	float closingAcceleration = -glm::dot( mind->evasion.targetAcceleration, radial2 );
+	constexpr float threatHorizon = 0.65f;
+	float predictedDistance = distance - closingSpeed * threatHorizon
+		- 0.5f * std::max( 0.0f, closingAcceleration ) * Square( threatHorizon );
+	bool fastAlienApproach = G_Team( self ) == TEAM_HUMANS
+		&& G_Team( target ) == TEAM_ALIENS
+		&& ( closingSpeed > 110.0f || predictedDistance < minRange + 65.0f );
+	if ( fastAlienApproach )
+	{
+		// Keep the side step, but bias it hard enough to escape a pounce or
+		// rush. The next frame can return to circling once the threat passes.
+		radial = std::min( radial, -1.25f );
+	}
+	// Keep the styles on a broad arc instead of letting their radial correction
+	// turn every dodge into a backpedal. Burst still has a short approach/
+	// retreat beat, but its active beat is strongly lateral.
+	float lateral = 1.8f;
+	if ( orbit ) lateral = 2.1f;
+	if ( matador ) lateral = 1.9f;
+	if ( burst ) lateral = mind->evasion.maneuver == 0 ? 0.75f : 2.2f;
+	if ( alienThreat ) lateral *= 1.15f;
+	// Make range correction dominate near either edge of the band. Full
+	// lateral arcs are reserved for the middle, where they cannot compromise
+	// the minimum safe distance.
+	lateral *= 1.0f - 0.75f * distancePriority;
+	lateral *= side;
+	glm::vec2 desired = radial2 * radial + tangent * lateral;
+	glm::vec2 motion = desired;
+	if ( glm::length2( desired ) > 0.01f && !BotEvasionStepClear( self, desired ) )
+	{
+		// Try the local alternatives in preference order. This handles a wall
+		// on the chosen side without waiting for the bot to become stuck.
+		const glm::vec2 candidates[] = {
+			desired,
+			tangent * static_cast<float>( side ) + radial2 * radial * 0.35f,
+			tangent * -static_cast<float>( side ) + radial2 * radial * 0.35f,
+			tangent * static_cast<float>( side ),
+			tangent * -static_cast<float>( side ),
+			radial2 * radial,
+			radial2 * -1.0f,
+		};
+		bool found = false;
+		for ( const glm::vec2 &candidate : candidates )
+		{
+			if ( glm::length2( candidate ) > 0.01f && BotEvasionStepClear( self, candidate ) )
+			{
+				motion = candidate;
+				found = true;
+				break;
+			}
+		}
+		if ( !found )
+		{
+			// Evasion has no safe local step. Let the regular nav obstacle
+			// resolver choose a route around the blocker instead of issuing a
+			// zero movement command forever.
+			BotMoveToGoal( self );
+			return true;
+		}
+	}
+
+	glm::vec3 botForward, botRight;
+	AngleVectors( VEC2GLM( self->client->ps.viewangles ), &botForward, &botRight, nullptr );
+	botForward.z = botRight.z = 0.0f;
+	if ( glm::length2( botForward ) < 0.01f || glm::length2( botRight ) < 0.01f ) return true;
+	botForward = glm::normalize( botForward );
+	botRight = glm::normalize( botRight );
+
+	// Compose the motion in world space, then project onto local movement
+	// axes. A simple forward/back command ignores the target's bearing while
+	// aim turns, and made every style appear to retreat.
+	glm::vec3 motion3 = glm::vec3( motion, 0.0f );
+	float forwardCmd = glm::dot( motion3, botForward );
+	float rightCmd = glm::dot( motion3, botRight );
+	if ( forwardCmd < -0.1f && !BotTraceForFloor( self, MOVE_BACKWARD ) ) forwardCmd = 0.0f;
+	if ( rightCmd > 0.1f && !BotTraceForFloor( self, MOVE_RIGHT ) ) rightCmd = 0.0f;
+	if ( rightCmd < -0.1f && !BotTraceForFloor( self, MOVE_LEFT ) ) rightCmd = 0.0f;
+	glm::vec2 finalWorld = glm::vec2( botForward ) * forwardCmd + glm::vec2( botRight ) * rightCmd;
+	if ( glm::length2( finalWorld ) > 0.01f && !BotEvasionStepClear( self, finalWorld ) )
+	{
+		BotMoveToGoal( self );
+		return true;
+	}
+	float scale = std::max( 1.0f, std::max( std::abs( forwardCmd ), std::abs( rightCmd ) ) );
+	mind->cmdBuffer.forwardmove = static_cast<signed char>( forwardCmd * 127.0f / scale );
+	mind->cmdBuffer.rightmove = static_cast<signed char>( rightCmd * 127.0f / scale );
+	// A jump is expensive and exposes the bot if used as decoration. Reserve
+	// it for an enemy that is already in attack range and is closing quickly,
+	// accelerating into the bot, or close enough that a melee swing can miss.
+	glm::vec3 enemyForward;
+	AngleVectors( VEC2GLM( target->client->ps.viewangles ), &enemyForward, nullptr, nullptr );
+	glm::vec2 enemyToBot2( -targetDelta.x, -targetDelta.y );
+	bool enemyFacingBot = glm::length2( enemyToBot2 ) > 0.01f
+		&& glm::dot( glm::vec2( enemyForward ), glm::normalize( enemyToBot2 ) ) > 0.45f;
+	bool attackComing = closingSpeed > 100.0f || closingAcceleration > 500.0f
+		|| ( enemyDistance < enemyAttackRange * 0.65f && enemyFacingBot
+		     && ( target->client->ps.weaponTime <= 150 || closingSpeed > 30.0f ) );
+	if ( burst && G_Team( self ) == TEAM_HUMANS && attackComing
+		&& level.time - mind->evasion.lastJumpTime >= 900 )
+	{
+		if ( BotJump( self ) ) mind->evasion.lastJumpTime = level.time;
+	}
+	return true;
+}
+
 // return true if an upward attack is started or in progress, false otherwise
 static bool BotAttackUpward( gentity_t *self )
 {

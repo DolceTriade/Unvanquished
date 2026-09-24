@@ -184,6 +184,7 @@ struct botSkillTreeElement_t {
 	int cost;
 	team_t allowed_teams; // TEAM_NONE means that the skill is available for every team
 	skillSet_t prerequisite; // This skill needs ONE OF those prerequisite to be selectable
+	int exclusive_group = 0; // non-zero skills in one group: select at most one
 };
 
 // used as a convenience function to build the "prerequisite" bitset
@@ -225,6 +226,9 @@ static const std::vector<botSkillTreeElement_t> skillTree =
 	{ "goon-attack-jump",   BOT_A_POUNCE_ON_ATTACK,        5,  TEAM_ALIENS, needs_one_of({BOT_B_BASIC_MOVEMENT}) },
 	{ "tyrant-attack-run",  BOT_A_TYRANT_CHARGE_ON_ATTACK, 5,  TEAM_ALIENS, needs_one_of({BOT_B_BASIC_MOVEMENT}) },
 	{ "attack-from-behind", BOT_A_ATTACK_FROM_BEHIND,      6,  TEAM_ALIENS, needs_one_of({BOT_B_BASIC_MOVEMENT}) },
+	{ "h-evasion-orbit",    BOT_H_EVASION_ORBIT,           0,  TEAM_HUMANS, 0, 1 },
+	{ "h-evasion-matador",  BOT_H_EVASION_MATADOR,         0,  TEAM_HUMANS, 0, 1 },
+	{ "h-evasion-burst",    BOT_H_EVASION_BURST,           0,  TEAM_HUMANS, 0, 1 },
 
 
 	////
@@ -310,6 +314,14 @@ static Util::optional<botSkillTreeElement_t> ChooseOneSkill(team_t team, skillSe
 		{
 			botSkillTreeElement_t choice = *skill;
 			possible_choices.erase(skill);
+			if ( choice.exclusive_group )
+			{
+				possible_choices.erase( std::remove_if( possible_choices.begin(), possible_choices.end(),
+					[&choice]( const botSkillTreeElement_t &other )
+					{
+						return other.exclusive_group == choice.exclusive_group;
+					} ), possible_choices.end() );
+			}
 			return choice;
 		}
 	}
@@ -357,6 +369,31 @@ static skillSet_t ChooseBaseSkills( int skillLevel, team_t team, std::vector<bot
 skillSet_t BotPickSkillset(std::string seed, int skillLevel, team_t team)
 {
 	std::vector<botSkillTreeElement_t> possible_choices = skillTree;
+	bot_skill evasionSkill = BOT_NUM_SKILLS;
+
+	// Evasion is a free, spawn-time specialization. It has its own random
+	// stream so adding it cannot change existing skill assignments.
+	std::vector<botSkillTreeElement_t> evasion_choices;
+	for ( const auto &choice : skillTree )
+	{
+		if ( choice.exclusive_group == 1 ) evasion_choices.push_back( choice );
+	}
+	std::seed_seq evasion_seed( seed.begin(), seed.end() );
+	std::mt19937_64 evasion_rng( evasion_seed );
+	if ( !evasion_choices.empty() )
+	{
+		std::vector<botSkillTreeElement_t> available;
+		for ( const auto &choice : evasion_choices )
+			if ( SkillIsAvailable( choice, team, {} ) ) available.push_back( choice );
+		if ( !available.empty() )
+		{
+			std::uniform_int_distribution<size_t> dist( 0, available.size() - 1 );
+			evasionSkill = available[ dist( evasion_rng ) ].skill;
+		}
+	}
+	// The group never participates in base or budget selection.
+	possible_choices.erase( std::remove_if( possible_choices.begin(), possible_choices.end(),
+		[]( const botSkillTreeElement_t &s ) { return s.exclusive_group == 1; } ), possible_choices.end() );
 
 	float max = team == TEAM_ALIENS ? static_cast<float>( skillsetBudgetAliens ) : static_cast<float>( skillsetBudgetHumans );
 
@@ -364,6 +401,7 @@ skillSet_t BotPickSkillset(std::string seed, int skillLevel, team_t team)
 	int skill_points = static_cast<float>(skillLevel + 2) / 9.0f * max;
 
 	skillSet_t skillSet = ChooseBaseSkills( skillLevel, team, possible_choices, skill_points );
+	if ( evasionSkill != BOT_NUM_SKILLS ) skillSet.set( evasionSkill );
 
 	// rng preparation
 	std::seed_seq seed_seq(seed.begin(), seed.end());

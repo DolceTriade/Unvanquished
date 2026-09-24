@@ -1170,24 +1170,33 @@ AINodeStatus_t BotActionFight( gentity_t *self, AIGenericNode_t *node )
 	bool evasiveAction = self->botMind->skillSet[BOT_B_PAIN]
 		&& ( level.time - self->botMind->painTime < PAIN_EVASIVE_WINDOW
 		     || level.time - self->botMind->seenEnemyTime < PAIN_EVASIVE_WINDOW );
-	if ( evasiveAction )
+	bool enemyInAttackRange = BotEnemyInAttackRange( self );
+	bool hasCombatEvasionStyle = self->botMind->skillSet[BOT_H_EVASION_ORBIT]
+		|| self->botMind->skillSet[BOT_H_EVASION_MATADOR]
+		|| self->botMind->skillSet[BOT_H_EVASION_BURST];
+	if ( BotCombatEvasion( self ) )
+	{
+		// The selected combat style owns grounded movement while the target is
+		// visible; aiming and firing above remain unchanged.
+	}
+	else if ( !hasCombatEvasionStyle && evasiveAction && enemyInAttackRange )
 	{
 		BotStrafeDodge( self );
 	}
-	else if ( mind->skillLevel >= 3 && goalDist < Square( MAX_HUMAN_DANCE_DIST )
+	else if ( !hasCombatEvasionStyle && mind->skillLevel >= 3 && goalDist < Square( MAX_HUMAN_DANCE_DIST )
 	        && ( goalDist > Square( MIN_HUMAN_DANCE_DIST ) || mind->skillLevel < 5 )
 	        && self->client->ps.weapon != WP_PAIN_SAW && self->client->ps.weapon != WP_FLAMER
 	        && BotTraceForFloor( self, MOVE_BACKWARD ) )
 	{
 		BotMoveInDir( self, MOVE_BACKWARD );
 	}
-	else if ( goalDist <= Square( MIN_HUMAN_DANCE_DIST ) ) //we wont hit this if skill < 5
+	else if ( !hasCombatEvasionStyle && goalDist <= Square( MIN_HUMAN_DANCE_DIST ) ) //we wont hit this if skill < 5
 	{
 		// We will be moving toward enemy, strafing to
 		// the result: we go around the enemy
 		BotAlternateStrafe( self );
 	}
-	else if ( goalDist >= Square( MAX_HUMAN_DANCE_DIST ) && self->client->ps.weapon != WP_PAIN_SAW )
+	else if ( !hasCombatEvasionStyle && goalDist >= Square( MAX_HUMAN_DANCE_DIST ) && self->client->ps.weapon != WP_PAIN_SAW )
 	{
 		if ( goalDist - Square( MAX_HUMAN_DANCE_DIST ) < 100 )
 		{
