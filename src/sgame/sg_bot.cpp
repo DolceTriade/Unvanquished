@@ -962,6 +962,7 @@ void G_Bot_ResetBehaviorState( botMemory_t &memory )
 	memory.lastNavconTime = 0;
 	memory.lastNavconDistance = 0;
 	memory.hasOffmeshGoal = false;
+	memory.evasion = {};
 }
 
 // assumes bot is a bot, otherwise will crash.

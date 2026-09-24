@@ -85,6 +85,10 @@ void     BotResetEnemyQueue( enemyQueue_t *queue );
 void     BotFireWeapon( weaponMode_t mode, usercmd_t *botCmdBuffer );
 void     BotFireWeaponAI( gentity_t *self );
 void     BotClassMovement( gentity_t *self, bool inAttackRange );
+// Apply the bot's selected combat evasion style. Returns false when no style
+// is selected, so callers can retain the legacy movement behavior.
+bool     BotCombatEvasion( gentity_t *self );
+bool     BotEnemyInAttackRange( const gentity_t *self );
 
 // human bots
 bool   WeaponIsEmpty( weapon_t weapon, playerState_t const *ps );
