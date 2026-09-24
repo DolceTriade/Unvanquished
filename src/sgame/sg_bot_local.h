@@ -165,6 +165,9 @@ enum bot_skill
 	BOT_A_POUNCE_ON_ATTACK, // dragoon and adv dragoon
 	BOT_A_TYRANT_CHARGE_ON_ATTACK,
 	BOT_A_ATTACK_FROM_BEHIND, // attempt to strafe behind a human target while attacking
+	BOT_H_EVASION_ORBIT,
+	BOT_H_EVASION_MATADOR,
+	BOT_H_EVASION_BURST,
 
 	// situation awareness and survival
 	BOT_B_PAIN, // basic awareness: notice an enemy if it bites you, or shoots at you
@@ -199,6 +202,18 @@ enum botJetpackState_t
 #define MAX_NODE_DEPTH 20
 struct AIBehaviorTree_t;
 struct AIGenericNode_t;
+struct botEvasionState_t
+{
+	int side = 1;
+	int targetNum = -1;
+	int nextSwitchTime = 0;
+	int maneuver = 1;
+	int lastTargetSampleTime = 0;
+	int lastJumpTime = -9999;
+	glm::vec2 lastTargetVelocity = {};
+	glm::vec2 targetAcceleration = {};
+};
+
 struct botMemory_t
 {
 	// Permanent memory {
@@ -236,6 +251,8 @@ struct botMemory_t
 		int seenEnemyTime; // level.time of the last time the bot had a visible enemy
 
 		bool exhausted;
+
+		botEvasionState_t evasion;
 	// }
 
 	// Behavior-specific state. Reset when the bot spawns or the behavior is changed {
