@@ -316,9 +316,8 @@ static void CG_Creep( centity_t *cent )
 
 	if ( size > 0.0f && tr.fraction < 1.0f )
 	{
-		CG_RegisterMark( cgs.media.creepShader, tr.endpos, cent->currentState.origin2,
-			0.0f, 1.0f, 1.0f, 1.0f, 1.0f,
-			false, size, true );
+		CG_RegisterCreepMark( cent->currentState.number, cent->currentState.modelindex,
+			cgs.media.creepShader, tr.endpos, cent->currentState.origin2, size );
 	}
 }
 
