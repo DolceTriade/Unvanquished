@@ -2180,6 +2180,8 @@ void CG_RegisterMark( qhandle_t shader,
                     float r, float g, float b, float a,
                     bool alphaFade,
                     float radius, bool temporary );
+void CG_RegisterCreepMark( int entityNum, int buildable, qhandle_t shader,
+                           const vec3_t origin, const vec3_t dir, float radius );
 
 void CG_ResetMarks();
 void CG_ProcessMarks();
