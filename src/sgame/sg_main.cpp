@@ -26,6 +26,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "common/Common.h"
 #include "sg_local.h"
+#include "sg_votes.h"
 #include "shared/parse.h"
 #include "Entities.h"
 #include "CBSE.h"
@@ -637,6 +638,7 @@ void G_InitGame( int levelTime, int randomSeed, bool inClient )
 
 	// parse the key/value pairs and spawn gentities
 	G_SpawnEntitiesFromString();
+	G_UpdateVoteCalls();
 
 	// add any fake entities
 	G_SpawnFakeEntities();

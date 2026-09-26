@@ -2204,6 +2204,7 @@ void     CG_ShowScores_f();
 //
 void CG_ExecuteServerCommands( snapshot_t* snap );
 void CG_SetMapNameFromServerinfo();
+void CG_SetVoteCallsFromServerInfo();
 void CG_ConfigStringModified( int num );
 void CG_CenterPrint_f();
 

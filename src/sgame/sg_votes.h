@@ -84,6 +84,7 @@ struct VoteDefinition
 
 // Handle a vote. Expected to already have args pushed to the arg stack and called from sg_cmds.cpp
 void G_HandleVote( gentity_t* ent );
+void G_UpdateVoteCalls();
 // Add a custom vote. Returns false if the vote was not added, which can happen if a vote of the
 // same name already exists or if the vote argument is empty. voteTemplate is the command that is
 // run if the vote passes displayTemplate is the human friendly text shown to players when deciding
