@@ -2176,6 +2176,7 @@ static struct gameElements_t
 } bg_disabledGameElements;
 
 static std::set<std::string> bg_tacticBehaviors;
+static std::set<std::string> bg_voteCalls;
 
 std::set<std::string> BG_ParseTacticBehaviorsList( const std::string &behaviorsCsv )
 {
@@ -2315,6 +2316,21 @@ std::string BG_TacticBehaviorsToString( Str::StringRef sep )
 std::vector<std::string> BG_GetAllowedTactics()
 {
 	return std::vector<std::string>( bg_tacticBehaviors.begin(), bg_tacticBehaviors.end() );
+}
+
+void BG_SetVoteCalls( Str::StringRef voteCsv )
+{
+	bg_voteCalls.clear();
+
+	for ( Parse_WordListSplitter i( voteCsv ); *i; ++i )
+	{
+		bg_voteCalls.insert( *i );
+	}
+}
+
+std::vector<std::string> BG_GetVoteCalls()
+{
+	return std::vector<std::string>( bg_voteCalls.begin(), bg_voteCalls.end() );
 }
 
 /*

@@ -382,6 +382,13 @@ void CG_SetAllowedTacticsFromServerInfo()
 	BG_SetTacticBehaviors( tactics );
 }
 
+void CG_SetVoteCallsFromServerInfo()
+{
+	const char *info = CG_ConfigString( CS_SERVERINFO );
+	const char *voteCalls = Info_ValueForKey( info, "g_voteCalls" );
+	BG_SetVoteCalls( voteCalls );
+}
+
 static void CG_ParseGameplayCvars()
 {
 	const char *info = CG_ConfigString( CS_GAMEPLAY_CVARS );
@@ -470,6 +477,7 @@ void CG_ConfigStringModified( int num )
 	{
 		CG_SetMapNameFromServerinfo();
 		CG_SetAllowedTacticsFromServerInfo();
+		CG_SetVoteCallsFromServerInfo();
 	}
 	else if ( num == CS_GAMEPLAY_CVARS )
 	{

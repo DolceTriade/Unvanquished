@@ -291,6 +291,16 @@ static void CG_CompleteGive()
 
 static void CG_CompleteTeamVote()
 {
+	std::vector<std::string> voteCalls = BG_GetVoteCalls();
+	if ( !voteCalls.empty() )
+	{
+		for ( const auto& vote : voteCalls )
+		{
+			trap_CompleteCallback( vote.c_str() );
+		}
+		return;
+	}
+
 	unsigned           i = 0;
 	static const char vote[][ 16 ] =
 	{
@@ -304,6 +314,16 @@ static void CG_CompleteTeamVote()
 }
 static void CG_CompleteVote()
 {
+	std::vector<std::string> voteCalls = BG_GetVoteCalls();
+	if ( !voteCalls.empty() )
+	{
+		for ( const auto& vote : voteCalls )
+		{
+			trap_CompleteCallback( vote.c_str() );
+		}
+		return;
+	}
+
 	unsigned           i = 0;
 	static const char vote[][ 16 ] =
 	{

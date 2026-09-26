@@ -1826,6 +1826,9 @@ bool BG_TacticBehaviorAllowed( Str::StringRef behavior );
 std::string BG_TacticBehaviorsToString( Str::StringRef sep );
 std::vector<std::string> BG_GetAllowedTactics();
 
+void BG_SetVoteCalls( Str::StringRef voteCsv );
+std::vector<std::string> BG_GetVoteCalls();
+
 // bg_voice.c
 #define MAX_VOICES             8
 #define MAX_VOICE_NAME_LEN     16
