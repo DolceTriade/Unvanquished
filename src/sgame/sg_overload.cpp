@@ -1650,6 +1650,10 @@ static void BuildOverloadCatalog()
 	              PercentAttributeEffect( BG_ATTR_CLASS, "human_bsuit", "staminaJogRestore", 2500.0 / STAMINA_MAX, 1.0 ),
 	              PercentAttributeEffect( BG_ATTR_CLASS, "human_bsuit", "staminaWalkRestore", 2500.0 / STAMINA_MAX, 1.0 ),
 	              PercentAttributeEffect( BG_ATTR_CLASS, "human_bsuit", "staminaStopRestore", 2500.0 / STAMINA_MAX, 1.0 ) } );
+	AddUpgrade( TEAM_HUMANS, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), DefaultUpgradeStepCost( OVERLOAD_STAGE2_COUNT ), OVERLOAD_UNCAPPED_RANKS, "biokit", "Bio Kit", "regen", "health regeneration", "Bio Kit Health Regeneration", "Increase the Bio Kit's health regeneration rate.",
+	            { GameplayEffect( "BIOKIT_INTERVAL", -200.0, 500.0 ) } );
+	AddUpgrade( TEAM_HUMANS, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), DefaultUpgradeStepCost( OVERLOAD_STAGE2_COUNT ), OVERLOAD_UNCAPPED_RANKS, "biokit", "Bio Kit", "poison", "poison resistance", "Bio Kit Poison Resistance", "Reduce damage taken from alien poison.",
+	            { GameplayEffect( "BIOKIT_MODIFIER", -0.1, 0.5 ) } );
 
 	// Human buildable weapon upgrades.
 	// Covered buildables: medistat, mgturret, rocketpod.
