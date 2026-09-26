@@ -30,6 +30,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "shared/parse.h"
 
+static Cvar::Cvar<std::string> g_voteCalls(
+	"g_voteCalls", "registered vote calls advertised to clients", Cvar::SERVERINFO, "" );
+
 /*
 Return true if arg is valid, and store the number in argnum.
 Otherwise, return false and do not modify argnum.
@@ -428,6 +431,28 @@ static std::unordered_map<std::string, VoteDefinition> voteInfo = {
 };
 
 // clang-format on
+
+void G_UpdateVoteCalls()
+{
+	std::set<std::string> names;
+	for ( const auto& vote : voteInfo )
+	{
+		names.insert( vote.first );
+	}
+
+	std::string calls;
+	for ( const auto& name : names )
+	{
+		if ( !calls.empty() )
+		{
+			calls += ',';
+		}
+		calls += name;
+	}
+
+	g_voteCalls.Set( calls );
+}
+
 /*
 ==================
 G_CheckStopVote
@@ -1113,6 +1138,7 @@ bool G_AddCustomVoteRaw( std::string vote, VoteDefinition def )
 		return false;
 	}
 	it = voteInfo.emplace( std::move( vote ), std::move( def ) ).first;
+	G_UpdateVoteCalls();
 
 	return true;
 }
