@@ -3,6 +3,51 @@
 
 namespace {
 
+bool IsZapTargetAimedAt( gentity_t* target, const glm::vec3& muzzle,
+	const glm::vec3& forward )
+{
+	if ( !target )
+	{
+		return false;
+	}
+
+	// A wide trace against the target's bounding box is equivalent to a ray
+	// against the box expanded by the trace width and height.
+	glm::vec3 mins = VEC2GLM( target->r.absmin ) -
+		glm::vec3( LEVEL2_AREAZAP_WIDTH, LEVEL2_AREAZAP_WIDTH,
+			LEVEL2_AREAZAP_WIDTH );
+	glm::vec3 maxs = VEC2GLM( target->r.absmax ) +
+		glm::vec3( LEVEL2_AREAZAP_WIDTH, LEVEL2_AREAZAP_WIDTH,
+			LEVEL2_AREAZAP_WIDTH );
+	float enter = 0.0f;
+	float exit = LEVEL2_AREAZAP_RANGE;
+
+	for ( int axis = 0; axis < 3; ++axis )
+	{
+		if ( std::abs( forward[ axis ] ) < 1.0e-6f )
+		{
+			if ( muzzle[ axis ] < mins[ axis ] || muzzle[ axis ] > maxs[ axis ] )
+			{
+				return false;
+			}
+			continue;
+		}
+
+		float near = ( mins[ axis ] - muzzle[ axis ] ) / forward[ axis ];
+		float far = ( maxs[ axis ] - muzzle[ axis ] ) / forward[ axis ];
+		if ( near > far ) std::swap( near, far );
+		enter = std::max( enter, near );
+		exit = std::min( exit, far );
+
+		if ( enter > exit )
+		{
+			return false;
+		}
+	}
+
+	return enter <= exit;
+}
+
 void FreeZapEffectEntity(zap_t& zap)
 {
 	if (!zap.effectChannel)
@@ -177,13 +222,24 @@ void ZapComponent::UpdateZap(int timeDelta)
 	AngleVectors( VEC2GLM( self->client->ps.viewangles ), &forward, nullptr, nullptr);
 	glm::vec3 muzzle = G_CalcMuzzlePoint( self, forward );
 
-	trace_t tr;
-	gentity_t *traceEnt;
-
-
-	G_WideTrace(&tr, this->entity.oldEnt, muzzle, forward, LEVEL2_AREAZAP_RANGE, LEVEL2_AREAZAP_WIDTH, LEVEL2_AREAZAP_WIDTH, &traceEnt);
 	HealthComponent *targetHealth = zap.targets[0]->entity->Get<HealthComponent>();
-	if (traceEnt == nullptr || traceEnt != zap.targets[0].get() || !targetHealth || !targetHealth->Alive())
+	const glm::vec3 traceExtents{ LEVEL2_AREAZAP_WIDTH, LEVEL2_AREAZAP_WIDTH,
+		LEVEL2_AREAZAP_WIDTH };
+	G_UnlaggedOn( self, GLM4READ( muzzle ),
+		LEVEL2_AREAZAP_RANGE + glm::length( traceExtents ) );
+
+	bool aimedAtTarget = IsZapTargetAimedAt(zap.targets[0].get(), muzzle, forward);
+
+	// Keep the existing CONTENTS_SOLID behavior: BODY entities are ignored,
+	// while world geometry and solid movers remain blockers.
+	trace_t lineOfSightTrace;
+	trap_Trace( &lineOfSightTrace, muzzle, glm::vec3(), glm::vec3(),
+		VEC2GLM( zap.targets[0]->r.currentOrigin ), self->s.number, CONTENTS_SOLID, 0 );
+
+	G_UnlaggedOff();
+
+	if (!aimedAtTarget || lineOfSightTrace.entityNum != ENTITYNUM_NONE ||
+		!targetHealth || !targetHealth->Alive())
 	{
 
 		// If you're not aiming at them at this moment, you have some time to aim at them again, however
