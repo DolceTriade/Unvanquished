@@ -3,7 +3,6 @@ STATUS_SUCCESS = 1
 STATUS_RUNNING = 2
 
 package.loaded["bots/common.lua"] = nil
-package.loaded["bots/boss.lua"] = nil
 
 local common = require("bots/common.lua")
 local boss = require("bots/boss.lua")
@@ -14,6 +13,24 @@ local target_entity = common.target_entity
 local unstick = common.unstick
 
 local TASKS = task_runtime.new_runtime()
+
+local BOSS = boss.new({
+    behavior = "boss_flamer.lua",
+    team = "humans",
+    spawn = "rifle",
+    weapon = "flamer",
+    armor_options = { "bsuit", "marmour", "larmour" },
+    spawn_credits = 2000,
+    damage_dealt_multiplier = 3.0,
+    damage_received_multiplier = 0.35,
+    ignore_self_damage = true,
+    on_load = function()
+        Cmd.exec("set g_bot_flamer 1")
+    end,
+    on_init = function()
+        sgame.overload.force_unlock("humans", "weapon", "flamer")
+    end,
+})
 local RANDOM_LOOK_INTERVAL_MS = 200
 local TAUNT_DURATION_MS = 2500
 local RECOVERY_MOVE_DURATION_MS = 500
@@ -435,13 +452,13 @@ local function select_task(state)
     return BOSS_PATROL_TASK
 end
 
-return function(self, ctx)
+local function boss_behavior(self, ctx)
     local client = self.client
     local team = self.team
     local number = self.number
     local level = sgame.level
 
-    local status = boss.prepare("flamer", self, ctx)
+    local status = BOSS:prepare(self, ctx)
     if status ~= nil then
         return status
     end
@@ -485,3 +502,6 @@ return function(self, ctx)
     task = TASKS.start(number, select_task(state))
     return TASKS.run(task, state, ctx)
 end
+
+boss.register("flamer", BOSS)
+return boss_behavior

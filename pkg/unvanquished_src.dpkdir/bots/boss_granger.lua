@@ -3,7 +3,6 @@ STATUS_SUCCESS = 1
 STATUS_RUNNING = 2
 
 package.loaded["bots/common.lua"] = nil
-package.loaded["bots/boss.lua"] = nil
 
 local common = require("bots/common.lua")
 local boss = require("bots/boss.lua")
@@ -26,6 +25,55 @@ local RECOVERY_ABORT_ATTEMPTS = 3
 local TARGET_ABANDON_DURATION_MS = 4000
 local LOOK_STATE = {}
 local RECOVERY_DIRS = { "left", "right", "backward", "forward" }
+
+local GRANGER_SPAWN_CANDIDATES = {
+    "eggpod",
+    "acid_tube",
+    "trapper",
+    "hive",
+    "spiker",
+}
+
+local function on_granger_spit_impact(missile, hit_ent)
+    if not missile or not missile.missile then
+        return
+    end
+
+    local owner = missile.missile.parent
+    if not owner or not owner.number then
+        return
+    end
+
+    local origin = missile.missile.origin
+    if not origin then
+        return
+    end
+
+    if hit_ent
+        and owner.team
+        and hit_ent.team
+        and owner.team ~= "none"
+        and hit_ent.team ~= "none"
+        and owner.team ~= hit_ent.team then
+        return
+    end
+
+    local buildable = GRANGER_SPAWN_CANDIDATES[random(#GRANGER_SPAWN_CANDIDATES)]
+    sgame.TrySpawnBuildableAt(buildable, origin)
+end
+
+local BOSS = boss.new({
+    behavior = "boss_granger.lua",
+    team = "aliens",
+    class = "builderupg",
+    damage_dealt_multiplier = 5.0,
+    damage_received_multiplier = 0.15,
+    startup_delay_ms = 200,
+    on_load = function(controller)
+        sgame.overload.force_unlock("aliens", "class", "builderupg")
+        controller:registerMissileHandler("slowblob", on_granger_spit_impact)
+    end,
+})
 
 
 local function always_fire(state, ctx)
@@ -361,13 +409,13 @@ end
 -- Behavior entry point
 -- ---------------------------------------------------------------------------
 
-return function(self, ctx)
+local function boss_behavior(self, ctx)
     local client = self.client
     local team = self.team
     local number = self.number
     local level = sgame.level
 
-    local status = boss.prepare("granger", self, ctx)
+    local status = BOSS:prepare(self, ctx)
     if status ~= nil then
         return status
     end
@@ -411,3 +459,6 @@ return function(self, ctx)
     task = TASKS.start(number, select_task(state))
     return TASKS.run(task, state, ctx)
 end
+
+boss.register("granger", BOSS)
+return boss_behavior
