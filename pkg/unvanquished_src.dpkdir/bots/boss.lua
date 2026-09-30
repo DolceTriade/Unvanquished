@@ -2,112 +2,9 @@ local PMF_QUEUED = 1 << 12
 
 local common = require("bots/common.lua")
 
-local random = math.random
-
 local M = {}
-
-local GRANGER_STATE = {}
-local MISSILE_HOOKS = {}
-local REGISTERED_MISSILE_TYPES = {}
-local PENDING_SPECS = {}
-local BOT_SPECS = {}
-
-local GRANGER_SPAWN_CANDIDATES = {
-    "eggpod",
-    "acid_tube",
-    "trapper",
-    "hive",
-    "spiker",
-}
-
-local function boss_state()
-    return {
-        flamer = {},
-        lucifer = {},
-        granger = GRANGER_STATE,
-    }
-end
-
-local BOSS_STATE = boss_state()
-
-local function pos_str(vec)
-    return string.format("{%f,%f,%f}", vec[1] or 0, vec[2] or 0, vec[3] or 0)
-end
-
-local function on_granger_spit_impact(missile, hit_ent)
-    if not missile or not missile.missile then
-        return
-    end
-
-    local owner = missile.missile.parent
-    if not owner or not owner.number or not GRANGER_STATE[owner.number] then
-        return
-    end
-
-    local origin = missile.missile.origin
-    if not origin then
-        return
-    end
-
-    if hit_ent
-        and owner.team
-        and hit_ent.team
-        and owner.team ~= "none"
-        and hit_ent.team ~= "none"
-        and owner.team ~= hit_ent.team then
-        hit_ent:kill("MOD_SLOWBLOB", owner)
-    end
-
-    local buildable = GRANGER_SPAWN_CANDIDATES[random(#GRANGER_SPAWN_CANDIDATES)]
-    sgame.TrySpawnBuildableAt(buildable, origin)
-end
-
-local function ensure_missile_hook(missile_type)
-    if REGISTERED_MISSILE_TYPES[missile_type] then
-        return
-    end
-
-    sgame.hooks.RegisterMissileSpawnedHook(function(missile)
-        local m = missile and missile.missile
-        if not m or m.type ~= missile_type then
-            return
-        end
-
-        local parent = m.parent
-        if not parent or not parent.number then
-            return
-        end
-
-        local handlers = MISSILE_HOOKS[missile_type]
-        if not handlers then
-            return
-        end
-
-        for _, handler in ipairs(handlers) do
-            if handler.owners[parent.number] then
-                missile.missile.impact = handler.impact
-                return
-            end
-        end
-    end)
-
-    REGISTERED_MISSILE_TYPES[missile_type] = true
-end
-
-local function register_missile_handler(missile_type, owners, impact)
-    local handlers = MISSILE_HOOKS[missile_type]
-    if not handlers then
-        handlers = {}
-        MISSILE_HOOKS[missile_type] = handlers
-    end
-
-    handlers[#handlers + 1] = {
-        owners = owners,
-        impact = impact,
-    }
-
-    ensure_missile_hook(missile_type)
-end
+local CONTROLLERS = {}
+local PENDING_ADDS = {}
 
 local function copy_shallow(src)
     local dst = {}
@@ -122,22 +19,14 @@ local function copy_shallow(src)
     return dst
 end
 
-local function has_all_upgrades(client, upgrades)
-    if not upgrades or #upgrades == 0 then
-        return true
-    end
-
-    if not client or not client.hasUpgrade then
-        return false
-    end
-
-    for _, upgrade in ipairs(upgrades) do
+local function missing_upgrades(client, upgrades)
+    local missing = {}
+    for _, upgrade in ipairs(upgrades or {}) do
         if not client:hasUpgrade(upgrade) then
-            return false
+            missing[#missing + 1] = upgrade
         end
     end
-
-    return true
+    return missing
 end
 
 local function selected_armor(spec, client, state)
@@ -173,10 +62,11 @@ local function ensure_human_loadout(spec, self, ctx, state)
     end
 
     local armor = selected_armor(spec, client, state)
+    local required_upgrades = missing_upgrades(client, spec.required_upgrades)
     local weapon_ready = not spec.weapon or client.weapon == spec.weapon
     local upgrades_ready = armor
         and client:hasUpgrade(armor)
-        or has_all_upgrades(client, spec.required_upgrades)
+        or #required_upgrades == 0
     if weapon_ready and upgrades_ready then
         state.loadout_ready = true
         return nil
@@ -204,6 +94,15 @@ local function ensure_human_loadout(spec, self, ctx, state)
         if state.armor_attempt > #spec.armor_options then
             state.armor_attempt = #spec.armor_options
         end
+    elseif spec.weapon and #required_upgrades > 0 then
+        local args = { spec.weapon }
+        for _, upgrade in ipairs(required_upgrades) do
+            args[#args + 1] = upgrade
+        end
+        local status = ctx:buy(table.unpack(args, 1, 4))
+        if status ~= STATUS_FAILURE then
+            return STATUS_RUNNING
+        end
     elseif spec.weapon then
         local status = ctx:buyPrimary(spec.weapon)
         if status ~= STATUS_FAILURE then
@@ -217,56 +116,6 @@ local function ensure_human_loadout(spec, self, ctx, state)
     end
 
     return STATUS_RUNNING
-end
-
-local BOSSES = {
-    flamer = {
-        behavior = "boss_flamer.lua",
-        team = "humans",
-        spawn = "rifle",
-        weapon = "flamer",
-        armor_options = { "bsuit", "marmour", "larmour" },
-        spawn_credits = 2000,
-        damage_dealt_multiplier = 3.0,
-        damage_received_multiplier = 0.35,
-        ignore_self_damage = true,
-        state_store = BOSS_STATE.flamer,
-        on_load = function()
-            Cmd.exec("set g_bot_flamer 1")
-        end,
-        on_init = function()
-            sgame.overload.force_unlock("humans", "weapon", "flamer")
-        end,
-    },
-    granger = {
-        behavior = "boss_granger.lua",
-        team = "aliens",
-        class = "builderupg",
-        damage_dealt_multiplier = 10.0,
-        damage_received_multiplier = 0.15,
-        startup_delay_ms = 200,
-        state_store = BOSS_STATE.granger,
-        on_load = function(spec)
-            register_missile_handler("slowblob", spec.state_store, on_granger_spit_impact)
-        end,
-    },
-}
-
-local function ensure_spec_loaded(spec)
-    if spec.on_load and not spec.loaded then
-        spec.on_load(spec)
-        spec.loaded = true
-    end
-end
-
-local function get_base_boss(id)
-    local spec = BOSSES[id]
-    if not spec then
-        error("unknown boss: " .. tostring(id))
-    end
-
-    ensure_spec_loaded(spec)
-    return spec
 end
 
 local function spec_overrides(opts)
@@ -284,152 +133,232 @@ local function spec_overrides(opts)
     return overrides
 end
 
-local function merge_spec(spec, overrides)
-    local merged = copy_shallow(spec)
-    for key, value in pairs(overrides or {}) do
-        merged[key] = value
+local function new(spec)
+    assert(type(spec) == "table", "boss.new requires a specification")
+    assert(spec.behavior, "boss specification requires behavior")
+    assert(spec.team, "boss specification requires team")
+
+    local state_store = {}
+    local pending_specs = {}
+    local bot_specs = {}
+    local missile_handlers = {}
+    local registered_missile_types = {}
+    local controller = {}
+
+    local function merge_spec(overrides)
+        local merged = copy_shallow(spec)
+        for key, value in pairs(overrides or {}) do
+            merged[key] = value
+        end
+        return merged
     end
-    merged.loaded = nil
-    return merged
-end
 
-local function enqueue_pending_spec(id, entry)
-    local pending = PENDING_SPECS[id]
-    if not pending then
-        pending = {}
-        PENDING_SPECS[id] = pending
-    end
+    local function find_pending_spec(self)
+        if #pending_specs == 0 then
+            return nil
+        end
 
-    pending[#pending + 1] = entry
-end
+        local client = self.client
+        local bot_name = client and client.clean_name or nil
+        local wildcard_index = nil
 
-local function find_pending_spec(id, self)
-    local pending = PENDING_SPECS[id]
-    if not pending or #pending == 0 then
+        for index, entry in ipairs(pending_specs) do
+            if not entry.name then
+                if not wildcard_index then
+                    wildcard_index = index
+                end
+            elseif bot_name and entry.name == bot_name then
+                table.remove(pending_specs, index)
+                return entry.spec
+            end
+        end
+
+        if wildcard_index then
+            local entry = table.remove(pending_specs, wildcard_index)
+            return entry.spec
+        end
+
         return nil
     end
 
-    local client = self.client
-    local bot_name = client and client.clean_name or nil
-    local wildcard_index = nil
-
-    for index, entry in ipairs(pending) do
-        if not entry.name then
-            if not wildcard_index then
-                wildcard_index = index
-            end
-        elseif bot_name and entry.name == bot_name then
-            table.remove(pending, index)
-            if #pending == 0 then
-                PENDING_SPECS[id] = nil
-            end
-            return entry.spec
+    local function resolve_spec(self)
+        local number = self.number
+        local resolved = bot_specs[number]
+        if resolved then
+            return resolved
         end
+
+        resolved = find_pending_spec(self) or spec
+        bot_specs[number] = resolved
+        return resolved
     end
 
-    if wildcard_index then
-        local entry = table.remove(pending, wildcard_index)
-        if #pending == 0 then
-            PENDING_SPECS[id] = nil
+    local function ensure_missile_hook(missile_type)
+        if registered_missile_types[missile_type] then
+            return
         end
-        return entry.spec
+
+        sgame.hooks.RegisterMissileSpawnedHook(function(missile)
+            local m = missile and missile.missile
+            if not m or m.type ~= missile_type then
+                return
+            end
+
+            local parent = m.parent
+            if not parent or not parent.number or not state_store[parent.number] then
+                return
+            end
+
+            for _, impact in ipairs(missile_handlers[missile_type] or {}) do
+                missile.missile.impact = impact
+                return
+            end
+        end)
+
+        registered_missile_types[missile_type] = true
     end
 
-    return nil
+    function controller:registerMissileHandler(missile_type, impact)
+        local handlers = missile_handlers[missile_type]
+        if not handlers then
+            handlers = {}
+            missile_handlers[missile_type] = handlers
+        end
+
+        handlers[#handlers + 1] = impact
+        ensure_missile_hook(missile_type)
+    end
+
+    local function queue_add(opts)
+        opts = opts or {}
+        local name = opts.name or "*"
+        local added_spec = merge_spec(spec_overrides(opts))
+        pending_specs[#pending_specs + 1] = {
+            name = name ~= "*" and name or nil,
+            spec = added_spec,
+        }
+        return name, added_spec
+    end
+
+    function controller:queue(opts)
+        queue_add(opts)
+    end
+
+    function controller:add(opts)
+        opts = opts or {}
+        local skill = tonumber(opts.skill) or 9
+        local name, added_spec = queue_add(opts)
+        local name_arg = name == "*" and name or ("%q"):format(name)
+        Cmd.exec(("bot add %s %s %d %s"):format(name_arg, added_spec.team, skill, added_spec.behavior))
+    end
+
+    function controller:prepare(self, ctx)
+        local active_spec = resolve_spec(self)
+
+        if common.should_spawn(self, PMF_QUEUED) then
+            state_store[self.number] = nil
+            return ctx:spawnAs(active_spec.spawn or active_spec.class)
+        end
+
+        local client = self.client
+        if not client then
+            return nil
+        end
+        client.notarget = true
+
+        local state = state_store[self.number]
+        if not state then
+            state = {}
+            state_store[self.number] = state
+
+            if active_spec.damage_dealt_multiplier ~= nil then
+                client.damage_dealt_multiplier = active_spec.damage_dealt_multiplier
+            end
+
+            if active_spec.damage_received_multiplier ~= nil then
+                client.damage_received_multiplier = active_spec.damage_received_multiplier
+            end
+
+            if active_spec.ignore_self_damage ~= nil then
+                client.ignore_self_damage = active_spec.ignore_self_damage
+            end
+
+            if active_spec.on_init then
+                active_spec.on_init(self, ctx, state)
+            end
+
+            if active_spec.startup_delay_ms and active_spec.startup_delay_ms > 0 then
+                state.ready_at = sgame.level.time + active_spec.startup_delay_ms
+            end
+
+            self.die = function(ent, inflictor, attacker, mod)
+                state_store[ent.number] = nil
+                bot_specs[ent.number] = nil
+
+                if active_spec.on_die then
+                    active_spec.on_die(ent, inflictor, attacker, mod)
+                end
+
+                Timer.add(1, function() Cmd.exec("bot del " .. ent.number) end)
+                return true
+            end
+        end
+
+        if state.ready_at and sgame.level.time < state.ready_at then
+            return STATUS_RUNNING
+        end
+
+        if common.is_human(active_spec.team) and not state.loadout_ready then
+            local status = ensure_human_loadout(active_spec, self, ctx, state)
+            if status ~= nil then
+                return status
+            end
+        end
+
+        return nil
+    end
+
+    if spec.on_load then
+        spec.on_load(controller, spec)
+    end
+
+    return controller
 end
 
-local function resolve_boss_spec(id, self)
-    local number = self.number
-    local spec = BOT_SPECS[number]
-    if spec then
-        return spec
-    end
+M.new = new
 
-    spec = find_pending_spec(id, self) or get_base_boss(id)
-    ensure_spec_loaded(spec)
-    BOT_SPECS[number] = spec
-    return spec
+function M.register(id, controller)
+    CONTROLLERS[id] = controller
+    local pending = PENDING_ADDS[id]
+    if pending then
+        for _, opts in ipairs(pending) do
+            controller:queue(opts)
+        end
+        PENDING_ADDS[id] = nil
+    end
 end
 
 function M.add(id, opts)
-    local base = get_base_boss(id)
+    local controller = CONTROLLERS[id]
+    if controller then
+        return controller:add(opts)
+    end
+
     opts = opts or {}
+    assert(opts.team, "boss.add requires team until the boss behavior is loaded")
+    assert(opts.behavior, "boss.add requires behavior until the boss behavior is loaded")
+
+    local pending = PENDING_ADDS[id]
+    if not pending then
+        pending = {}
+        PENDING_ADDS[id] = pending
+    end
+    pending[#pending + 1] = copy_shallow(opts)
 
     local name = opts.name or "*"
     local skill = tonumber(opts.skill) or 9
-    local spec = merge_spec(base, spec_overrides(opts))
-    enqueue_pending_spec(id, {
-        name = name ~= "*" and name or nil,
-        spec = spec,
-    })
-    Cmd.exec(("bot add %s %s %d %s"):format(name, spec.team, skill, spec.behavior))
-end
-
-function M.prepare(id, self, ctx)
-    local spec = resolve_boss_spec(id, self)
-    local state_store = spec.state_store
-
-    if common.should_spawn(self, PMF_QUEUED) then
-        state_store[self.number] = nil
-
-        return ctx:spawnAs(spec.spawn or spec.class)
-    end
-
-    local client = self.client
-    if not client then
-        return nil
-    end
-    client.notarget = true
-    local state = state_store[self.number]
-    if not state then
-        state = {}
-        state_store[self.number] = state
-
-        if spec.damage_dealt_multiplier ~= nil then
-            client.damage_dealt_multiplier = spec.damage_dealt_multiplier
-        end
-
-        if spec.damage_received_multiplier ~= nil then
-            client.damage_received_multiplier = spec.damage_received_multiplier
-        end
-
-        if spec.ignore_self_damage ~= nil then
-            client.ignore_self_damage = spec.ignore_self_damage
-        end
-
-        if spec.on_init then
-            spec.on_init(self, ctx)
-        end
-
-        if spec.startup_delay_ms and spec.startup_delay_ms > 0 then
-            state.ready_at = sgame.level.time + spec.startup_delay_ms
-        end
-
-        self.die = function(ent, inflictor, attacker, mod)
-            state_store[ent.number] = nil
-            BOT_SPECS[ent.number] = nil
-
-            if spec.on_die then
-                spec.on_die(ent, inflictor, attacker, mod)
-            end
-
-            Timer.add(1, function() Cmd.exec("bot del " .. ent.number) end)
-            return true
-        end
-    end
-
-    if state.ready_at and sgame.level.time < state.ready_at then
-        return STATUS_RUNNING
-    end
-
-    if common.is_human(spec.team) and not state.loadout_ready then
-        local status = ensure_human_loadout(spec, self, ctx, state)
-        if status ~= nil then
-            return status
-        end
-    end
-
-    return nil
+    local name_arg = name == "*" and name or ("%q"):format(name)
+    Cmd.exec(("bot add %s %s %d %s"):format(name_arg, opts.team, skill, opts.behavior))
 end
 
 return M
