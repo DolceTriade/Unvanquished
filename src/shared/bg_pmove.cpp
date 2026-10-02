@@ -1547,6 +1547,8 @@ static void PM_LandJetpack( bool force )
 
 static bool PM_CheckJump()
 {
+	class_t pcl = static_cast<class_t>( pm->ps->stats[ STAT_CLASS ] );
+
 	// can't jump while in air
 	if ( pm->ps->groundEntityNum == ENTITYNUM_NONE )
 	{
@@ -1559,7 +1561,6 @@ static bool PM_CheckJump()
 		return false;
 	}
 
-	class_t pcl = static_cast<class_t>( pm->ps->stats[ STAT_CLASS ] );
 	classAttributes_t const* attr = BG_Class( pcl );
 	team_t team = static_cast<team_t>( pm->ps->persistant[ PERS_TEAM ] );
 	// needs jump ability
@@ -1664,6 +1665,88 @@ static bool PM_CheckJump()
 	PM_AddEvent( EV_JUMP );
 	PM_PlayJumpingAnimation();
 
+	return true;
+}
+
+static bool PM_CheckShrikeFlightStart()
+{
+	bool shrike = BG_ClassHasAbility( pm->ps->stats[ STAT_CLASS ], SCA_FLYER ) &&
+	              pm->ps->weapon == WP_ALEVELFLY;
+
+	if ( !shrike )
+	{
+		// Not Shrike: reset cooldown and return early.
+		pm->pmext->shrikeFlightCooldown = 0;
+		pm->ps->stats[ STAT_STATE2 ] &= ~( SS2_FLYING | SS2_DIVING );
+		return false;
+	}
+
+	if ( ( pm->ps->stats[ STAT_STATE2 ] & SS2_FLYING ) && pm->cmd.upmove < 0 )
+	{
+		// Crouch cancels flight.
+		pm->ps->stats[ STAT_STATE2 ] &= ~( SS2_FLYING | SS2_DIVING );
+		pm->ps->weaponCharge = 0;
+		return false;
+	}
+
+	bool attack2 = usercmdButtonPressed( pm->cmd.buttons, BTN_ATTACK2 );
+	if ( !attack2 )
+	{
+		return false;
+	}
+
+	if ( pm->ps->pm_type == PM_DEAD ||
+	     pm->ps->pm_type == PM_GRABBED )
+	{
+		return false;
+	}
+
+	// Alt-fire is launch-only. While airborne it is deliberately a no-op;
+	// crouch is the flight cancel input.
+	if ( pm->ps->stats[ STAT_STATE2 ] & SS2_FLYING )
+	{
+		return false;
+	}
+
+	if ( pm->pmext->shrikeFlightCooldown > 0 )
+	{
+		return false;
+	}
+
+	vec3_t direction;
+	AngleVectors( pm->ps->viewangles, direction, nullptr, nullptr );
+	if ( VectorNormalize( direction ) < 0.1f )
+	{
+		return false;
+	}
+
+	VectorMA( pm->ps->velocity, SHRIKE_FLIGHT_LAUNCH_BOOST, direction, pm->ps->velocity );
+	float launchSpeed = VectorLength( pm->ps->velocity );
+	if ( launchSpeed < SHRIKE_FLIGHT_LAUNCH_SPEED )
+	{
+		VectorScale( direction, SHRIKE_FLIGHT_LAUNCH_SPEED, pm->ps->velocity );
+	}
+
+	// PM_UpdateViewAngles has just converted the wallwalk-relative view into
+	// world space. Preserve that exact direction when the second view update
+	// runs after movement, rather than applying the wallwalk rotation again.
+	pm->ps->delta_angles[ YAW ] = ANGLE2SHORT( pm->ps->viewangles[ YAW ] ) - pm->cmd.angles[ YAW ];
+	pm->ps->delta_angles[ PITCH ] = ANGLE2SHORT( pm->ps->viewangles[ PITCH ] ) - pm->cmd.angles[ PITCH ];
+	pm->ps->stats[ STAT_STATE ] &= ~SS_WALLCLIMBING;
+	pm->ps->eFlags &= ~( EF_WALLCLIMB | EF_WALLCLIMBCEILING );
+	VectorSet( pm->ps->grapplePoint, 0.0f, 0.0f, 1.0f );
+	pm->ps->groundEntityNum = ENTITYNUM_NONE;
+	pm->ps->stats[ STAT_STATE2 ] |= SS2_FLYING;
+	pm->ps->stats[ STAT_STATE2 ] &= ~SS2_DIVING;
+	// The initial launch burst starts the same cooldown used by airborne boosts.
+	pm->pmext->shrikeFlightCooldown = SHRIKE_FLIGHT_LAUNCH_COOLDOWN;
+	pm->ps->weaponCharge = 0;
+	// Keep the airborne pose while flying. Flaps and dive transitions override
+	// it with their own non-looping animations.
+	PM_ForceLegsAnim( NSPA_JUMP );
+	pml.groundPlane = false;
+	pml.walking = false;
+	PM_AddEvent( EV_JUMP );
 	return true;
 }
 
@@ -1852,6 +1935,139 @@ static void PM_GhostMove( bool noclip )
 	else
 	{
 		PM_StepSlideMove( false, false );
+	}
+}
+
+static void PM_AlienFlyMove()
+{
+	PM_Friction();
+
+	vec3_t desiredDirection;
+	AngleVectors( pm->ps->viewangles, desiredDirection, nullptr, nullptr );
+	float desiredLength = VectorNormalize( desiredDirection );
+	if ( !std::isfinite( desiredLength ) || desiredLength < 0.1f )
+	{
+		VectorSet( desiredDirection, 1.0f, 0.0f, 0.0f );
+	}
+
+	vec3_t velocityDirection;
+	VectorCopy( pm->ps->velocity, velocityDirection );
+	float speed = VectorNormalize( velocityDirection );
+	if ( !std::isfinite( speed ) )
+	{
+		VectorClear( velocityDirection );
+		speed = 0.0f;
+	}
+
+	// Roll with turns cuz it feels nice.
+	float turnSeverity = 0.0f;
+	if ( speed > 0.1f )
+	{
+		float alignment = Math::Clamp( DotProduct( velocityDirection, desiredDirection ), -1.0f, 1.0f );
+		turnSeverity = 1.0f - alignment;
+		float response = Math::Clamp( SHRIKE_FLIGHT_TURN_RATE * pml.frametime, 0.0f, 1.0f );
+		VectorMA( velocityDirection, response, desiredDirection, velocityDirection );
+		VectorNormalize( velocityDirection );
+	}
+	else
+	{
+		VectorCopy( desiredDirection, velocityDirection );
+	}
+
+	// Turning, climbing, and diving exchange speed for control over the flight
+	// path. Turning always remains possible; it simply costs more energy.
+	float climbAmount = std::max( 0.0f, desiredDirection[ 2 ] );
+	float diveAmount = std::max( 0.0f, -desiredDirection[ 2 ] );
+	speed -= speed * turnSeverity * SHRIKE_FLIGHT_TURN_DRAG * pml.frametime;
+	speed -= speed * climbAmount * SHRIKE_FLIGHT_TURN_DRAG * pml.frametime;
+	speed += diveAmount * SHRIKE_FLIGHT_DIVE_ACCELERATION;
+
+	VectorScale( velocityDirection, std::max( 0.0f, speed ), pm->ps->velocity );
+
+	// A glider is always losing altitude unless the player actively flaps or
+	// dives. This is separate from forward drag so flapping does not grant a
+	// speed boost.
+	pm->ps->velocity[ 2 ] -= SHRIKE_FLIGHT_GLIDE_SINK;
+
+	float diveThreshold = sinf( DEG2RAD( SHRIKE_FLIGHT_DIVE_ANGLE ) );
+	bool diving = desiredDirection[ 2 ] < -diveThreshold;
+	bool wasDiving = pm->ps->stats[ STAT_STATE2 ] & SS2_DIVING;
+	if ( diving )
+	{
+		pm->ps->stats[ STAT_STATE2 ] |= SS2_DIVING;
+		if ( !wasDiving )
+		{
+			PM_ForceLegsAnim( NSPA_DIVE );
+		}
+
+	}
+	else
+	{
+		pm->ps->stats[ STAT_STATE2 ] &= ~SS2_DIVING;
+		if ( wasDiving )
+		{
+			PM_ForceLegsAnim( NSPA_DIVE_END );
+		}
+	}
+
+	// Do not interrupt the flap animation while flapping.
+	if ( pm->cmd.upmove >= 10 && !diving )
+	{
+		if ( ( pm->ps->legsAnim & ~ANIM_TOGGLEBIT ) != NSPA_FLAP )
+		{
+			PM_ForceLegsAnim( NSPA_FLAP );
+		}
+
+		if ( pm->ps->weaponCharge == 0 )
+		{
+			pm->ps->weaponCharge = SHRIKE_FLIGHT_FLAP_INTERVAL;
+			pm->ps->velocity[ 2 ] += SHRIKE_FLIGHT_FLAP_IMPULSE;
+		}
+	}
+	// Low speed remains controllable but starts to bleed altitude. Only the
+	// much lower stall threshold below ends flight entirely.
+	if ( speed < SHRIKE_FLIGHT_LOW_SPEED && !diving )
+	{
+		float sink = 1.0f - speed / SHRIKE_FLIGHT_LOW_SPEED;
+		pm->ps->velocity[ 2 ] -= SHRIKE_FLIGHT_LOW_SPEED_SINK * sink;
+	}
+
+	// Roll is visual feedback for mouse steering. The flight path itself is
+	// controlled by the view direction above, not by strafe input.
+	float viewYaw = pm->ps->viewangles[ YAW ];
+	float flightYaw = velocityDirection[ 0 ] == 0.0f && velocityDirection[ 1 ] == 0.0f
+		? viewYaw : RAD2DEG( atan2f( velocityDirection[ 1 ], velocityDirection[ 0 ] ) );
+	float yawDelta = AngleSubtract( viewYaw, flightYaw );
+	float targetRoll = Math::Clamp( -yawDelta * SHRIKE_FLIGHT_ROLL_SCALE,
+		-SHRIKE_FLIGHT_MAX_ROLL, SHRIKE_FLIGHT_MAX_ROLL );
+	float rollDelta = targetRoll - pm->ps->viewangles[ ROLL ];
+	float rollResponse = Math::Clamp( SHRIKE_FLIGHT_ROLL_RESPONSE * pml.frametime, 0.0f, 1.0f );
+	pm->ps->viewangles[ ROLL ] += rollDelta * rollResponse;
+
+	float finalSpeed = VectorLength( pm->ps->velocity );
+	if ( !std::isfinite( finalSpeed ) )
+	{
+		VectorClear( pm->ps->velocity );
+		finalSpeed = 0.0f;
+	}
+	// Flying bodies should slide along walls, not use the ground step-up
+	// logic. Avoid entering the slide code with a zero vector: its initial
+	// clip plane is the normalized velocity.
+	if ( finalSpeed > 0.01f )
+	{
+		PM_SlideMove( false );
+	}
+
+	// A Shrike that loses too much speed has stalled. End flight after the
+	// collision response so a wall impact can stall it as well. Keep whatever
+	// velocity remains; the normal airborne movement will take over next frame
+	// and let the player fall naturally.
+	float postSlideSpeed = VectorLength( pm->ps->velocity );
+	if ( !std::isfinite( postSlideSpeed ) || postSlideSpeed < SHRIKE_FLIGHT_STALL_SPEED )
+	{
+		pm->ps->stats[ STAT_STATE2 ] &= ~SS2_FLYING;
+		pm->ps->stats[ STAT_STATE2 ] &= ~SS2_DIVING;
+		pm->ps->weaponCharge = 0;
 	}
 }
 
@@ -2228,18 +2444,30 @@ Play landing animation
 static void PM_Land()
 {
 	PM_LandJetpack( false ); // don't force a stop, sometimes we can push off with a jump
+	pm->ps->stats[ STAT_STATE2 ] &= ~( SS2_FLYING | SS2_DIVING );
+	if ( pm->ps->weapon == WP_ALEVELFLY )
+	{
+		pm->ps->weaponCharge = 0;
+	}
 
 	// decide which landing animation to use
 	bool backward = pm->ps->pm_flags & PMF_BACKWARDS_JUMP;
+	int landTimer = TIMER_LAND;
+	if ( pm->ps->stats[ STAT_CLASS ] == PCL_ALIEN_LEVELFLY )
+	{
+		// Shrike's 28-frame landing clip runs at 24 FPS, so keep grounded
+		// movement animations from replacing it before it folds its wings.
+		landTimer = SHRIKE_FLIGHT_LAND_TIME;
+	}
 	if ( IsSegmentedModel( pm->ps ) )
 	{
 		PM_ForceLegsAnim( backward ? LEGS_LANDB : LEGS_LAND );
-		pm->ps->legsTimer = TIMER_LAND;
+		pm->ps->legsTimer = landTimer;
 	}
 	else
 	{
 		PM_ForceLegsAnim( backward ? NSPA_LANDBACK : NSPA_LAND );
-		pm->ps->torsoTimer = TIMER_LAND; //this is weird, but I'm just refactoring here.
+		pm->ps->torsoTimer = landTimer; //this is weird, but I'm just refactoring here.
 	}
 
 	// potential jump ended
@@ -2869,7 +3097,8 @@ static void PM_GroundTrace()
 
 	static const vec3_t refNormal = { 0.0f, 0.0f, 1.0f };
 
-	if ( BG_ClassHasAbility( pm->ps->stats[ STAT_CLASS ], SCA_WALLCLIMBER ) )
+	if ( BG_ClassHasAbility( pm->ps->stats[ STAT_CLASS ], SCA_WALLCLIMBER ) &&
+	     !( pm->ps->stats[ STAT_STATE2 ] & SS2_FLYING ) )
 	{
 		if ( pm->ps->persistant[ PERS_STATE ] & PS_WALLCLIMBINGTOGGLE )
 		{
@@ -3160,7 +3389,8 @@ static void PM_CheckDuck()
 	}
 
 	// If the standing and crouching bboxes are the same the class can't crouch
-	if ( pm->cmd.upmove < 0 && !VectorCompare( PCmaxs, PCcmaxs ) )
+	if ( pm->cmd.upmove < 0 && !( ps->stats[ STAT_STATE2 ] & SS2_FLYING ) &&
+	     !VectorCompare( PCmaxs, PCcmaxs ) )
 	{
 		// duck
 		ps->pm_flags |= PMF_DUCKED;
@@ -3894,7 +4124,13 @@ static void PM_Weapon()
 	}
 
 	// check for out of ammo
-	if ( !pm->ps->ammo && !pm->ps->clips && !BG_Weapon( pm->ps->weapon )->infiniteAmmo )
+	bool noAmmo = !pm->ps->ammo && !pm->ps->clips && !BG_Weapon( pm->ps->weapon )->infiniteAmmo;
+	if ( pm->ps->weapon == WP_ALEVELFLY && attack3 && !pm->ps->ammo )
+	{
+		noAmmo = true;
+	}
+
+	if ( noAmmo )
 	{
 		if ( attack1 ||
 		     ( BG_Weapon( pm->ps->weapon )->hasAltMode && attack2 ) ||
@@ -4106,9 +4342,9 @@ static void PM_Weapon()
 
 	// fire events for autohit weapons
 	if ( pm->autoWeaponHit[ pm->ps->weapon ] )
-	{
-		switch ( pm->ps->weapon )
 		{
+			switch ( pm->ps->weapon )
+			{
 			case WP_ALEVEL0:
 				pm->ps->generic1 = WPM_PRIMARY;
 				PM_AddEvent( EV_FIRE_WEAPON );
@@ -4203,6 +4439,7 @@ static void PM_Weapon()
 
 				break;
 
+			case WP_ALEVELFLY:
 			case WP_ALEVEL4:
 				num = BG_randrange( 3 );
 				PM_ForceLegsAnim( NSPA_ATTACK1 + num );
@@ -4240,7 +4477,7 @@ static void PM_Weapon()
 
 	// take an ammo away if not infinite
 	if ( !BG_Weapon( pm->ps->weapon )->infiniteAmmo ||
-	     ( pm->ps->weapon == WP_ALEVEL3_UPG && attack3 ) )
+	     ( ( pm->ps->weapon == WP_ALEVEL3_UPG || pm->ps->weapon == WP_ALEVELFLY ) && attack3 ) )
 	{
 		// Special case for lcannon
 		if ( pm->ps->weapon == WP_LUCIFER_CANNON && attack1 && !attack2 )
@@ -4353,6 +4590,20 @@ static void PM_DropAnimTimer( int & timer, int decr )
 
 static void PM_DropTimers()
 {
+	if ( pm->pmext->shrikeFlightCooldown > 0 )
+	{
+		pm->pmext->shrikeFlightCooldown = std::max( 0, pm->pmext->shrikeFlightCooldown - pml.msec );
+	}
+
+	if ( pm->ps->weapon == WP_ALEVELFLY &&
+	     ( pm->ps->stats[ STAT_STATE2 ] & SS2_FLYING ) && pm->ps->weaponCharge > 0 )
+	{
+		// Shrike's weaponCharge is its flap cooldown while airborne. Keep it in
+		// the shared timer path so client prediction and the server count it down
+		// consistently every frame.
+		pm->ps->weaponCharge = std::max( 0, pm->ps->weaponCharge - pml.msec );
+	}
+
 	// drop misc timing counter
 	if ( pm->ps->pm_time )
 	{
@@ -4387,6 +4638,8 @@ void PM_UpdateViewAngles( playerState_t *ps, const usercmd_t *cmd )
 	int    i;
 	vec3_t axis[ 3 ], rotaxis[ 3 ];
 	vec3_t tempang;
+	bool   flying = ps->stats[ STAT_STATE2 ] & SS2_FLYING;
+	float  flightRoll = ps->viewangles[ ROLL ];
 
 	if ( ps->pm_type == PM_INTERMISSION )
 	{
@@ -4455,6 +4708,13 @@ void PM_UpdateViewAngles( playerState_t *ps, const usercmd_t *cmd )
 		tempang[ i ] -= 360.0f * floor( ( tempang[ i ] + 180.0f ) / 360.0f );
 	}
 
+	// Flight has free-look, but its bank is movement state rather than a
+	// camera input. Preserve it while allowing yaw and pitch to update normally.
+	if ( flying )
+	{
+		tempang[ ROLL ] = flightRoll;
+	}
+
 	//actually set the viewangles
 	VectorCopy( tempang, ps->viewangles );
 
@@ -4494,18 +4754,18 @@ void PM_UpdateViewAngles( playerState_t *ps, const usercmd_t *cmd )
 	}
 }
 
-static void PM_HumanStaminaEffects()
+static void PM_StaminaEffects()
 {
 	const classAttributes_t *ca;
 	int      *stats;
 	bool crouching, stopped, walking;
+	stats = pm->ps->stats;
 
 	if ( pm->ps->persistant[ PERS_TEAM ] != TEAM_HUMANS )
 	{
 		return;
 	}
 
-	stats     = pm->ps->stats;
 	ca        = BG_Class( stats[ STAT_CLASS ] );
 	stopped   = ( pm->cmd.forwardmove == 0 && pm->cmd.rightmove == 0 );
 	crouching = ( pm->ps->pm_flags & PMF_DUCKED );
@@ -4734,6 +4994,7 @@ static void PmoveSingle( pmove_t *pmove )
 
 	// update the viewangles
 	PM_UpdateViewAngles( pm->ps, &pm->cmd );
+	PM_CheckShrikeFlightStart();
 
 	if ( pm->ps->pm_type == PM_DEAD || pm->ps->pm_type == PM_GRABBED )
 	{
@@ -4745,6 +5006,10 @@ static void PmoveSingle( pmove_t *pmove )
 	if ( pm->ps->pm_flags & PMF_TIME_WATERJUMP )
 	{
 		PM_WaterJumpMove();
+	}
+	else if ( ( pm->ps->stats[ STAT_STATE2 ] & SS2_FLYING ) && pm->waterlevel <= 1 )
+	{
+		PM_AlienFlyMove();
 	}
 	else if ( pm->waterlevel > 1 )
 	{
@@ -4789,7 +5054,7 @@ static void PmoveSingle( pmove_t *pmove )
 	PM_CheckJetpackRestoreFuel();
 
 	// restore or remove stamina
-	PM_HumanStaminaEffects();
+	PM_StaminaEffects();
 
 	PM_Animate();
 

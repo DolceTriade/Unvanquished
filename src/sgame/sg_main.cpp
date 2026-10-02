@@ -302,6 +302,7 @@ Cvar::Cvar<bool> g_bot_level2upg("g_bot_level2upg", "whether bots use Advanced M
 Cvar::Cvar<bool> g_bot_level3("g_bot_level3", "whether bots use non-advanced Dragoon", Cvar::NONE, true);
 Cvar::Cvar<bool> g_bot_level3upg("g_bot_level3upg", "whether bots use Advanced Dragoon", Cvar::NONE, true);
 Cvar::Cvar<bool> g_bot_level4("g_bot_level4", "whether bots use Tyrant", Cvar::NONE, true);
+Cvar::Cvar<bool> g_bot_levelfly("g_bot_levelfly", "whether bots use Shrike", Cvar::NONE, true);
 
 // misc bot cvars
 Cvar::Cvar<bool> g_bot_attackStruct("g_bot_attackStruct", "whether bots target buildables", Cvar::NONE, true);

@@ -8,6 +8,7 @@ units
 	ui/hud_basics.rml
 	ui/hud_barbs.rml
 	ui/hud_chargebar.rml
+	ui/hud_flight.rml
 	ui/hud_bp.rml
 	ui/hud_builder.rml
 	ui/hud_spawnwait.rml
@@ -114,6 +115,18 @@ level4.hudgroup
 	hud_alien
 
 	hud_chargebar
+}
+
+levelfly.hudgroup
+{
+	hud_basics
+	hud_overlay
+	hud_messagebuffer
+
+	hud_alien
+	hud_chargebar
+	hud_flight
+	hud_barbs
 }
 
 abuild.hudgroup

@@ -10,7 +10,7 @@
 		width: 100%;
 		height: 1.3%;
 		position: absolute;
-		top: 51%;
+		top: 54%;
 	}
 	barbs img {
 		width: 1.3%;

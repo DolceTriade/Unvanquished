@@ -80,7 +80,8 @@ static gentity_t *LookUpMainBuildable(bool requireActive)
 	gentity_t *answer = nullptr;
 	ForEntities<Component>([&](Entity& entity, Component&) {
 		if (!requireActive ||
-		    entity.Get<BuildableComponent>()->GetState() == BuildableComponent::CONSTRUCTED)
+		    ( entity.Get<BuildableComponent>()->GetState() == BuildableComponent::CONSTRUCTED &&
+		      entity.Get<BuildableComponent>()->Powered() ) )
 		{
 			answer = entity.oldEnt;
 		}
@@ -118,6 +119,19 @@ gentity_t *G_ActiveMainBuildable(team_t team) {
 		case TEAM_HUMANS: return G_ActiveReactor();
 		default:          return nullptr;
 	}
+}
+
+void G_BlightBuildable( gentity_t *buildable, int duration )
+{
+	if ( !buildable || buildable->s.eType != entityType_t::ET_BUILDABLE ||
+	     buildable->buildableTeam != TEAM_HUMANS || !buildable->entity ||
+	     !HasComponents<BuildableComponent>( *buildable->entity ) )
+	{
+		return;
+	}
+
+	buildable->blightUntil = std::max( buildable->blightUntil, level.time + duration );
+	buildable->entity->Get<BuildableComponent>()->SetPowerState( false );
 }
 
 /**
@@ -421,13 +435,21 @@ static void MainStructure_Use( gentity_t *self, gentity_t*, gentity_t *activator
 void G_UpdateBuildablePowerStates()
 {
 	for (team_t team = TEAM_NONE; (team = G_IterateTeams(team)); ) {
+		gentity_t* mainBuildable = G_MainBuildable( team );
+		if ( mainBuildable && mainBuildable->blightUntil <= level.time &&
+		     HasComponents<BuildableComponent>( *mainBuildable->entity ) )
+		{
+			mainBuildable->entity->Get<BuildableComponent>()->SetPowerState( true );
+		}
+
 		gentity_t* activeMainBuildable = G_ActiveMainBuildable(team);
 
 		ForEntities<BuildableComponent>([&](Entity& entity, BuildableComponent& buildableComponent) {
 			if (G_Team(entity.oldEnt) != team) return;
 			if ( entity.Get<MainBuildableComponent>() ) return;
 			if ( entity.Get<SpawnerComponent>() ) return;
-			buildableComponent.SetPowerState( activeMainBuildable != nullptr );
+			buildableComponent.SetPowerState( activeMainBuildable != nullptr &&
+			                                  entity.oldEnt->blightUntil <= level.time );
 		});
 	}
 }

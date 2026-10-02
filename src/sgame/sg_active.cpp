@@ -1833,6 +1833,33 @@ static void G_ReplenishDragoonBarbs( gentity_t *self, int msec )
 	}
 }
 
+static void G_ReplenishShrikeBlight( gentity_t *self, int msec )
+{
+	gclient_t *client = self->client;
+
+	if ( client->ps.weapon == WP_ALEVELFLY )
+	{
+		if ( client->ps.ammo < BG_Weapon( WP_ALEVELFLY )->maxAmmo )
+		{
+			int interval = BG_GetShrikeBlightRegenerationInterval( client->ps );
+			if ( interval > 0 )
+			{
+				self->barbRegeneration += (float)msec / interval;
+				while ( self->barbRegeneration >= 1.0f &&
+				        client->ps.ammo < BG_Weapon( WP_ALEVELFLY )->maxAmmo )
+				{
+					self->barbRegeneration -= 1.0f;
+					client->ps.ammo++;
+				}
+				}
+		}
+		else
+		{
+			self->barbRegeneration = 0.0f;
+		}
+	}
+}
+
 /*
 ==============
 ClientThink_real
@@ -1998,6 +2025,7 @@ static void ClientThink_real( gentity_t *self )
 	G_ReplenishAlienHealth( self );
 
 	G_ReplenishDragoonBarbs( self, msec );
+	G_ReplenishShrikeBlight( self, msec );
 
 	G_HandleClientBuildQueue( self );
 

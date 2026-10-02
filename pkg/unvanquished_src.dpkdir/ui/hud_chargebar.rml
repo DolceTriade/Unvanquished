@@ -42,6 +42,7 @@
 		outerRadius: 2em;
 		color: #83fff580;
 	}
+
 </style>
 </head>
 <body id="hud_chargebar" onload="UpdateChargeRingColor(document)" onshow="UpdateChargeRingColor(document)">

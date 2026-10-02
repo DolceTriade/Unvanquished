@@ -254,6 +254,11 @@ static classData_t bg_classData[] =
 		WP_ALEVEL2_UPG //weapon_t  startWeapon;
 	},
 	{
+		PCL_ALIEN_LEVELFLY, //int     number;
+		"levelfly", //char    *name;
+		WP_ALEVELFLY //weapon_t  startWeapon;
+	},
+	{
 		PCL_ALIEN_LEVEL3, //int     number;
 		"level3", //char    *name;
 		WP_ALEVEL3 //weapon_t  startWeapon;
@@ -480,6 +485,22 @@ int BG_GetBarbRegenerationInterval(const playerState_t& ps)
 	}
 }
 
+int BG_GetShrikeBlightRegenerationInterval(const playerState_t& ps)
+{
+	if ( ps.stats[ STAT_STATE ] & SS_HEALING_8X )
+	{
+		return SHRIKE_BLIGHT_REGEN_BOOSTER;
+	}
+	else if ( ps.stats[ STAT_STATE ] & SS_HEALING_4X )
+	{
+		return SHRIKE_BLIGHT_REGEN_CREEP;
+	}
+	else
+	{
+		return SHRIKE_BLIGHT_REGEN;
+	}
+}
+
 /*
 ===============
 BG_InitClassAttributes
@@ -542,6 +563,7 @@ static const weaponData_t bg_weaponsData[] =
 	{ WP_ALEVEL1,           "level1"    },
 	{ WP_ALEVEL2,           "level2"    },
 	{ WP_ALEVEL2_UPG,       "level2upg" },
+	{ WP_ALEVELFLY,         "levelfly"  },
 	{ WP_ALEVEL3,           "level3"    },
 	{ WP_ALEVEL3_UPG,       "level3upg" },
 	{ WP_ALEVEL4,           "level4"    },
@@ -742,6 +764,7 @@ static const missileData_t bg_missilesData[] =
   { MIS_HIVE,         "hive"         },
   { MIS_LOCKBLOB,     "lockblob"     },
   { MIS_SLOWBLOB,     "slowblob"     },
+  { MIS_BLIGHT,       "blight"       },
   { MIS_BOUNCEBALL,   "bounceball"   },
   { MIS_ROCKET,       "rocket"       },
   { MIS_SPIKER,       "spiker"       }
@@ -853,9 +876,11 @@ static const meansOfDeathData_t bg_meansOfDeathData[] =
 	{ MOD_LEVEL3_CLAW, "MOD_LEVEL3_CLAW" },
 	{ MOD_LEVEL3_POUNCE, "MOD_LEVEL3_POUNCE" },
 	{ MOD_LEVEL3_BOUNCEBALL, "MOD_LEVEL3_BOUNCEBALL" },
-	{ MOD_LEVEL2_CLAW, "MOD_LEVEL2_CLAW" },
-	{ MOD_LEVEL2_ZAP, "MOD_LEVEL2_ZAP" },
-	{ MOD_LEVEL4_CLAW, "MOD_LEVEL4_CLAW" },
+  { MOD_LEVEL2_CLAW, "MOD_LEVEL2_CLAW" },
+  { MOD_LEVEL2_ZAP, "MOD_LEVEL2_ZAP" },
+  { MOD_BLIGHT, "MOD_BLIGHT" },
+  { MOD_LEVELFLY_TALON, "MOD_LEVELFLY_TALON" },
+  { MOD_LEVEL4_CLAW, "MOD_LEVEL4_CLAW" },
 	{ MOD_LEVEL4_TRAMPLE, "MOD_LEVEL4_TRAMPLE" },
 	{ MOD_WEIGHT_A, "MOD_WEIGHT_A" },
 	{ MOD_SLOWBLOB, "MOD_SLOWBLOB" },
@@ -2824,6 +2849,12 @@ float BG_crandom()
 {
 	std::uniform_real_distribution<float> dis(-1.0f, 1.0f);
 	return dis(rng);
+}
+
+float BG_FlightVelocityToCoefficient( float velocity )
+{
+	return 1.0f / ( 1.0f + SHRIKE_FLIGHT_STAMINA_CURVE_SCALE *
+		expf( -velocity / SHRIKE_FLIGHT_STAMINA_CURVE_SPEED ) );
 }
 
 int BG_randrange( int n )

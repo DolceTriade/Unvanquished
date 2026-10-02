@@ -1574,6 +1574,7 @@ static void BuildOverloadCatalog()
 	AddClassUnlock( TEAM_ALIENS, PCL_ALIEN_LEVEL3 );
 	AddClassUnlock( TEAM_ALIENS, PCL_ALIEN_LEVEL3_UPG );
 	AddClassUnlock( TEAM_ALIENS, PCL_ALIEN_LEVEL4 );
+	AddClassUnlock( TEAM_ALIENS, PCL_ALIEN_LEVELFLY );
 
 	// Human weapon upgrades.
 	// Covered weapons: blaster, rifle, psaw, shotgun, lasgun, mdriver, chaingun, flamer, prifle, lcannon.
@@ -1720,6 +1721,15 @@ static void BuildOverloadCatalog()
 	            { GameplayEffect( "LEVEL4_CLAW_DMG", 8.0 ) } );
 	AddUpgrade( TEAM_ALIENS, DefaultUpgradeBaseCost( OVERLOAD_STAGE3_COUNT ), DefaultUpgradeStepCost( OVERLOAD_STAGE3_COUNT ), OVERLOAD_UNCAPPED_RANKS, "level4", "Tyrant", "trample_damage", "trample damage", "Tyrant Trample Damage", "Increase tyrant trample damage.",
 	            { GameplayEffect( "LEVEL4_TRAMPLE_DMG", 10.0 ) } );
+	AddUpgrade( TEAM_ALIENS, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), DefaultUpgradeStepCost( OVERLOAD_STAGE2_COUNT ), OVERLOAD_UNCAPPED_RANKS, "levelfly", "Shrike", "blight", "blight", "Shrike Blight", "Increase Shrike Blight duration and damage.",
+	            { GameplayEffect( "SHRIKE_BLIGHT_DURATION", 500.0 ),
+              AttributeEffect( BG_ATTR_MISSILE, "blight", "damage", 2.0, 1.0 ) } );
+	AddUpgrade( TEAM_ALIENS, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), DefaultUpgradeStepCost( OVERLOAD_STAGE2_COUNT ), OVERLOAD_UNCAPPED_RANKS, "levelfly", "Shrike", "claw_damage", "claw damage", "Shrike Claw Damage", "Increase Shrike claw damage.",
+	            { GameplayEffect( "SHRIKE_CLAW_DMG", 4.0 ) } );
+	AddUpgrade( TEAM_ALIENS, DefaultUpgradeBaseCost( OVERLOAD_STAGE3_COUNT ), DefaultUpgradeStepCost( OVERLOAD_STAGE3_COUNT ), OVERLOAD_UNCAPPED_RANKS, "levelfly", "Shrike", "blight_regen", "blight replenishment", "Shrike Blight Replenishment", "Reduce the time needed to replenish Shrike Blight charges.",
+	            { GameplayEffect( "SHRIKE_BLIGHT_REGEN", -5000.0, 1000.0 ),
+	              GameplayEffect( "SHRIKE_BLIGHT_REGEN_CREEP", -3500.0, 1000.0 ),
+	              GameplayEffect( "SHRIKE_BLIGHT_REGEN_BOOSTER", -2000.0, 1000.0 ) } );
 
 	if ( overloadPurchases.size() > MAX_OVERLOAD_PURCHASES )
 	{
