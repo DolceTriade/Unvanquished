@@ -671,6 +671,21 @@ NSPA_STAND, "idle", true, false, false )
 				ci->animations[ NSPA_JUMP ] = ci->animations[ NSPA_STAND ];
 			}
 
+			if ( !CG_RegisterPlayerAnimation( ci, modelName, NSPA_FLAP, "flap", true, false, false ) )
+			{
+				ci->animations[ NSPA_FLAP ] = ci->animations[ NSPA_JUMP ];
+			}
+
+			if ( !CG_RegisterPlayerAnimation( ci, modelName, NSPA_DIVE, "dive_start", false, false, false ) )
+			{
+				ci->animations[ NSPA_DIVE ] = ci->animations[ NSPA_STAND ];
+			}
+
+			if ( !CG_RegisterPlayerAnimation( ci, modelName, NSPA_DIVE_END, "dive_end", false, false, false ) )
+			{
+				ci->animations[ NSPA_DIVE_END ] = ci->animations[ NSPA_STAND ];
+			}
+
 			if ( !CG_RegisterPlayerAnimation( ci, modelName, NSPA_JUMPBACK, "jump_back", false, false, false ) )
 			{
 				ci->animations[ NSPA_JUMPBACK ] = ci->animations[ NSPA_STAND ];

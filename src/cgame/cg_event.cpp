@@ -541,6 +541,11 @@ static void CG_Obituary( entityState_t *ent )
 				messageAssisted = G_( "%s%s ^*was electrocuted by %s%s%s^*'s marauder; %s%s%s^* assisted" );
 				break;
 
+			case MOD_LEVELFLY_TALON:
+				message = G_( "%s%s ^*was raked open by %s%s%s^*'s shrike" );
+				messageAssisted = G_( "%s%s ^*was raked open by %s%s%s^*'s shrike; %s%s%s^* assisted" );
+				break;
+
 			case MOD_LEVEL3_CLAW:
 				message = G_( "%s%s ^*was eviscerated by %s%s%s^*'s dragoon" );
 				messageAssisted = G_( "%s%s ^*was eviscerated by %s%s%s^*'s dragoon; %s%s%s^* assisted" );

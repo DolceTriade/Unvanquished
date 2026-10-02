@@ -304,6 +304,10 @@
 				<input cvar="g_bot_level4" type="checkbox" />
 				<h3><translate>Tyrant</translate></h3>
 			</row>
+			<row>
+				<input cvar="g_bot_levelfly" type="checkbox" />
+				<h3><translate>Shrike</translate></h3>
+			</row>
 		</panel>
 
 		</tabset>

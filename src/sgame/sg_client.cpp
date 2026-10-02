@@ -1557,6 +1557,10 @@ static void ClientSpawnCBSE(gentity_t *ent, bool evolving) {
 			ClientEntityCreate<TyrantEntity>( ent, oldEntity, client, pcl, evolving );
 			break;
 
+		case PCL_ALIEN_LEVELFLY:
+			ClientEntityCreate<ShrikeEntity>( ent, oldEntity, client, pcl, evolving );
+			break;
+
 		case PCL_HUMAN_NAKED:
 		case PCL_HUMAN_LIGHT:
 		case PCL_HUMAN_MEDIUM:
@@ -1780,6 +1784,7 @@ void ClientSpawn( gentity_t *ent, gentity_t *spawn, const vec3_t origin, const v
 	client->ps.stats[ STAT_STAMINA ] = STAMINA_MAX;
 	client->ps.stats[ STAT_FUEL ]    = JETPACK_FUEL_MAX;
 	client->ps.stats[ STAT_CLASS ] = ent->client->pers.classSelection;
+	client->pmext.shrikeFlightCooldown = 0;
 
 	VectorSet( client->ps.grapplePoint, 0.0f, 0.0f, 1.0f );
 

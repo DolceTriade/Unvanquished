@@ -109,6 +109,7 @@ void              G_BuildLogSet( buildLog_t *log, gentity_t *ent );
 void              G_BuildLogAuto( gentity_t *actor, gentity_t *buildable, buildFate_t fate );
 void              G_BuildLogRevert( int id );
 void              G_UpdateBuildablePowerStates();
+void              G_BlightBuildable( gentity_t *buildable, int duration );
 void              G_BuildableTouchTriggers( gentity_t *ent );
 void              G_HandleClientBuildQueue( gentity_t *ent );
 void              G_ClearClientBuildQueue( gentity_t *ent, bool clearCurrent );

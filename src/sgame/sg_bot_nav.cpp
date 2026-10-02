@@ -1062,6 +1062,11 @@ void BotMoveUpward( gentity_t *self, glm::vec3 nextCorner )
 	case PCL_ALIEN_LEVEL0:
 		BotClimbToGoal( self );
 		break;
+	case PCL_ALIEN_LEVELFLY:
+		BotAimAtLocation( self, nextCorner );
+		self->botMind->cmdBuffer.forwardmove = 127;
+		self->botMind->cmdBuffer.upmove = nextCorner.z > self->s.origin[ 2 ] ? 127 : -127;
+		break;
 	case PCL_ALIEN_LEVEL1:
 		if ( level.time < WallclimbStopTime( self ) )
 		{
@@ -1195,6 +1200,8 @@ static bool BotTryMoveUpward( gentity_t *self )
 				return false;
 			}
 			break;
+		case PCL_ALIEN_LEVELFLY:
+			break;
 		default:
 			return false;
 		}
@@ -1228,6 +1235,12 @@ static bool BotTryMoveUpward( gentity_t *self )
 			return false;
 		}
 		BotStandStill( self );
+		break;
+	case PCL_ALIEN_LEVELFLY:
+		if ( !( self->client->ps.stats[ STAT_STATE2 ] & SS2_FLYING ) )
+		{
+			BotJump( self );
+		}
 		break;
 	default:
 		break;

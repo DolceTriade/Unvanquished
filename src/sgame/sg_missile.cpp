@@ -312,6 +312,17 @@ static int ImpactHive( gentity_t *, const trace2_t*, gentity_t *hitEnt )
 	}
 }
 
+static int ImpactBlight( gentity_t *, const trace2_t *, gentity_t *hitEnt )
+{
+	if ( hitEnt->s.eType == entityType_t::ET_BUILDABLE &&
+	     hitEnt->buildableTeam == TEAM_HUMANS )
+	{
+		G_BlightBuildable( hitEnt, SHRIKE_BLIGHT_DURATION );
+	}
+
+	return MIB_IMPACT;
+}
+
 static int DefaultImpactFunc( gentity_t*, const trace2_t*, gentity_t* )
 {
 	return MIB_IMPACT;
@@ -351,6 +362,7 @@ bool G_MissileImpact( gentity_t *ent, const trace2_t *trace )
 		case MIS_FIREBOMB_SUB: impactFunc = ImpactFirebombSub; break;
 		case MIS_LOCKBLOB:     impactFunc = ImpactLockblock;   break;
 		case MIS_SLOWBLOB:     impactFunc = ImpactSlowblob;    break;
+		case MIS_BLIGHT:       impactFunc = ImpactBlight;      break;
 		case MIS_HIVE:         impactFunc = ImpactHive;        break;
 		default:               impactFunc = DefaultImpactFunc; break;
 	}

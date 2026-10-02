@@ -190,6 +190,7 @@ struct gentity_t
 	 * other entities might also consider the powergrid for behavior changes
 	 */
 	bool     powered;
+	int      blightUntil; // level.time until which a human buildable is disabled by Shrike Blight
 
 	GentityRef   target; // target of hive, rocketpod, builder's +deconstruct
 

@@ -358,6 +358,7 @@ enum weaponstate_t
 struct pmoveExt_t
 {
 	int    pouncePayload;
+	int    shrikeFlightCooldown;
 	vec3_t fallImpactVelocity;
 	bool cancelDeconstructCharge;
 };
@@ -441,6 +442,7 @@ enum statIndex_t
 #define SCA_WALLJUMPER      BIT(6)
 #define SCA_WALLRUNNER      BIT(7)
 #define SCA_SLIDER          BIT(8)
+#define SCA_FLYER           BIT(9)
 
 // STAT_STATE fields. 16 bit available
 #define SS_WALLCLIMBING     BIT(0)
@@ -464,6 +466,8 @@ enum statIndex_t
 #define SS2_JETPACK_WARM    BIT(1)  // whether we can start a thrust
 #define SS2_JETPACK_ACTIVE  BIT(2)  // whether we are thrusting
 #define SS2_LEVEL1SLOW      BIT(3)  // hit and slowed by a Mantis attack
+#define SS2_FLYING          BIT(4)  // Shrike flight is active
+#define SS2_DIVING          BIT(5)  // Shrike is looking down and diving
 
 // has to fit into 16 bits
 #define SB_BUILDABLE_MASK        0x00FF
@@ -604,6 +608,7 @@ enum weapon_t
   WP_ALEVEL1,
   WP_ALEVEL2,
   WP_ALEVEL2_UPG,
+  WP_ALEVELFLY,
   WP_ALEVEL3,
   WP_ALEVEL3_UPG,
   WP_ALEVEL4,
@@ -666,6 +671,7 @@ enum missile_t
 	MIS_HIVE,
 	MIS_LOCKBLOB,
 	MIS_SLOWBLOB,
+	MIS_BLIGHT,
 	MIS_BOUNCEBALL,
 	MIS_ROCKET,
 	MIS_SPIKER,
@@ -1021,6 +1027,9 @@ enum nonSegPlayerAnimNumber_t
   NSPA_SWIM,
 
   NSPA_JUMP,
+  NSPA_FLAP,
+  NSPA_DIVE, // dive_start
+  NSPA_DIVE_END,
   NSPA_LAND,
   NSPA_JUMPBACK,
   NSPA_LANDBACK,
@@ -1136,6 +1145,7 @@ enum class_t
   PCL_ALIEN_LEVEL1,
   PCL_ALIEN_LEVEL2,
   PCL_ALIEN_LEVEL2_UPG,
+  PCL_ALIEN_LEVELFLY,
   PCL_ALIEN_LEVEL3,
   PCL_ALIEN_LEVEL3_UPG,
   PCL_ALIEN_LEVEL4,
@@ -1223,6 +1233,8 @@ enum meansOfDeath_t
   MOD_LEVEL3_BOUNCEBALL,
   MOD_LEVEL2_CLAW,
   MOD_LEVEL2_ZAP,
+  MOD_BLIGHT,
+  MOD_LEVELFLY_TALON,
   MOD_LEVEL4_CLAW,
   MOD_LEVEL4_TRAMPLE,
   MOD_WEIGHT_A,
@@ -1641,6 +1653,7 @@ bool                    BG_ClassHasAbility( int pClass, int ability );
 evolveInfo_t            BG_ClassEvolveInfoFromTo(int from, int to);
 
 int                       BG_GetBarbRegenerationInterval(const playerState_t& ps);
+int                       BG_GetShrikeBlightRegenerationInterval(const playerState_t& ps);
 
 weapon_t                  BG_WeaponNumberByName( const char *name );
 const weaponAttributes_t  *BG_WeaponByName( const char *name );
@@ -1934,6 +1947,7 @@ int BG_FOpenGameOrPakPath( Str::StringRef filename, fileHandle_t &handle );
 void BG_InitRandom();
 WARN_UNUSED_RESULT float BG_random();
 WARN_UNUSED_RESULT float BG_crandom();
+float BG_FlightVelocityToCoefficient( float velocity );
 WARN_UNUSED_RESULT int BG_randrange( int n );
 WARN_UNUSED_RESULT std::minstd_rand &BG_RandomEngine();
 

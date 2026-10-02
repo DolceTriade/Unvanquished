@@ -430,6 +430,10 @@ entities:
         components:
             AlienClass:
 
+    Shrike:
+        components:
+            AlienClass:
+
     Granger:
         components:
             AlienClass:

@@ -33,7 +33,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 // sure it's close to 0 by the time the anim finishes?
 static Cvar::Cvar<float> cg_animBlendHalfLife(
 	"cg_animBlendHalfLife", "inter-animation transition time (higher:slower, 0:instant)", Cvar::NONE, 100);
-
+static Cvar::Cvar<float> cg_animFPSMult(
+	"cg_animFPSMult", "Animation FPS multiplier (higher: faster)", Cvar::NONE, 1.0);
 /*
 ===============
 CG_AnimNumber
@@ -90,9 +91,7 @@ void CG_RunLerpFrame( lerpFrame_t *lf )
 			animation_t *anim = lf->animation;
 			int numFrames = anim->numFrames;
 
-			/* Previously the code was dividing frameLength by scale
-			But scale was always eqal to 1.0f so we did not it */
-			float frameLength = anim->frameLerp;
+			float frameLength = anim->frameLerp / cg_animFPSMult.Get();
 
 			int relativeFrame = ceil((cg.time - lf->animationTime) / frameLength);
 			if (relativeFrame >= numFrames)

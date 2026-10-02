@@ -1266,6 +1266,20 @@ void G_FireWeapon( gentity_t *self, weapon_t weapon, weaponMode_t weaponMode )
 					           LEVEL2_CLAW_DMG, MOD_LEVEL2_CLAW, false );
 					break;
 
+				case WP_ALEVELFLY:
+				{
+					float damage = SHRIKE_CLAW_DMG;
+					if ( self->client->ps.stats[ STAT_STATE2 ] & SS2_FLYING )
+					{
+						float speed = VectorLength( self->client->ps.velocity );
+						damage *= 1.0f + speed / 100.0f * SHRIKE_CLAW_DAMAGE_PER_100_SPEED;
+					}
+
+					FireMelee( self, SHRIKE_CLAW_RANGE, SHRIKE_CLAW_WIDTH, SHRIKE_CLAW_WIDTH,
+					           damage, MOD_LEVELFLY_TALON, false );
+				}
+					break;
+
 				case WP_ALEVEL4:
 					FireMelee( self, LEVEL4_CLAW_RANGE, LEVEL4_CLAW_WIDTH, LEVEL4_CLAW_HEIGHT,
 					           LEVEL4_CLAW_DMG, MOD_LEVEL4_CLAW, false );
@@ -1357,6 +1371,10 @@ void G_FireWeapon( gentity_t *self, weapon_t weapon, weaponMode_t weaponMode )
 		{
 			switch ( weapon )
 			{
+				case WP_ALEVELFLY:
+					FireMissile( self, MIS_BLIGHT );
+					break;
+
 				case WP_ALEVEL3_UPG:
 					FireMissile( self, MIS_BOUNCEBALL );
 					break;

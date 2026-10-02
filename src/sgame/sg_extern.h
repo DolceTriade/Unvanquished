@@ -199,6 +199,7 @@ extern Cvar::Cvar<bool> g_bot_level2upg;
 extern Cvar::Cvar<bool> g_bot_level3;
 extern Cvar::Cvar<bool> g_bot_level3upg;
 extern Cvar::Cvar<bool> g_bot_level4;
+extern Cvar::Cvar<bool> g_bot_levelfly;
 
 // misc bot cvars
 extern Cvar::Cvar<bool> g_bot_attackStruct;

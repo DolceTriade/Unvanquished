@@ -177,6 +177,7 @@ static Cvar::Cvar<float> cg_fov_level1("cg_fov_level1", "field of view (degrees)
 static Cvar::Cvar<float> cg_fov_level2("cg_fov_level2", "field of view (degrees) for Marauder", Cvar::NONE, 0);
 static Cvar::Cvar<float> cg_fov_level3("cg_fov_level3", "field of view (degrees) for Dragoon", Cvar::NONE, 0);
 static Cvar::Cvar<float> cg_fov_level4("cg_fov_level4", "field of view (degrees) for Tyrant", Cvar::NONE, 0);
+static Cvar::Cvar<float> cg_fov_levelfly("cg_fov_levelfly", "field of view (degrees) for Shrike", Cvar::NONE, 0);
 static Cvar::Cvar<float> cg_fov_human("cg_fov_human", "field of view (degrees) for humans", Cvar::NONE, 0);
 
 Cvar::Cvar<bool> ui_chatPromptColors("ui_chatPromptColors", "chat prompts (e.g. 'Say:') are color-coded", Cvar::NONE, true);

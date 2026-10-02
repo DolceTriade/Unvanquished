@@ -182,6 +182,7 @@ int equipment_t<weapon_t>::slots( void ) const
 equipment_t<class_t> classes[] =
 {
 	{ g_bot_level4    , PCL_ALIEN_LEVEL4       },
+	{ g_bot_levelfly  , PCL_ALIEN_LEVELFLY     },
 	{ g_bot_level3upg , PCL_ALIEN_LEVEL3_UPG   },
 	{ g_bot_level3    , PCL_ALIEN_LEVEL3       },
 	{ g_bot_level2upg , PCL_ALIEN_LEVEL2_UPG   },
@@ -463,6 +464,9 @@ float BotGetEnemyPriority( gentity_t *self, gentity_t *ent )
 		{
 			case WP_ALEVEL0:
 				enemyScore = 0.1;
+				break;
+			case WP_ALEVELFLY:
+				enemyScore = 0.5;
 				break;
 			case WP_ALEVEL1:
 				enemyScore = 0.3;
@@ -1386,6 +1390,11 @@ bool BotTargetInAttackRange( const gentity_t *self, botTarget_t target )
 			range = LEVEL0_BITE_RANGE;
 			secondaryRange = 0;
 			break;
+		case WP_ALEVELFLY:
+			range = SHRIKE_CLAW_RANGE;
+			secondaryRange = 0;
+			width = height = SHRIKE_CLAW_WIDTH;
+			break;
 		case WP_ALEVEL1:
 			range = LEVEL1_CLAW_RANGE;
 			if ( self->botMind->skillSet[BOT_A_LEAP_ON_ATTACK] )
@@ -1558,7 +1567,8 @@ bool BotEntityIsValidEnemyTarget( const gentity_t *self, const gentity_t *enemy 
 	}
 
 	// dretch limitations
-	if ( self->client->ps.stats[STAT_CLASS] == PCL_ALIEN_LEVEL0 && !G_DretchCanDamageEntity( enemy ) )
+	if ( self->client->ps.stats[STAT_CLASS] == PCL_ALIEN_LEVEL0 &&
+	     !G_DretchCanDamageEntity( enemy ) )
 	{
 		return false;
 	}
@@ -2022,6 +2032,8 @@ static float BotEnemyAttackRange( const gentity_t *enemy )
 		{
 		case PCL_ALIEN_LEVEL0:
 			return LEVEL0_BITE_RANGE;
+		case PCL_ALIEN_LEVELFLY:
+			return SHRIKE_CLAW_RANGE;
 		case PCL_ALIEN_LEVEL1:
 			return std::max( LEVEL1_CLAW_RANGE, static_cast<float>( LEVEL1_POUNCE_DISTANCE ) );
 		case PCL_ALIEN_LEVEL2:
@@ -2536,6 +2548,7 @@ void BotFireWeaponAI( gentity_t *self )
 			}
 			break;
 		case WP_ALEVEL0:
+		case WP_ALEVELFLY:
 			break; //auto hit
 		case WP_ALEVEL1:
 			if ( distance < LEVEL1_CLAW_RANGE && readyFire )

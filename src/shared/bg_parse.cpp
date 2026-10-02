@@ -778,6 +778,10 @@ void BG_ParseClassAttributeFile( const char *filename, classAttributes_t *ca )
 		{
 			ca->abilities |= SCA_SLIDER;
 		}
+		else if ( !Q_stricmp( token, "flyer" ) )
+		{
+			ca->abilities |= SCA_FLYER;
+		}
 		else if ( !Q_stricmp( token, "buildDistance" ) )
 		{
 			PARSE(text, token);

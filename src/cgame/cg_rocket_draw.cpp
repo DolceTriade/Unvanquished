@@ -1217,6 +1217,31 @@ private:
 	bool isActive_;
 };
 
+class FlightIndicatorElement : public HudElement
+{
+public:
+	FlightIndicatorElement( const Rml::String& tag ) :
+		HudElement( tag, ELEMENT_ALIENS ),
+		isActive_( false )
+	{
+		SetClass( "inactive", true );
+	}
+
+	void DoOnUpdate() override
+	{
+		bool flying = cg.predictedPlayerState.stats[ STAT_STATE2 ] & SS2_FLYING;
+		if ( flying != isActive_ )
+		{
+			isActive_ = flying;
+			SetClass( "active", flying );
+			SetClass( "inactive", !flying );
+		}
+	}
+
+private:
+	bool isActive_;
+};
+
 class StaminaElement : public HudElement
 {
 public:
@@ -2544,6 +2569,7 @@ public:
 	numBarbs_( 0 ),
 	maxBarbs_( BG_Weapon( WP_ALEVEL3_UPG )->maxAmmo ),
 	regenerationInterval_ ( 0 ),
+	baseInterval_ ( LEVEL3_BOUNCEBALL_REGEN_CREEP ),
 	t0_ ( 0 ),
 	offset_ ( 0 ) {}
 
@@ -2574,9 +2600,20 @@ public:
 	void DoOnUpdate() override
 	{
 		int newNumBarbs = cg.snap->ps.ammo;
-		int interval = BG_GetBarbRegenerationInterval( cg.snap->ps );
+		int interval;
+		int primaryWeapon = BG_PrimaryWeapon( cg.snap->ps.stats );
 
-		if ( BG_PrimaryWeapon( cg.snap->ps.stats ) != WP_ALEVEL3_UPG )
+		if ( primaryWeapon == WP_ALEVEL3_UPG )
+		{
+			interval = BG_GetBarbRegenerationInterval( cg.snap->ps );
+			baseInterval_ = LEVEL3_BOUNCEBALL_REGEN_CREEP;
+		}
+		else if ( primaryWeapon == WP_ALEVELFLY )
+		{
+			interval = BG_GetShrikeBlightRegenerationInterval( cg.snap->ps );
+			baseInterval_ = SHRIKE_BLIGHT_REGEN_CREEP;
+		}
+		else
 		{
 			return;
 		}
@@ -2645,7 +2682,7 @@ private:
 	float GetParam()
 	{
 		float timeElapsed = ( cg.time - t0_ ) / 1000.0f; // in s
-		float frequency = (float)LEVEL3_BOUNCEBALL_REGEN_CREEP
+		float frequency = (float)baseInterval_
 		                / (float)regenerationInterval_; // in Hz
 		return offset_ + 2.0f * M_PI * frequency * timeElapsed;
 	}
@@ -2653,6 +2690,7 @@ private:
 	int numBarbs_;
 	int maxBarbs_;
 	int regenerationInterval_;
+	int baseInterval_;
 
 	// t0 and offset are used to make sure that there are no sudden jumps in opacity.
 	int t0_;
@@ -3747,6 +3785,7 @@ void CG_Rocket_RegisterElements()
 	RegisterElement<EvosValueElement>( "evos" );
 	RegisterElement<WeaponIconElement>( "weapon_icon" );
 	RegisterElement<WallwalkElement>( "wallwalk" );
+	RegisterElement<FlightIndicatorElement>( "flight_indicator" );
 	RegisterElement<StaminaElement>( "stamina" );
 	RegisterElement<UsableBuildableElement>( "usable_buildable" );
 	RegisterElement<LocationElement>( "location" );

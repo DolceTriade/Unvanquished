@@ -1,0 +1,56 @@
+<rml>
+<head>
+<link type="text/rcss" href="/ui/shared/basics.rcss" />
+<style>
+	body {
+		width: 100%;
+		height: 100%;
+		z-index: 1;
+	}
+
+	flight_indicator {
+		position: absolute;
+		left: 0;
+		top: 0;
+		width: 100%;
+		height: 100%;
+		transition: opacity 0.15s linear-in;
+	}
+
+	flight_indicator.active {
+		opacity: 1;
+	}
+
+	flight_indicator.inactive {
+		opacity: 0;
+	}
+
+	flight_indicator .wing {
+		position: absolute;
+		top: 50%;
+		margin-top: -0.6em;
+		width: 1.6em;
+		height: 1.2em;
+		font-family: FontAwesome;
+		font-size: 1.5em;
+		line-height: 1.2em;
+		color: #ff4040cc;
+	}
+
+	flight_indicator .wing.left {
+		right: 53%;
+		transform: scaleX(-1);
+	}
+
+	flight_indicator .wing.right {
+		left: 53%;
+	}
+</style>
+</head>
+<body id="hud_flight">
+	<flight_indicator>
+		<span class="wing left"></span>
+		<span class="wing right"></span>
+	</flight_indicator>
+</body>
+</rml>

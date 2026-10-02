@@ -683,6 +683,17 @@ static bool CG_ParseWeaponFile( const char *filename, int weapon, weaponInfo_t *
 						CG_RegisterWeaponAnimation( &wi->animations[ WANIM_ATTACK6 ],
 													va( "%s_view.iqm:fire6", token2 ), false, false, false );
 						break;
+					case WP_ALEVELFLY:
+						CG_RegisterWeaponAnimation( &wi->animations[ WANIM_ATTACK1 ],
+													va( "%s_view.iqm:fire", token2 ), false, false, false );
+						CG_RegisterWeaponAnimation( &wi->animations[ WANIM_ATTACK2 ],
+													va( "%s_view.iqm:fire2", token2 ), false, false, false );
+						CG_RegisterWeaponAnimation( &wi->animations[ WANIM_ATTACK3 ],
+													va( "%s_view.iqm:fire3", token2 ), false, false, false );
+						wi->animations[ WANIM_ATTACK4 ] = wi->animations[ WANIM_ATTACK1 ];
+						wi->animations[ WANIM_ATTACK5 ] = wi->animations[ WANIM_ATTACK2 ];
+						wi->animations[ WANIM_ATTACK6 ] = wi->animations[ WANIM_ATTACK3 ];
+						break;
 
 					case WP_ALEVEL2_UPG:
 						CG_RegisterWeaponAnimation( &wi->animations[ WANIM_ATTACK1 ],
@@ -754,6 +765,7 @@ static bool CG_ParseWeaponFile( const char *filename, int weapon, weaponInfo_t *
 
 					case WP_ALEVEL1:
 					case WP_ALEVEL2:
+					case WP_ALEVELFLY:
 					case WP_ALEVEL4:
 						CG_RegisterWeaponAnimation( &wi->animations[ WANIM_ATTACK1 ],
 									    va( "%s_view_fire.md5anim", token2 ), false, false, false );
@@ -2970,6 +2982,14 @@ float CG_ChargeProgress()
 	case WP_ALEVEL1:
 		min = 0;
 		max = LEVEL1_POUNCE_COOLDOWN;
+		break;
+	case WP_ALEVELFLY:
+		if ( cg.pmext.shrikeFlightCooldown > 0 )
+		{
+			return Math::Clamp(
+				static_cast<float>( cg.pmext.shrikeFlightCooldown ) /
+				SHRIKE_FLIGHT_LAUNCH_COOLDOWN, 0.0f, 1.0f );
+		}
 		break;
 	case WP_ALEVEL3:
 		min = LEVEL3_POUNCE_TIME_MIN;
