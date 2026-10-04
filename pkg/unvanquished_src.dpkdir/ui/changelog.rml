@@ -2,15 +2,12 @@
 <head></head>
 <body>
 <div>
-    <p><h1>Changelog</h1></p>
-    <p><h3>2026-05-17</h3>
+    <h1>Changelog</h1>
         <ul>
             <li>Marazap requires constant aim</li>
             <li>Mantis and Creep effects are debuffed by armor</li>
             <li>Can shove people around</li>
             <li>Bsuits can walk over dretches</li>
-            <li>kai's biokit</li>
-            <li>Redsky's circle menus</li>
             <li>Momentum and Vampire removed...
                 <ul>
                     <li>Go to OM/RC and press "Q" to open Overload menu and purchase upgrades</li>
@@ -20,7 +17,14 @@
             </li>
             <li>freem's chaingun (balance tweaked slightly)</li>
             <li>Human and Alien raid modes (with bosses) USE /callvote alienraid or /callvote humanraid</li>
+            <li>Shrike Flying Alien</li>
+            <li>New Shotgun and Mass Driver models</li>
         </ul>
+    <h1>Shrike Guide</h1>
+    <p>
+        Shrike is a disruptor class. It can claw and fire blight barbs which temorarily disable a human buildable.
+
+        Use alt-attack to start flying. Use crouch to stop flying. Use tertiaryAttack to fire barbs.
     </p>
 </div>
 </body>
