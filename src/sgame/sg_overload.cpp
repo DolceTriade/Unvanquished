@@ -896,6 +896,7 @@ static int OverloadSortIndexForThing( team_t team, const char* thing )
 		if ( !Q_stricmp( thing, "level3" ) ) return 15;
 		if ( !Q_stricmp( thing, "level3upg" ) ) return 16;
 		if ( !Q_stricmp( thing, "level4" ) ) return 17;
+		if ( !Q_stricmp( thing, "levelfly" ) ) return 18;
 		if ( !Q_stricmp( thing, "acid_tube" ) ) return 30;
 		if ( !Q_stricmp( thing, "trapper" ) ) return 31;
 		if ( !Q_stricmp( thing, "spiker" ) ) return 32;
@@ -1676,7 +1677,7 @@ static void BuildOverloadCatalog()
 	            { AttributeEffect( BG_ATTR_MISSILE, "hive", "damage", 8.0, 1.0 ) } );
 
 	// Alien class upgrades.
-	// Covered classes: dretch, level1 scout, marauder, advanced marauder, dragoon, advanced dragoon, tyrant.
+	// Covered classes: dretch, level1 scout, marauder, advanced marauder, Shrike, dragoon, advanced dragoon, tyrant.
 	// Intentionally missing for now: granger, advanced granger.
 	AddUpgrade( TEAM_ALIENS, DefaultUpgradeBaseCost( 0 ), DefaultUpgradeStepCost( OVERLOAD_STAGE2_COUNT ), OVERLOAD_UNCAPPED_RANKS, "aliens", "Alien Lifeforms", "vitality", "vitality", "Alien Vitality", "Increase max health for all alien classes.",
 	            { PercentAttributeEffect( BG_ATTR_CLASS, "builder", "health", 0.1, 1.0 ),
@@ -1685,6 +1686,7 @@ static void BuildOverloadCatalog()
 	              PercentAttributeEffect( BG_ATTR_CLASS, "level1", "health", 0.1, 1.0 ),
 	              PercentAttributeEffect( BG_ATTR_CLASS, "level2", "health", 0.1, 1.0 ),
 	              PercentAttributeEffect( BG_ATTR_CLASS, "level2upg", "health", 0.1, 1.0 ),
+				  PercentAttributeEffect( BG_ATTR_CLASS, "levelfly", "health", 0.1, 1.0 ),
 	              PercentAttributeEffect( BG_ATTR_CLASS, "level3", "health", 0.1, 1.0 ),
 	              PercentAttributeEffect( BG_ATTR_CLASS, "level3upg", "health", 0.1, 1.0 ),
 	              PercentAttributeEffect( BG_ATTR_CLASS, "level4", "health", 0.1, 1.0 ),
@@ -1699,6 +1701,7 @@ static void BuildOverloadCatalog()
 	              PercentAttributeEffect( BG_ATTR_CLASS, "level1", "regen_rate", 0.1, 0.001 ),
 	              PercentAttributeEffect( BG_ATTR_CLASS, "level2", "regen_rate", 0.1, 0.001 ),
 	              PercentAttributeEffect( BG_ATTR_CLASS, "level2upg", "regen_rate", 0.1, 0.001 ),
+	              PercentAttributeEffect( BG_ATTR_CLASS, "levelfly", "regen_rate", 0.1, 0.001 ),
 	              PercentAttributeEffect( BG_ATTR_CLASS, "level3", "regen_rate", 0.1, 0.001 ),
 	              PercentAttributeEffect( BG_ATTR_CLASS, "level3upg", "regen_rate", 0.1, 0.001 ),
 	              PercentAttributeEffect( BG_ATTR_CLASS, "level4", "regen_rate", 0.1, 0.001 ) } );
@@ -1722,14 +1725,14 @@ static void BuildOverloadCatalog()
 	AddUpgrade( TEAM_ALIENS, DefaultUpgradeBaseCost( OVERLOAD_STAGE3_COUNT ), DefaultUpgradeStepCost( OVERLOAD_STAGE3_COUNT ), OVERLOAD_UNCAPPED_RANKS, "level4", "Tyrant", "trample_damage", "trample damage", "Tyrant Trample Damage", "Increase tyrant trample damage.",
 	            { GameplayEffect( "LEVEL4_TRAMPLE_DMG", 10.0 ) } );
 	AddUpgrade( TEAM_ALIENS, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), DefaultUpgradeStepCost( OVERLOAD_STAGE2_COUNT ), OVERLOAD_UNCAPPED_RANKS, "levelfly", "Shrike", "blight", "blight", "Shrike Blight", "Increase Shrike Blight duration and damage.",
-	            { GameplayEffect( "SHRIKE_BLIGHT_DURATION", 500.0 ),
+	            { GameplayEffect( "LEVELFLY_BLIGHT_DURATION", 500.0 ),
               AttributeEffect( BG_ATTR_MISSILE, "blight", "damage", 2.0, 1.0 ) } );
 	AddUpgrade( TEAM_ALIENS, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), DefaultUpgradeStepCost( OVERLOAD_STAGE2_COUNT ), OVERLOAD_UNCAPPED_RANKS, "levelfly", "Shrike", "claw_damage", "claw damage", "Shrike Claw Damage", "Increase Shrike claw damage.",
-	            { GameplayEffect( "SHRIKE_CLAW_DMG", 4.0 ) } );
+	            { GameplayEffect( "LEVELFLY_CLAW_DMG", 4.0 ) } );
 	AddUpgrade( TEAM_ALIENS, DefaultUpgradeBaseCost( OVERLOAD_STAGE3_COUNT ), DefaultUpgradeStepCost( OVERLOAD_STAGE3_COUNT ), OVERLOAD_UNCAPPED_RANKS, "levelfly", "Shrike", "blight_regen", "blight replenishment", "Shrike Blight Replenishment", "Reduce the time needed to replenish Shrike Blight charges.",
-	            { GameplayEffect( "SHRIKE_BLIGHT_REGEN", -5000.0, 1000.0 ),
-	              GameplayEffect( "SHRIKE_BLIGHT_REGEN_CREEP", -3500.0, 1000.0 ),
-	              GameplayEffect( "SHRIKE_BLIGHT_REGEN_BOOSTER", -2000.0, 1000.0 ) } );
+	            { GameplayEffect( "LEVELFLY_BLIGHT_REGEN", -5000.0, 1000.0 ),
+	              GameplayEffect( "LEVELFLY_BLIGHT_REGEN_CREEP", -3500.0, 1000.0 ),
+	              GameplayEffect( "LEVELFLY_BLIGHT_REGEN_BOOSTER", -2000.0, 1000.0 ) } );
 
 	if ( overloadPurchases.size() > MAX_OVERLOAD_PURCHASES )
 	{
@@ -1780,6 +1783,10 @@ bool EntryIsAvailable( team_t team, const overloadPurchaseDef_t& entry )
 
 	const TeamEconomyState& economy = TeamEconomy( team );
 	const size_t index = &entry - overloadPurchases.data();
+	if ( entry.requiredCompletedCount > economy.completedPurchases )
+	{
+		return false;
+	}
 
 	if ( entry.kind == overloadPurchaseKind_t::UNLOCK )
 	{

@@ -317,7 +317,7 @@ static int ImpactBlight( gentity_t *, const trace2_t *, gentity_t *hitEnt )
 	if ( hitEnt->s.eType == entityType_t::ET_BUILDABLE &&
 	     hitEnt->buildableTeam == TEAM_HUMANS )
 	{
-		G_BlightBuildable( hitEnt, SHRIKE_BLIGHT_DURATION );
+		G_BlightBuildable( hitEnt, LEVELFLY_BLIGHT_DURATION );
 	}
 
 	return MIB_IMPACT;
