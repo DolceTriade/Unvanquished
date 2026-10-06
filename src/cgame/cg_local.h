@@ -1613,6 +1613,7 @@ struct cgMedia_t
 
 	sfxHandle_t alienL4ChargePrepare;
 	sfxHandle_t alienL4ChargeStart;
+	sfxHandle_t shrikeFlapSound;
 
 	qhandle_t   jetpackModel;
 	qhandle_t   radarModel;

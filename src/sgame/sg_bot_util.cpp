@@ -1391,9 +1391,9 @@ bool BotTargetInAttackRange( const gentity_t *self, botTarget_t target )
 			secondaryRange = 0;
 			break;
 		case WP_ALEVELFLY:
-			range = SHRIKE_CLAW_RANGE;
+			range = LEVELFLY_CLAW_RANGE;
 			secondaryRange = 0;
-			width = height = SHRIKE_CLAW_WIDTH;
+			width = height = LEVELFLY_CLAW_WIDTH;
 			break;
 		case WP_ALEVEL1:
 			range = LEVEL1_CLAW_RANGE;
@@ -2033,7 +2033,7 @@ static float BotEnemyAttackRange( const gentity_t *enemy )
 		case PCL_ALIEN_LEVEL0:
 			return LEVEL0_BITE_RANGE;
 		case PCL_ALIEN_LEVELFLY:
-			return SHRIKE_CLAW_RANGE;
+			return LEVELFLY_CLAW_RANGE;
 		case PCL_ALIEN_LEVEL1:
 			return std::max( LEVEL1_CLAW_RANGE, static_cast<float>( LEVEL1_POUNCE_DISTANCE ) );
 		case PCL_ALIEN_LEVEL2:

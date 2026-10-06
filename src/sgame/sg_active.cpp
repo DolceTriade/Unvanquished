@@ -2079,7 +2079,6 @@ static void ClientThink_real( gentity_t *self )
 	oldEventSequence = client->ps.eventSequence;
 
 	pm = {};
-
 	// clear fall impact velocity before every pmove
 	VectorSet( client->pmext.fallImpactVelocity, 0.0f, 0.0f, 0.0f );
 

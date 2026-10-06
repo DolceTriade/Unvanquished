@@ -561,6 +561,7 @@ static void CG_RegisterSounds()
 
 	cgs.media.alienL4ChargePrepare = trap_S_RegisterSound( "sound/player/level4/charge_prepare", true );
 	cgs.media.alienL4ChargeStart = trap_S_RegisterSound( "sound/player/level4/charge_start", true );
+	cgs.media.shrikeFlapSound = trap_S_RegisterSound( "sound/player/levelfly/wings_flap_large", true );
 
 	cgs.media.selectSound = trap_S_RegisterSound( "sound/weapons/change", false );
 	cgs.media.turretSpinupSound = trap_S_RegisterSound( "sound/buildables/mgturret/spinup", false );

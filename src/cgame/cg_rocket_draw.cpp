@@ -2611,7 +2611,7 @@ public:
 		else if ( primaryWeapon == WP_ALEVELFLY )
 		{
 			interval = BG_GetShrikeBlightRegenerationInterval( cg.snap->ps );
-			baseInterval_ = SHRIKE_BLIGHT_REGEN_CREEP;
+			baseInterval_ = LEVELFLY_BLIGHT_REGEN_CREEP;
 		}
 		else
 		{

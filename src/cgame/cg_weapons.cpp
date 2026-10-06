@@ -2988,7 +2988,7 @@ float CG_ChargeProgress()
 		{
 			return Math::Clamp(
 				static_cast<float>( cg.pmext.shrikeFlightCooldown ) /
-				SHRIKE_FLIGHT_LAUNCH_COOLDOWN, 0.0f, 1.0f );
+				LEVELFLY_FLIGHT_LAUNCH_COOLDOWN, 0.0f, 1.0f );
 		}
 		break;
 	case WP_ALEVEL3:

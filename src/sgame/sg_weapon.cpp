@@ -41,7 +41,7 @@ static bool TakesDamages( gentity_t const* ent )
 	return false
 		|| Entities::IsAlive( ent )
 		|| ( ent && ent->s.eType == entityType_t::ET_MOVER && ent->health > 0 )
-		;
+	;
 }
 
 void G_ForceWeaponChange( gentity_t *ent, weapon_t weapon )
@@ -1266,19 +1266,19 @@ void G_FireWeapon( gentity_t *self, weapon_t weapon, weaponMode_t weaponMode )
 					           LEVEL2_CLAW_DMG, MOD_LEVEL2_CLAW, false );
 					break;
 
-				case WP_ALEVELFLY:
+			case WP_ALEVELFLY:
+			{
+				float damage = LEVELFLY_CLAW_DMG;
+				if ( self->client->ps.stats[ STAT_STATE2 ] & SS2_FLYING )
 				{
-					float damage = SHRIKE_CLAW_DMG;
-					if ( self->client->ps.stats[ STAT_STATE2 ] & SS2_FLYING )
-					{
-						float speed = VectorLength( self->client->ps.velocity );
-						damage *= 1.0f + speed / 100.0f * SHRIKE_CLAW_DAMAGE_PER_100_SPEED;
-					}
-
-					FireMelee( self, SHRIKE_CLAW_RANGE, SHRIKE_CLAW_WIDTH, SHRIKE_CLAW_WIDTH,
-					           damage, MOD_LEVELFLY_TALON, false );
+					float speed = VectorLength( self->client->ps.velocity );
+					damage *= 1.0f + speed / 100.0f * LEVELFLY_CLAW_DAMAGE_PER_100_SPEED;
 				}
-					break;
+
+				FireMelee( self, LEVELFLY_CLAW_RANGE, LEVELFLY_CLAW_WIDTH, LEVELFLY_CLAW_WIDTH,
+				           damage, MOD_LEVELFLY_TALON, false );
+			}
+				break;
 
 				case WP_ALEVEL4:
 					FireMelee( self, LEVEL4_CLAW_RANGE, LEVEL4_CLAW_WIDTH, LEVEL4_CLAW_HEIGHT,

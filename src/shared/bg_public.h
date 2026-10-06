@@ -765,6 +765,7 @@ enum entity_event_t
   EV_FALLING,
 
   EV_JUMP,
+  EV_LEVELFLY_FLAP,
 
   EV_WATER_TOUCH, // foot touches
   EV_WATER_LEAVE, // foot leaves

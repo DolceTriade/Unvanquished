@@ -489,15 +489,15 @@ int BG_GetShrikeBlightRegenerationInterval(const playerState_t& ps)
 {
 	if ( ps.stats[ STAT_STATE ] & SS_HEALING_8X )
 	{
-		return SHRIKE_BLIGHT_REGEN_BOOSTER;
+		return LEVELFLY_BLIGHT_REGEN_BOOSTER;
 	}
 	else if ( ps.stats[ STAT_STATE ] & SS_HEALING_4X )
 	{
-		return SHRIKE_BLIGHT_REGEN_CREEP;
+		return LEVELFLY_BLIGHT_REGEN_CREEP;
 	}
 	else
 	{
-		return SHRIKE_BLIGHT_REGEN;
+		return LEVELFLY_BLIGHT_REGEN;
 	}
 }
 
@@ -1279,6 +1279,7 @@ static constexpr const char *const eventnames[] =
   "EV_FALLING",
 
   "EV_JUMP",
+  "EV_LEVELFLY_FLAP",
 
   "EV_WATER_TOUCH", // foot touches
   "EV_WATER_LEAVE", // foot leaves
@@ -2853,8 +2854,8 @@ float BG_crandom()
 
 float BG_FlightVelocityToCoefficient( float velocity )
 {
-	return 1.0f / ( 1.0f + SHRIKE_FLIGHT_STAMINA_CURVE_SCALE *
-		expf( -velocity / SHRIKE_FLIGHT_STAMINA_CURVE_SPEED ) );
+	return 1.0f / ( 1.0f + LEVELFLY_FLIGHT_STAMINA_CURVE_SCALE *
+		expf( -velocity / LEVELFLY_FLIGHT_STAMINA_CURVE_SPEED ) );
 }
 
 int BG_randrange( int n )

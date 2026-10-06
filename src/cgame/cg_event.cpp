@@ -998,6 +998,10 @@ void CG_EntityEvent( centity_t *cent, vec3_t position )
 
 			break;
 
+		case EV_LEVELFLY_FLAP:
+			trap_S_StartSound( nullptr, es->number, soundChannel_t::CHAN_BODY, cgs.media.shrikeFlapSound );
+			break;
+
 		case EV_LEV4_TRAMPLE_PREPARE:
 			trap_S_StartSound( nullptr, es->number, soundChannel_t::CHAN_VOICE, cgs.media.alienL4ChargePrepare );
 			break;
