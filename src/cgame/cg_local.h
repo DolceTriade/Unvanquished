@@ -1077,10 +1077,10 @@ enum sayType_t
 
 struct WeaponOffsets
 {
-	vec3_t bob;
+	vec3_t bob = {};
 
-	vec3_t angles;
-	vec3_t angvel;
+	vec3_t angles = {};
+	vec3_t angvel = {};
 
 	WeaponOffsets operator+=( WeaponOffsets );
 	WeaponOffsets operator*( float );
