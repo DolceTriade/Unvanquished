@@ -243,6 +243,11 @@ static const char* OverloadStatusForEntry( const cgOverloadCatalogEntry_t& entry
 		return "owned";
 	}
 
+	if ( entry.requiredCompletedCount > state.completedPurchases )
+	{
+		return "locked";
+	}
+
 	if ( OverloadEntryMaxed( entry, index, state ) )
 	{
 		return "maxed";

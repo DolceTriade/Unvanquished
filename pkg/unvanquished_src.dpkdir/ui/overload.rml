@@ -590,8 +590,10 @@
 
 		function ActionLabel(kind, status)
 			if kind == "bp" then return "Buy Bundle" end
+			if status == "locked" then return "Locked" end
+			if status == "expensive" then return "Need More Credits" end
 			if kind == "unlock" then
-				if status == "partial" or status == "expensive" then return "Finish Unlock" end
+				if status == "partial" then return "Finish Unlock" end
 				return "Unlock"
 			end
 			if status == "partial" then return "Finish Rank" end
@@ -621,7 +623,7 @@
 			if status == "owned" or status == "maxed" then
 				return '<button class="owned" onclick="return false;">Complete</button>'
 			end
-			if status == "locked" and row.kind ~= "unlock" then
+			if status == "locked" then
 				return string.format(
 					'<button class="locked" onclick="return false;">%s</button>',
 					ActionLabel(row.kind, status))
