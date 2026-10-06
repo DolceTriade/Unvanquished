@@ -2163,6 +2163,37 @@ static void ClientThink_real( gentity_t *self )
 			}
 			break;
 
+		case WP_ALEVELFLY:
+			if ( client->ps.IsWeaponReady() &&
+			     ( client->ps.stats[ STAT_STATE2 ] & SS2_FLYING ) &&
+			     client->pmext.pouncePayload > 0 )
+			{
+				glm::vec3 forward;
+				AngleVectors( VEC2GLM( client->ps.viewangles ), &forward, nullptr, nullptr );
+				glm::vec3 muzzle = G_CalcMuzzlePoint( self, forward );
+				trace_t tr;
+				gentity_t *target = nullptr;
+				G_WideTrace( &tr, self, muzzle, forward, LEVELFLY_CLAW_RANGE,
+				             LEVELFLY_CLAW_WIDTH, LEVELFLY_CLAW_WIDTH, &target );
+				if ( target && ( target->client || target->s.eType == ET_BUILDABLE ) &&
+				     G_Team( target ) != G_Team( self ) )
+				{
+					client->pmext.pouncePayload = 0;
+					G_FireWeapon( self, WP_ALEVELFLY, WPM_PRIMARY );
+					client->ps.legsAnim =
+						( ( client->ps.legsAnim & ANIM_TOGGLEBIT ) ^ ANIM_TOGGLEBIT ) |
+						NSPA_ATTACK1;
+					client->ps.weaponAnim =
+						( ( client->ps.weaponAnim & ANIM_TOGGLEBIT ) ^ ANIM_TOGGLEBIT ) |
+						WANIM_ATTACK1;
+					client->ps.torsoTimer = 500; // TIMER_ATTACK for nonsegmented models.
+					client->ps.weaponTime += BG_Weapon( WP_ALEVELFLY )->repeatRate1;
+					client->ps.weaponstate = WEAPON_FIRING;
+					BG_PlayerStateToEntityState( &client->ps, &self->s, true );
+				}
+			}
+			break;
+
 		case WP_ALEVEL0:
 			if ( !G_CheckDretchAttack( self ) )
 			{
