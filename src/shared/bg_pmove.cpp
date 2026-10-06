@@ -3875,6 +3875,22 @@ static void PM_TorsoAnimation()
 	}
 }
 
+// Animation variants are part of the predicted player state. Do not use the
+// process-global RNG here: prediction and the server consume random numbers
+// in different contexts and would otherwise choose different variants.
+static int PM_DeterministicAnimRange( uint32_t salt, int count )
+{
+	uint32_t value = static_cast<uint32_t>( pm->cmd.serverTime );
+	value ^= static_cast<uint32_t>( pm->ps->weapon ) * 0x9E3779B9u;
+	value ^= salt;
+	value ^= value >> 16;
+	value *= 0x85EBCA6Bu;
+	value ^= value >> 13;
+	value *= 0xC2B2AE35u;
+	value ^= value >> 16;
+	return static_cast<int>( value % static_cast<uint32_t>( count ) );
+}
+
 /*
 ==============
 PM_Weapon
@@ -4451,7 +4467,7 @@ static void PM_Weapon()
 			case WP_ALEVEL1:
 				if ( attack1 )
 				{
-					num = BG_randrange( 6 );
+					num = PM_DeterministicAnimRange( 0xA1E00101u, 6 );
 					PM_ForceLegsAnim( NSPA_ATTACK1 );
 					PM_StartWeaponAnim( WANIM_ATTACK1 + num );
 				}
@@ -4469,9 +4485,9 @@ static void PM_Weapon()
 			case WP_ALEVEL2:
 				if ( attack1 )
 				{
-					num = BG_randrange( 3 );
+					num = PM_DeterministicAnimRange( 0xA1E00201u, 3 );
 					PM_ForceLegsAnim( NSPA_ATTACK1 + num );
-					num = BG_randrange( 6 );
+					num = PM_DeterministicAnimRange( 0xA1E00202u, 6 );
 					PM_StartWeaponAnim( WANIM_ATTACK1 + num );
 				}
 
@@ -4479,9 +4495,9 @@ static void PM_Weapon()
 
 			case WP_ALEVELFLY:
 			case WP_ALEVEL4:
-				num = BG_randrange( 3 );
+				num = PM_DeterministicAnimRange( 0xA1E00401u, 3 );
 				PM_ForceLegsAnim( NSPA_ATTACK1 + num );
-				num = BG_randrange( 6 );
+				num = PM_DeterministicAnimRange( 0xA1E00402u, 6 );
 				PM_StartWeaponAnim( WANIM_ATTACK1 + num );
 				break;
 
