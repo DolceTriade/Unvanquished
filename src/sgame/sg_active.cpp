@@ -2145,10 +2145,20 @@ static void ClientThink_real( gentity_t *self )
 				gentity_t *target = nullptr;
 				G_WideTrace( &tr, self, muzzle, forward, LEVEL1_CLAW_RANGE,
 				             LEVEL1_CLAW_WIDTH, LEVEL1_CLAW_WIDTH, &target );
-				if ( target && G_Team( target ) != G_Team( self ) )
+				if ( target && ( target->client || target->s.eType == ET_BUILDABLE )  && G_Team( target ) != G_Team( self ) )
 				{
 					client->pmext.pouncePayload = 0;
 					G_FireWeapon( self, WP_ALEVEL1, WPM_PRIMARY );
+					client->ps.legsAnim =
+						( ( client->ps.legsAnim & ANIM_TOGGLEBIT ) ^ ANIM_TOGGLEBIT ) |
+						NSPA_ATTACK1;
+					client->ps.weaponAnim =
+						( ( client->ps.weaponAnim & ANIM_TOGGLEBIT ) ^ ANIM_TOGGLEBIT ) |
+						WANIM_ATTACK1;
+					client->ps.torsoTimer = 500; // TIMER_ATTACK for nonsegmented models.
+					client->ps.weaponTime += BG_Weapon( WP_ALEVEL1 )->repeatRate1;
+					client->ps.weaponstate = WEAPON_FIRING;
+					BG_PlayerStateToEntityState( &client->ps, &self->s, true );
 				}
 			}
 			break;
