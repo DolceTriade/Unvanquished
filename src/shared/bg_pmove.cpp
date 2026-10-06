@@ -1679,6 +1679,7 @@ static bool PM_CheckShrikeFlightStart()
 	{
 		// Not Shrike: reset cooldown and return early.
 		pm->pmext->shrikeFlightCooldown = 0;
+		pm->pmext->pouncePayload = 0;
 		pm->ps->stats[ STAT_STATE2 ] &= ~( SS2_FLYING | SS2_DIVING );
 		return false;
 	}
@@ -1689,12 +1690,14 @@ static bool PM_CheckShrikeFlightStart()
 		// Crouch cancels flight.
 		pm->ps->stats[ STAT_STATE2 ] &= ~( SS2_FLYING | SS2_DIVING );
 		pm->ps->weaponCharge = 0;
+		pm->pmext->pouncePayload = 0;
 		return false;
 	}
 
 	if ( pm->ps->pm_type == PM_DEAD ||
 	     pm->ps->pm_type == PM_GRABBED )
 	{
+		pm->pmext->pouncePayload = 0;
 		return false;
 	}
 
@@ -1702,6 +1705,7 @@ static bool PM_CheckShrikeFlightStart()
 	{
 		pm->ps->stats[ STAT_STATE2 ] &= ~( SS2_FLYING | SS2_DIVING );
 		pm->ps->weaponCharge = 0;
+		pm->pmext->pouncePayload = 0;
 		return false;
 	}
 
@@ -1727,6 +1731,7 @@ static bool PM_CheckShrikeFlightStart()
 		pm->pmext->shrikeFlightCooldown = LEVELFLY_FLIGHT_LAUNCH_COOLDOWN;
 		if ( flying )
 		{
+			pm->pmext->pouncePayload = LEVELFLY_AIRBOOST_SLASH_TIME;
 			return false;
 		}
 		startsFlight = true;
@@ -1741,6 +1746,11 @@ static bool PM_CheckShrikeFlightStart()
 	{
 		// Jumping in the air starts flight once the Shrike has enough speed.
 		return false;
+	}
+
+	if ( startsFlight )
+	{
+		pm->pmext->pouncePayload = 0;
 	}
 
 	// PM_UpdateViewAngles has just converted the wallwalk-relative view into
@@ -4657,6 +4667,11 @@ static void PM_DropTimers()
 		// the shared timer path so client prediction and the server count it down
 		// consistently every frame.
 		pm->ps->weaponCharge = std::max( 0, pm->ps->weaponCharge - pml.msec );
+	}
+
+	if ( pm->ps->weapon == WP_ALEVELFLY && pm->pmext->pouncePayload > 0 )
+	{
+		pm->pmext->pouncePayload = std::max( 0, pm->pmext->pouncePayload - pml.msec );
 	}
 
 	// drop misc timing counter
