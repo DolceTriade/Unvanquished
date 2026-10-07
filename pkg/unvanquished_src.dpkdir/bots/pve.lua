@@ -820,7 +820,7 @@ local function maybe_heal_or_fight_alien(number, health_frac, enemy, enemy_targe
     local latched = alien_combat_latched(number, level.time)
     local alerted = enemy ~= nil or hostile_goal or recently_in_combat or latched
     local low_tier_alien = is_alien(team) and (client.class == "level0" or client.class == "level1")
-    local needs_healing = health_frac < 1.0
+    local needs_healing = health_frac < 0.4
     local stuck_for = elapsed_since(level.time, mind.stuckTime)
 
     if is_alien(team) and stuck_for > 45000 then
