@@ -727,7 +727,7 @@ local function maybe_heal_or_fight_alien(number, health_frac, enemy, enemy_targe
     local latched = alien_combat_latched(number, level.time)
     local alerted = enemy ~= nil or hostile_goal or recently_in_combat or latched
     local low_tier_alien = is_alien(team) and (client.class == "level0" or client.class == "level1")
-    local needs_healing = health_frac < 1.0
+    local needs_healing = health_frac < 0.4
 
     if needs_healing and not low_tier_alien and not recently_attacked_now then
         local status = ctx:heal()

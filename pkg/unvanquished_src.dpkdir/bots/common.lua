@@ -213,6 +213,10 @@ function M.can_evolve_to_class(self, client, level, class_name)
         return false
     end
 
+    if client.class == "level3upg" or client.class == "level4" then
+        return false
+    end
+
     if target.price <= current.price then
         return false
     end
@@ -237,6 +241,19 @@ function M.try_evolve_targets(self, ctx, client, level, targets)
     end
 
     local candidates = targets or M.ALIEN_EVOLVE_TARGETS
+
+    local terminal_candidates = {}
+    for _, class_name in ipairs(candidates) do
+        if (class_name == "level3upg" or class_name == "level4")
+            and M.can_evolve_to_class(self, client, level, class_name)
+            and ctx:canEvolveTo(class_name) then
+            table.insert(terminal_candidates, class_name)
+        end
+    end
+
+    if #terminal_candidates > 0 then
+        return ctx:evolveTo(terminal_candidates[math.random(#terminal_candidates)])
+    end
 
     for _, class_name in ipairs(candidates) do
         if M.can_evolve_to_class(self, client, level, class_name) and ctx:canEvolveTo(class_name) then
