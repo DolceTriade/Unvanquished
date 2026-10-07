@@ -1084,12 +1084,31 @@ AINodeStatus_t BotActionFight( gentity_t *self, AIGenericNode_t *node )
 
 	if ( mind->hasOffmeshGoal )
 	{
-		// The target is visible, but not on the navmesh
-		ASSERT( G_Team( self ) == TEAM_HUMANS );
+		// The target is visible, but not on the navmesh.
 		if ( !BotTargetIsVisible( self, self->botMind->goal, MASK_SHOT ) )
 		{
 			return STATUS_SUCCESS;
 		}
+
+		if ( G_Team( self ) == TEAM_ALIENS
+		     && self->client->ps.stats[ STAT_CLASS ] == PCL_ALIEN_LEVEL3_UPG )
+		{
+			// Advanced Dragoon barbs are the only alien attack currently
+			// supported against an off-mesh target.
+			if ( self->client->ps.ammo <= 0
+			  || DistanceToGoalSquared( self ) > Square( 900.0f ) )
+			{
+				return STATUS_SUCCESS;
+			}
+
+			BotAimAtEnemy( self );
+			BotStandStill( self );
+			BotFireWeaponAI( self );
+			return STATUS_RUNNING;
+		}
+
+		// Human bots use their ranged weapon against an off-mesh target.
+		ASSERT( G_Team( self ) == TEAM_HUMANS );
 		bool inRange = TargetInOffmeshAttackRange( self );
 		if ( !inRange && BG_GetPlayerWeapon( &self->client->ps ) != WP_BLASTER )
 		{

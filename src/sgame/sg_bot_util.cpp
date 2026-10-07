@@ -1325,10 +1325,25 @@ bool BotChangeGoal( gentity_t *self, botTarget_t target )
 
 	if ( !FindRouteToTarget( self, target, false ) )
 	{
-		// TODO: allow adv marauder and adv goon to pick offmesh targets,
-		// if they are in zap/barb range
 		if ( g_bot_offmeshAttack.Get() && G_Team( self ) == TEAM_HUMANS
 		     && G_Team( target.getTargetedEntity() ) == TEAM_ALIENS
+		     && BotTargetIsVisible( self, target, MASK_SHOT ) )
+		{
+			self->botMind->goal = target;
+			self->botMind->m_nav.directPathToGoal = false;
+			self->botMind->hasOffmeshGoal = true;
+			return true;
+		}
+
+		// Advanced Dragoons can attack targets which are not on the navmesh
+		// with barbs.  Keep this limited to barb range and available ammo so
+		// that an off-mesh goal does not make them stand still at an invalid
+		// destination indefinitely.
+		if ( g_bot_offmeshAttack.Get() && G_Team( self ) == TEAM_ALIENS
+		     && self->client->ps.stats[ STAT_CLASS ] == PCL_ALIEN_LEVEL3_UPG
+		     && G_Team( target.getTargetedEntity() ) == TEAM_HUMANS
+		     && self->client->ps.ammo > 0
+		     && glm::distance2( VEC2GLM( self->s.origin ), target.getPos() ) <= Square( 900.0f )
 		     && BotTargetIsVisible( self, target, MASK_SHOT ) )
 		{
 			self->botMind->goal = target;
