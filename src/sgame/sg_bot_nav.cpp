@@ -26,6 +26,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "common/Common.h"
 #include "sg_bot_util.h"
 #include "botlib/bot_types.h"
+#include "botlib/bot_local.h"
 #include "botlib/bot_api.h"
 #include "shared/bot_nav_shared.h"
 #include "shared/navgen/navgen.h"
@@ -39,6 +40,87 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 //this is a constant as fiddling with this value will impact both
 //server performance and efficiency of AI obstacle procedures.
 constexpr float BOT_OBSTACLE_AVOID_RANGE = 20.0f;
+
+static bool BotDevolveIfNavigationBlocked( gentity_t *self, int stuckTime )
+{
+	class_t currentClass = static_cast<class_t>( self->client->ps.stats[ STAT_CLASS ] );
+
+	switch ( currentClass )
+	{
+	case PCL_ALIEN_LEVEL3_UPG:
+	case PCL_ALIEN_LEVEL4:
+		break;
+	default:
+		// Allow a later evolution back into a supported class to try again.
+		self->botMind->navigationDevolveAttempted = false;
+		return false;
+	}
+
+	constexpr int softStuckThreshold = 5000;
+	if ( stuckTime <= softStuckThreshold || self->botMind->navigationDevolveAttempted )
+	{
+		return false;
+	}
+
+	self->botMind->navigationDevolveAttempted = true;
+
+	constexpr class_t mostMobileClass = PCL_ALIEN_LEVEL0;
+	class_t navClass = NavmeshForClass( mostMobileClass, false );
+	NavData_t *nav = nullptr;
+	for ( int i = 0; i < numNavData; ++i )
+	{
+		if ( BotNavData[ i ].species == navClass )
+		{
+			nav = &BotNavData[ i ];
+			break;
+		}
+	}
+
+	if ( !nav || !nav->query )
+	{
+		return false;
+	}
+
+	botRouteTarget_t routeTarget;
+	if ( !self->botMind->goal.isValid() )
+	{
+		return false;
+	}
+	BotTargetToRouteTarget( self, self->botMind->goal, &routeTarget );
+
+	dtQueryFilter filter;
+	filter.setIncludeFlags( POLYFLAGS_WALK );
+	filter.setExcludeFlags( 0 );
+	rVec start( VEC2GLM( self->s.origin ) );
+	rVec target( glm::vec3( routeTarget.pos[ 0 ], routeTarget.pos[ 1 ], routeTarget.pos[ 2 ] ) );
+	rVec startExtents( 640, 996, 640 );
+	rVec targetExtents( routeTarget.polyExtents[ 0 ] + 32,
+	                    routeTarget.polyExtents[ 1 ] + 96,
+	                    routeTarget.polyExtents[ 2 ] + 32 );
+	dtPolyRef startRef = 0;
+	dtPolyRef targetRef = 0;
+	rVec nearestStart, nearestTarget;
+	if ( dtStatusFailed( nav->query->findNearestPoly( start, startExtents, &filter,
+	                                                 &startRef, nearestStart ) ) || !startRef
+	  || dtStatusFailed( nav->query->findNearestPoly( target, targetExtents, &filter,
+	                                                 &targetRef, nearestTarget ) ) || !targetRef )
+	{
+		return false;
+	}
+
+	dtPolyRef path[ MAX_BOT_PATH ];
+	int pathCount = 0;
+	dtStatus status = nav->query->findPath( startRef, targetRef, nearestStart, nearestTarget,
+	                                        &filter, path, &pathCount, MAX_BOT_PATH );
+	if ( dtStatusFailed( status ) || dtStatusDetail( status, DT_PARTIAL_RESULT )
+	  || dtStatusDetail( status, DT_BUFFER_TOO_SMALL ) || !pathCount
+	  || path[ pathCount - 1 ] != targetRef )
+	{
+		return false;
+	}
+
+	return BotEvolveToClass( self, mostMobileClass );
+}
 
 //tells if all navmeshes loaded successfully
 // Only G_BotNavInit and G_BotNavCleanup should set it
@@ -1260,6 +1342,29 @@ bool BotMoveToGoal( gentity_t *self )
 	constexpr int ignoreGeometryThreshold = 1700; // 1.7s, we seem stuck
 	constexpr int softStuckThreshold = 5000; // 5s, something's fishy
 	int stuckTime = level.time - self->botMind->stuckTime;
+	class_t currentClass = static_cast<class_t>( self->client->ps.stats[ STAT_CLASS ] );
+
+	if ( stuckTime > ignoreGeometryThreshold
+	  && ( currentClass == PCL_ALIEN_LEVEL3_UPG || currentClass == PCL_ALIEN_LEVEL4 ) )
+	{
+		// The obstacle classifier can fail to recognize a jumpable lip or
+		// prop. Give large jump-capable aliens a recovery jump before they
+		// are considered permanently stuck.
+		BotJump( self );
+	}
+
+	if ( stuckTime > softStuckThreshold )
+	{
+		if ( BotDevolveIfNavigationBlocked( self, stuckTime ) )
+		{
+			return true;
+		}
+
+		// No displacement for long enough means this objective is not
+		// currently actionable. Returning failure lets the behavior tree
+		// select another objective instead of steering forever.
+		return false;
+	}
 
 	// At start, ignore geometry, unless we seem stuck for too long.
 	// This avoids the following two bugs:
@@ -1285,10 +1390,9 @@ bool BotMoveToGoal( gentity_t *self )
 		}
 
 		BotSeek( self, dir );
-		bool softStuck = stuckTime > softStuckThreshold;
 		// if we have not moved much for some time, let's propagate
 		// a failure status, so we can find another goal
-		return softStuck;
+		return false;
 	}
 
 	BotSeek( self, dir );

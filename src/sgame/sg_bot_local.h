@@ -74,6 +74,20 @@ private:
 
 struct botMemory_t;
 
+struct botVisibilitySearch_t
+{
+	GentityConstRef target = nullptr;
+	glm::vec3 targetPosition = {};
+	glm::vec3 botPosition = {};
+	botNavPoint_t point = {};
+	int nextSearchTime = 0;
+	int candidateOffset = 0;
+	int species = 0;
+	int weapon = 0;
+	bool jetpack = false;
+	bool found = false;
+};
+
 namespace Lua
 {
 struct AILuaNode_t;
@@ -265,6 +279,11 @@ struct botMemory_t
 		bool lastFailureTraceInitialized;
 
 		botTarget_t goal;
+		// Temporary navigation point used while approaching an entity goal.
+		// This lets combat continue to target the entity while movement heads
+		// for a visibility position.
+		botTarget_t navigationGoal;
+		botVisibilitySearch_t visibilitySearch;
 
 		int myTimer;
 		int buildCooldownUntil;
@@ -274,6 +293,7 @@ private:
 public:
 		int lastNavconTime;
 		int lastNavconDistance;
+		bool navigationDevolveAttempted;
 		bool hasOffmeshGoal;
 	// }
 
@@ -302,6 +322,8 @@ public:
 
 	// Functions
 	botNavCmd_t const& nav() const { return m_nav; };
+	botTarget_t const& navGoal() const { return navigationGoal; }
+	void clearNavGoal() { navigationGoal.clear(); }
 	void willSprint( bool enable );
 	void doSprint( int jumpCost, int stamina, usercmd_t& cmd );
 	void clearNav() { m_nav = {}; }
@@ -317,6 +339,11 @@ struct NavgenConfig;
 navMeshStatus_t G_BotSetupNav( const NavgenConfig &config, class_t species );
 void G_BotShutdownNav();
 bool G_BotFindRoute( int botClientNum, const botRouteTarget_t *target, bool allowPartial );
+bool G_BotProjectPoint( int botClientNum, const glm::vec3 &position,
+                       const glm::vec3 &extents, botNavPoint_t &point );
+// Install the first complete route to the supplied points; failed tests leave
+// the current corridor intact. Returns the selected index, or -1.
+int G_BotFindRouteToPoints( int botClientNum, const botNavPoint_t *points, int count );
 bool G_BotPathNextCorner( int botClientNum, glm::vec3 &result );
 void G_BotUpdatePath( int botClientNum, const botRouteTarget_t *target, botNavCmd_t *cmd );
 bool G_IsBotOverNavcon( int botClientNum );

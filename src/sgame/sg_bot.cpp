@@ -612,7 +612,9 @@ void G_BotThink( gentity_t *self )
 	if ( self->botMind->goal.isValid() )
 	{
 		botRouteTarget_t routeTarget;
-		BotTargetToRouteTarget( self, self->botMind->goal, &routeTarget );
+		botTarget_t const& routeGoal = self->botMind->navGoal().isValid()
+			? self->botMind->navGoal() : self->botMind->goal;
+		BotTargetToRouteTarget( self, routeGoal, &routeTarget );
 		G_BotUpdatePath( self->s.number, &routeTarget, &self->botMind->m_nav );
 	}
 
@@ -956,11 +958,14 @@ void G_Bot_ResetBehaviorState( botMemory_t &memory )
 	memory.currentNode = nullptr;
 	memory.runningNodes.clear();
 	memory.goal.clear();
+	memory.navigationGoal.clear();
+	memory.visibilitySearch = {};
 	memory.clearNav();
 	memory.overloadTargetPurchase = -1;
 	memory.overloadNextPurchaseTime = 0;
 	memory.lastNavconTime = 0;
 	memory.lastNavconDistance = 0;
+	memory.navigationDevolveAttempted = false;
 	memory.hasOffmeshGoal = false;
 	memory.evasion = {};
 }

@@ -1859,7 +1859,7 @@ static AINodeStatus_t BotActionReachHealA( gentity_t *self )
 
 	if ( !GoalInRange( self, dist ) )
 	{
-		BotMoveToGoal( self );
+		return BotMoveToGoal( self ) ? STATUS_RUNNING : STATUS_FAILURE;
 	}
 	return STATUS_RUNNING;
 }
@@ -1955,7 +1955,7 @@ static AINodeStatus_t BotActionReachHealH( gentity_t *self )
 	//keep moving to the medi until we are on top of it
 	if ( dist2 > Square( BG_BuildableModelConfig( BA_H_MEDISTAT )->mins[1] ) )
 	{
-		BotMoveToGoal( self );
+		return BotMoveToGoal( self ) ? STATUS_RUNNING : STATUS_FAILURE;
 	}
 	return STATUS_RUNNING;
 }
@@ -2128,8 +2128,7 @@ AINodeStatus_t BotActionBuy( gentity_t *self, AIGenericNode_t *node )
 		return STATUS_SUCCESS;
 	}
 
-	BotMoveToGoal( self );
-	return STATUS_RUNNING;
+	return BotMoveToGoal( self ) ? STATUS_RUNNING : STATUS_FAILURE;
 }
 
 AINodeStatus_t BotActionBuyPrimary( gentity_t *self, AIGenericNode_t *node )
@@ -2187,6 +2186,5 @@ AINodeStatus_t BotActionBuyPrimary( gentity_t *self, AIGenericNode_t *node )
 		return STATUS_SUCCESS;
 	}
 
-	BotMoveToGoal( self );
-	return STATUS_RUNNING;
+	return BotMoveToGoal( self ) ? STATUS_RUNNING : STATUS_FAILURE;
 }
