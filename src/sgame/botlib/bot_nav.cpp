@@ -161,6 +161,75 @@ bool G_BotFindRoute( int botClientNum, const botRouteTarget_t *target, bool allo
 	return FindRoute( bot, start, *target, allowPartial );
 }
 
+bool G_BotProjectPoint( int botClientNum, const glm::vec3 &position,
+                       const glm::vec3 &extents, botNavPoint_t &point )
+{
+	Bot_t *bot = &agents[ botClientNum ];
+	if ( !bot->nav )
+	{
+		return false;
+	}
+
+	dtPolyRef ref = 0;
+	rVec projected;
+	dtStatus status = bot->nav->query->findNearestPoly(
+		rVec( position ), rVec( extents ), &bot->filter, &ref, projected );
+	if ( dtStatusFailed( status ) || !ref )
+	{
+		return false;
+	}
+
+	point.position = projected.ToQuake();
+	point.polygon = ref;
+	return true;
+}
+
+int G_BotFindRouteToPoints( int botClientNum, const botNavPoint_t *points, int count )
+{
+	Bot_t *bot = &agents[ botClientNum ];
+	if ( !bot->nav || !points || count <= 0 )
+	{
+		return -1;
+	}
+
+	rVec origin, start;
+	dtPolyRef startRef;
+	GetEntPosition( botClientNum, origin );
+	if ( !BotFindNearestPoly( bot, origin, &startRef, start ) )
+	{
+		return -1;
+	}
+
+	for ( int i = 0; i < count; ++i )
+	{
+		dtPolyRef endRef = static_cast<dtPolyRef>( points[ i ].polygon );
+		if ( !bot->nav->query->isValidPolyRef( endRef, &bot->filter ) )
+		{
+			continue;
+		}
+
+		rVec end( points[ i ].position );
+		dtPolyRef path[ MAX_BOT_PATH ];
+		int pathCount = 0;
+		dtStatus status = bot->nav->query->findPath(
+			startRef, endRef, start, end, &bot->filter, path, &pathCount, MAX_BOT_PATH );
+		if ( dtStatusFailed( status ) || dtStatusDetail( status, DT_PARTIAL_RESULT )
+		  || dtStatusDetail( status, DT_BUFFER_TOO_SMALL ) || !pathCount
+		  || path[ pathCount - 1 ] != endRef )
+		{
+			continue;
+		}
+
+		bot->corridor.reset( startRef, start );
+		bot->corridor.setCorridor( end, path, pathCount );
+		bot->needReplan = false;
+		bot->offMesh = false;
+		return i;
+	}
+
+	return -1;
+}
+
 static bool withinRadiusOfOffMeshConnection( const Bot_t *bot, rVec pos, rVec off, dtPolyRef conPoly )
 {
 	const dtOffMeshConnection *con = bot->nav->mesh->getOffMeshConnectionByRef( conPoly );

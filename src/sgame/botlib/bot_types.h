@@ -44,6 +44,13 @@ struct botTrace_t
 	float frac;
 };
 
+// A projected navigation point. The polygon reference is opaque outside botlib.
+struct botNavPoint_t
+{
+	glm::vec3 position;
+	uint64_t polygon;
+};
+
 // parameters outputted by navigation
 // if they are followed exactly, the bot will not go off the nav mesh
 struct botNavCmd_t

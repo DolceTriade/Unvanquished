@@ -49,11 +49,16 @@ from the Quake to the Recast coordinate system
 
 void BotCalcSteerDir( Bot_t *bot, rVec &dir )
 {
+	if ( bot->numCorners <= 0 )
+	{
+		VectorClear( dir );
+		return;
+	}
+
 	const int ip0 = 0;
-	//FIXME: p1 will result in either -1, 0 or 1. It's very unlikely that -1 is a good idea.
-	//old code follow, for reference, because I'm not sure at all that the fix is valid.
-	//const int ip1 = std::min( 1, bot->numCorners - 1 );
-	const int ip1 = std::min( 1, bot->numCorners );
+	// Use the second corner when it exists, otherwise reuse the only valid
+	// corner. Corner 1 is not valid when numCorners is 1.
+	const int ip1 = std::min( 1, bot->numCorners - 1 );
 	const rVec p0 = rVec::Load( bot->cornerVerts + ip0 * 3 );
 	const rVec p1 = rVec::Load( bot->cornerVerts + ip1 * 3 );
 	rVec dir0, dir1;

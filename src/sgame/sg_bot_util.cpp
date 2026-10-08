@@ -31,6 +31,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "shared/bg_gameplay.h" // MIN_WALK_NORMAL
 #include "Entities.h"
 
+#include <array>
+
 #include <glm/geometric.hpp>
 #include <glm/gtx/norm.hpp>
 #include <glm/gtx/vector_angle.hpp>
@@ -1016,6 +1018,7 @@ void BotAbandonEnemy( gentity_t *self, const gentity_t *enemy, int durationMs, b
 	if ( clearGoal && self->botMind->goal.getTargetedEntity() == enemy )
 	{
 		self->botMind->goal.clear();
+		self->botMind->clearNavGoal();
 		self->botMind->clearNav();
 	}
 }
@@ -1316,12 +1319,186 @@ void BotTargetToRouteTarget( const gentity_t *self, botTarget_t target, botRoute
 
 static Cvar::Cvar<bool> g_bot_offmeshAttack("g_bot_offmeshAttack", "if bots will attack offmesh enemies", Cvar::NONE, true);
 
+static bool BotCanSeekVisibleGoal( const gentity_t *self )
+{
+	if ( G_Team( self ) == TEAM_HUMANS )
+	{
+		weapon_t weapon = BG_PrimaryWeapon( self->client->ps.stats );
+		return weapon != WP_HBUILD && weapon != WP_PAIN_SAW;
+	}
+
+	return self->client->ps.stats[ STAT_CLASS ] == PCL_ALIEN_LEVEL3_UPG
+		&& self->client->ps.ammo > 0;
+}
+
+static bool BotCanSeeFromPosition( const gentity_t *self, glm::vec3 position,
+	                                const gentity_t *targetEntity, glm::vec3 aimLocation )
+{
+	glm::vec3 start = position;
+	// The projected point is at the bot's feet, rather than its entity origin.
+	start[ 2 ] += std::max( 0.0f, -self->r.mins[ 2 ] ) + self->client->ps.viewheight;
+
+	if ( !trap_InPVS( GLM4READ( start ), GLM4READ( aimLocation ) ) )
+	{
+		return false;
+	}
+
+	trace_t trace;
+	trap_Trace( &trace, start, {}, {}, aimLocation, self->num(), MASK_SHOT, 0 );
+	return !( trace.surfaceFlags & SURF_NOIMPACT )
+		&& !trace.startsolid
+		&& ( trace.entityNum == targetEntity->num() || trace.fraction == 1.0f );
+}
+
+// Filter and rank projected firing positions before testing reachability.
+// Cache both successful and unsuccessful searches to avoid repeating them
+// whenever a Lua action sets its goal again.
+static bool BotFindVisibleNavigationGoal( gentity_t *self, botTarget_t target,
+	                                      botTarget_t &navigationGoal )
+{
+	if ( !target.targetsValidEntity() || !BotCanSeekVisibleGoal( self )
+	  || !BotEntityIsValidEnemyTarget( self, target.getTargetedEntity() )
+	  || BotTargetIsVisible( self, target, MASK_SHOT ) )
+	{
+		return false;
+	}
+
+	botMemory_t &mind = *self->botMind;
+	botVisibilitySearch_t &cache = mind.visibilitySearch;
+	const gentity_t *targetEntity = target.getTargetedEntity();
+	glm::vec3 targetPosition = target.getPos();
+	glm::vec3 botPosition = VEC2GLM( self->s.origin );
+	glm::vec3 aimLocation = BotGetIdealAimLocation( self, target, 0 );
+	int species = self->client->ps.stats[ STAT_CLASS ];
+	int weapon = BG_PrimaryWeapon( self->client->ps.stats );
+	bool jetpack = BG_InventoryContainsUpgrade( UP_JETPACK, self->client->ps.stats );
+	bool sameSearch = cache.target.get() == targetEntity
+		&& cache.species == species && cache.weapon == weapon && cache.jetpack == jetpack
+		&& glm::distance2( cache.targetPosition, targetPosition ) <= Square( 64.0f )
+		&& ( cache.found || glm::distance2( cache.botPosition, botPosition ) <= Square( 128.0f ) );
+
+	if ( sameSearch && level.time < cache.nextSearchTime )
+	{
+		if ( !cache.found )
+		{
+			return false;
+		}
+
+		bool currentRoute = mind.goal.targetsValidEntity()
+			&& mind.goal.getTargetedEntity() == targetEntity
+			&& mind.navGoal().targetsCoordinates() && mind.nav().havePath
+			&& glm::distance2( mind.navGoal().getPos(), cache.point.position ) < 1.0f;
+		if ( BotCanSeeFromPosition( self, cache.point.position, targetEntity, aimLocation )
+		  && ( currentRoute || G_BotFindRouteToPoints( self->num(), &cache.point, 1 ) == 0 ) )
+		{
+			navigationGoal = cache.point.position;
+			return true;
+		}
+
+		cache.found = false;
+		return false;
+	}
+
+	if ( !sameSearch )
+	{
+		cache.candidateOffset = 0;
+	}
+	cache.target = targetEntity;
+	cache.targetPosition = targetPosition;
+	cache.botPosition = botPosition;
+	cache.species = species;
+	cache.weapon = weapon;
+	cache.jetpack = jetpack;
+	cache.found = false;
+	// Stagger retries so bots that fail together do not all search again together.
+	cache.nextSearchTime = level.time + 1000 + ( self->num() * 37 ) % 250;
+
+	static constexpr float samples[][2] = {
+		{ 1.0f, 0.0f }, { 0.707f, 0.707f }, { 0.0f, 1.0f }, { -0.707f, 0.707f },
+		{ -1.0f, 0.0f }, { -0.707f, -0.707f }, { 0.0f, -1.0f }, { 0.707f, -0.707f }
+	};
+	static constexpr float radii[] = { 128.0f, 256.0f, 384.0f, 512.0f, 768.0f };
+
+	std::array<botNavPoint_t, 40> candidates;
+	int count = 0;
+
+	for ( float radius : radii )
+	{
+		for ( auto const& sample : samples )
+		{
+			glm::vec3 position = targetPosition;
+			position[ 0 ] += radius * sample[ 0 ];
+			position[ 1 ] += radius * sample[ 1 ];
+
+			botNavPoint_t candidate;
+			if ( !G_BotProjectPoint( self->num(), position, glm::vec3( 64, 64, 192 ), candidate )
+			  || !BotCanSeeFromPosition( self, candidate.position, targetEntity, aimLocation ) )
+			{
+				continue;
+			}
+
+			int existing = 0;
+			while ( existing < count && candidates[ existing ].polygon != candidate.polygon )
+			{
+				++existing;
+			}
+			if ( existing == count )
+			{
+				candidates[ count++ ] = candidate;
+			}
+			else if ( glm::distance2( botPosition, candidate.position )
+			        < glm::distance2( botPosition, candidates[ existing ].position ) )
+			{
+				candidates[ existing ] = candidate;
+			}
+		}
+	}
+
+	std::sort( candidates.begin(), candidates.begin() + count,
+		[&botPosition]( const botNavPoint_t &a, const botNavPoint_t &b )
+		{
+			return glm::distance2( botPosition, a.position ) < glm::distance2( botPosition, b.position );
+		} );
+
+	// Failed batches resume with other candidates on the next retry rather than
+	// repeatedly testing the same few unreachable polygons.
+	std::array<botNavPoint_t, 4> attempts;
+	int attemptCount = std::min( count, 4 );
+	for ( int i = 0; i < attemptCount; ++i )
+	{
+		attempts[ i ] = candidates[ ( cache.candidateOffset + i ) % count ];
+	}
+
+	int selected = G_BotFindRouteToPoints( self->num(), attempts.data(), attemptCount );
+	if ( selected < 0 )
+	{
+		cache.candidateOffset = count ? ( cache.candidateOffset + attemptCount ) % count : 0;
+		return false;
+	}
+
+	cache.point = attempts[ selected ];
+	cache.found = true;
+	cache.candidateOffset = 0;
+	navigationGoal = cache.point.position;
+	return true;
+}
+
 bool BotChangeGoal( gentity_t *self, botTarget_t target )
 {
 	if ( !target.isValid() )
 	{
 		return false;
 	}
+
+	if ( BotFindVisibleNavigationGoal( self, target, self->botMind->navigationGoal ) )
+	{
+		self->botMind->goal = target;
+		self->botMind->m_nav.directPathToGoal = false;
+		self->botMind->hasOffmeshGoal = false;
+		return true;
+	}
+
+	self->botMind->clearNavGoal();
 
 	if ( !FindRouteToTarget( self, target, false ) )
 	{
