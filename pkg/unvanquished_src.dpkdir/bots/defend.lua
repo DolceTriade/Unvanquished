@@ -92,7 +92,7 @@ local function maybe_retire_repair_kit(team, client, mind, ctx)
         return STATUS_FAILURE
     end
 
-    return ctx:equip()
+    return common.equip_and_buy_overload(ctx)
 end
 
 local function maybe_repair(team, number, client, ctx, mind)
@@ -148,7 +148,7 @@ local function maybe_equip(team, enemy_visible, level, mind, ctx)
         return ctx:moveTo("arm")
     end
 
-    return ctx:equip()
+    return common.equip_and_buy_overload(ctx)
 end
 
 local function maybe_fight_human(team, client, enemy_visible, attack_active, mind, ctx)

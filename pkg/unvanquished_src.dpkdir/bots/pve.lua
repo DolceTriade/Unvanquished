@@ -748,7 +748,7 @@ local function maybe_retire_builder(team, number, client, builder, wants_build, 
         if human_repair_target(mind) then
             return STATUS_FAILURE
         end
-        return ctx:equip()
+        return common.equip_and_buy_overload(ctx)
     end
 
     if is_alien(team) then
@@ -948,7 +948,7 @@ local function maybe_equip(team, number, level, ctx, mind, enemy_visible)
         return STATUS_FAILURE
     end
 
-    return ctx:equip()
+    return common.equip_and_buy_overload(ctx)
 end
 
 local function maybe_resupply_human(team, number, level, client, weapon_attr, mind, ctx)
@@ -962,7 +962,7 @@ local function maybe_resupply_human(team, number, level, client, weapon_attr, mi
 
     local phase = human_resupply_phase(number, level, client, weapon_attr, mind)
     if phase == "equip" then
-        return ctx:equip()
+        return common.equip_and_buy_overload(ctx)
     end
 
     if phase == "move_to_arm" then
@@ -1041,7 +1041,7 @@ local function run_builder_task(task, state, ctx)
             task.phase = "search"
             task.search_until = state.level.time + PVE_HUMAN_BUILDER_SEARCH_MS
         else
-            return ctx:equip()
+            return common.equip_and_buy_overload(ctx)
         end
     end
 

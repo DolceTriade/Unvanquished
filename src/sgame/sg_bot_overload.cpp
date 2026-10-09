@@ -38,33 +38,33 @@ static int BotReserveCredits( team_t team )
 	return team == TEAM_ALIENS ? OVERLOAD_BOT_ALIEN_RESERVE : OVERLOAD_BOT_HUMAN_RESERVE;
 }
 
-void G_BotOverloadThink( gentity_t *ent )
+AINodeStatus_t BotActionBuyOverloadUpgrades( gentity_t *ent, AIGenericNode_t * )
 {
-	if ( !ent || !ent->client || !ent->client->pers.isBot )
+	if ( !ent || !ent->client || !ent->botMind || !ent->client->pers.isBot )
 	{
-		return;
+		return STATUS_FAILURE;
 	}
 
 	team_t team = static_cast<team_t>( ent->client->pers.team );
 	if ( !G_IsPlayableTeam( team ) )
 	{
-		return;
+		return STATUS_FAILURE;
 	}
 
 	if ( level.time < ent->botMind->overloadNextPurchaseTime )
 	{
-		return;
+		return STATUS_FAILURE;
+	}
+
+	if ( !G_ActiveMainBuildable( team ) )
+	{
+		return STATUS_FAILURE;
 	}
 
 	const int spendableCredits = ent->client->pers.credit - BotReserveCredits( team );
 	if ( spendableCredits <= 0 )
 	{
-		return;
-	}
-
-	if ( !G_ActiveMainBuildable( team ) )
-	{
-		return;
+		return STATUS_FAILURE;
 	}
 
 	std::string error;
@@ -73,13 +73,14 @@ void G_BotOverloadThink( gentity_t *ent )
 		if ( error == "no eligible overload purchase found" )
 		{
 			ent->botMind->overloadNextPurchaseTime = level.time + OVERLOAD_BOT_PURCHASE_COOLDOWN;
-			return;
+			return STATUS_FAILURE;
 		}
 
 		Log::Warn( "%s: Bot failed autodonate: %s", ent->client->pers.netname, error.c_str() );
 		ent->botMind->overloadNextPurchaseTime = level.time + OVERLOAD_BOT_FAILURE_COOLDOWN;
-		return;
+		return STATUS_FAILURE;
 	}
 
 	ent->botMind->overloadNextPurchaseTime = level.time + OVERLOAD_BOT_PURCHASE_COOLDOWN;
+	return STATUS_SUCCESS;
 }

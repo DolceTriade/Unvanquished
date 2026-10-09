@@ -252,16 +252,34 @@ function M.try_evolve_targets(self, ctx, client, level, targets)
     end
 
     if #terminal_candidates > 0 then
-        return ctx:evolveTo(terminal_candidates[math.random(#terminal_candidates)])
+        local status = ctx:evolveTo(terminal_candidates[math.random(#terminal_candidates)])
+        M.buy_overload_upgrades(self, ctx)
+        return status
     end
 
     for _, class_name in ipairs(candidates) do
         if M.can_evolve_to_class(self, client, level, class_name) and ctx:canEvolveTo(class_name) then
-            return ctx:evolveTo(class_name)
+            local status = ctx:evolveTo(class_name)
+            M.buy_overload_upgrades(self, ctx)
+            return status
         end
     end
 
     return STATUS_FAILURE
+end
+
+function M.buy_overload_upgrades(self, ctx)
+    if not ctx then
+        return STATUS_FAILURE
+    end
+
+    return ctx:buyOverloadUpgrades()
+end
+
+function M.equip_and_buy_overload(ctx)
+    local status = ctx:equip()
+    M.buy_overload_upgrades(true, ctx)
+    return status
 end
 
 function M.resume_running_action(self, key, fn)

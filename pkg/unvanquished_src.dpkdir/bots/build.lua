@@ -445,7 +445,7 @@ local function maybe_retire_builder(team, number, client, builder, wants_build, 
             return STATUS_FAILURE
         end
 
-        return ctx:equip()
+        return common.equip_and_buy_overload(ctx)
     end
 
     if is_alien(team) then
@@ -567,7 +567,7 @@ local function maybe_equip(team, level, mind, enemy_visible, ctx)
         return STATUS_FAILURE
     end
 
-    return ctx:equip()
+    return common.equip_and_buy_overload(ctx)
 end
 
 local function maybe_empty_ammo_resupply(team, client, weapon_attr, ctx)

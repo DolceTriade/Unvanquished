@@ -560,7 +560,7 @@ local function maybe_retire_builder(team, number, client, builder, wants_build, 
         if human_repair_target(mind) then
             return STATUS_FAILURE
         end
-        return ctx:equip()
+        return common.equip_and_buy_overload(ctx)
     end
 
     if is_alien(team) then
@@ -837,7 +837,7 @@ local function maybe_equip(team, client, level, ctx, mind, enemy_visible)
         return STATUS_FAILURE
     end
 
-    return ctx:equip()
+    return common.equip_and_buy_overload(ctx)
 end
 
 local function maybe_flee_human(team, weapon, enemy_visible, ctx)

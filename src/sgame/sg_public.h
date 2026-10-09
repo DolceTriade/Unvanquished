@@ -144,7 +144,6 @@ bool              G_OverloadUnlockPurchasedByName( team_t team, unlockableType_t
 void              G_OverloadForceUnlockByName( team_t team, unlockableType_t type, Str::StringRef thing );
 int               G_OverloadUpgradeLevel( team_t team, Str::StringRef thing, Str::StringRef stat );
 int               G_OverloadForceUpgrade( team_t team, Str::StringRef thing, Str::StringRef stat );
-void              G_BotOverloadThink( gentity_t *ent );
 
 // sg_client.c
 void              G_AddCreditToClient( gclient_t *client, short credit, bool cap );

@@ -36,7 +36,7 @@ local function prepare_builder(self, ctx, boss_entity)
             return STATUS_FAILURE
         end
 
-        local status = ctx:equip()
+        local status = common.equip_and_buy_overload(ctx)
         if status == STATUS_FAILURE or status == STATUS_SUCCESS then
             STATE[number] = {
                 number = boss_entity.number,

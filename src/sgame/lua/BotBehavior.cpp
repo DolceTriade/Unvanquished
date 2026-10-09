@@ -655,6 +655,7 @@ DEFINE_BOT_ACTION_METHOD( buildNow, BotActionBuildNow, 1, 1 )
 DEFINE_BOT_ACTION_METHOD( buildNowChosenBuildable, BotActionBuildNowChosenBuildable, 0, 0 )
 DEFINE_BOT_ACTION_METHOD( buy, BotActionBuy, 1, 4 )
 DEFINE_BOT_ACTION_METHOD( buyPrimary, BotActionBuyPrimary, 1, 1 )
+DEFINE_BOT_ACTION_METHOD( buyOverloadUpgrades, BotActionBuyOverloadUpgrades, 0, 0 )
 DEFINE_BOT_ACTION_METHOD( changeBehavior, BotActionChangeBehavior, 1, 1 )
 DEFINE_BOT_ACTION_METHOD( changeGoal, BotActionChangeGoal, 1, 3 )
 DEFINE_BOT_ACTION_METHOD( classDodge, BotActionClassDodge, 0, 0 )
@@ -897,6 +898,7 @@ RegType<BotContext> BotContextMethods[] =
 	{ "buildNowChosenBuildable", MethodbuildNowChosenBuildable },
 	{ "buy", Methodbuy },
 	{ "buyPrimary", MethodbuyPrimary },
+	{ "buyOverloadUpgrades", MethodbuyOverloadUpgrades },
 	{ "canBuild", MethodcanBuild },
 	{ "canEvolveTo", MethodcanEvolveTo },
 	{ "changeBehavior", MethodchangeBehavior },

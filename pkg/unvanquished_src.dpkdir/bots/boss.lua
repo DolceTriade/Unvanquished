@@ -148,7 +148,7 @@ local function ensure_human_loadout(spec, self, ctx, state)
             return STATUS_RUNNING
         end
     else
-        local status = ctx:equip()
+        local status = common.equip_and_buy_overload(ctx)
         if status ~= STATUS_FAILURE then
             return STATUS_RUNNING
         end
