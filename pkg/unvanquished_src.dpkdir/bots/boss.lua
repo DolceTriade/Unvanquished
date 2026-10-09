@@ -1,10 +1,49 @@
 local PMF_QUEUED = 1 << 12
 
 local common = require("bots/common.lua")
+local cache = require("bots/cache.lua")
 
 local M = {}
 local CONTROLLERS = {}
 local PENDING_ADDS = {}
+local ACTIVE_BOSSES = {}
+local BOSS_EPOCHS = { humans = 0, aliens = 0 }
+
+local function team_name(team)
+    if common.is_human(team) then
+        return "humans"
+    end
+
+    if common.is_alien(team) then
+        return "aliens"
+    end
+
+    return nil
+end
+
+local function same_team(a, b)
+    if common.is_human(a) then
+        return common.is_human(b)
+    end
+
+    if common.is_alien(a) then
+        return common.is_alien(b)
+    end
+
+    return a == b
+end
+
+local function change_team_bot_behavior(team, behavior, exclude_number)
+    for _, entity in pairs(sgame.entity) do
+        if entity.number ~= exclude_number
+            and same_team(entity.team, team)
+            and entity.client
+            and entity.bot
+            and entity.bot.set_behavior then
+            entity.bot:set_behavior(behavior)
+        end
+    end
+end
 
 local function copy_shallow(src)
     local dst = {}
@@ -271,6 +310,16 @@ local function new(spec)
             state = {}
             state_store[self.number] = state
 
+            ACTIVE_BOSSES[active_spec.team] = {
+                number = self.number,
+                generation = self.generation,
+            }
+            local normalized_team = team_name(active_spec.team)
+            if normalized_team then
+                BOSS_EPOCHS[normalized_team] = BOSS_EPOCHS[normalized_team] + 1
+            end
+            change_team_bot_behavior(active_spec.team, "boss_rush.lua", self.number)
+
             if active_spec.damage_dealt_multiplier ~= nil then
                 client.damage_dealt_multiplier = active_spec.damage_dealt_multiplier
             end
@@ -294,9 +343,29 @@ local function new(spec)
             self.die = function(ent, inflictor, attacker, mod)
                 state_store[ent.number] = nil
                 bot_specs[ent.number] = nil
+                local active = ACTIVE_BOSSES[active_spec.team]
+                local was_active = active
+                    and active.number == ent.number
+                    and active.generation == ent.generation
+                if was_active then
+                    ACTIVE_BOSSES[active_spec.team] = nil
+                    local normalized_team = team_name(active_spec.team)
+                    if normalized_team then
+                        BOSS_EPOCHS[normalized_team] = BOSS_EPOCHS[normalized_team] + 1
+                    end
+                end
 
                 if active_spec.on_die then
                     active_spec.on_die(ent, inflictor, attacker, mod)
+                end
+
+                if was_active then
+                    cache.refresh()
+                    change_team_bot_behavior(
+                        active_spec.team,
+                        cache.default_behavior(active_spec.team),
+                        ent.number
+                    )
                 end
 
                 Timer.add(1, function() Cmd.exec("bot del " .. ent.number) end)
@@ -326,6 +395,37 @@ local function new(spec)
 end
 
 M.new = new
+
+function M.epoch(team)
+    local normalized_team = team_name(team)
+    return normalized_team and BOSS_EPOCHS[normalized_team] or 0
+end
+
+function M.enemy(team)
+    local active = ACTIVE_BOSSES[team]
+    if not active then
+        return nil
+    end
+
+    local entity = sgame.entity[active.number]
+    if not entity or entity.generation ~= active.generation
+        or not entity.client or not entity.client.health or entity.client.health <= 0 then
+        ACTIVE_BOSSES[team] = nil
+        return nil
+    end
+
+    return entity
+end
+
+function M.active(team)
+    return M.enemy(team) ~= nil
+end
+
+function M.target(team)
+    local boss_entity = M.enemy(team)
+    local mind = boss_entity and boss_entity.bot and boss_entity.bot.mind or nil
+    return mind and common.target_entity(mind.bestEnemy) or nil
+end
 
 function M.register(id, controller)
     CONTROLLERS[id] = controller

@@ -482,7 +482,8 @@ return function(self, ctx)
         enemy = nil
     end
     local enemy_visible = enemy and ctx:isVisibleEntity(enemy) or false
-    local weapon_attr = weapons[client.weapon]
+    local weapon = client.weapon
+    local weapon_attr = weapon and weapons[weapon] or nil
     local state = {
         self = self,
         team = self.team,

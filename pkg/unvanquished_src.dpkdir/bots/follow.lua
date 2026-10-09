@@ -201,7 +201,7 @@ return function(self, ctx)
     local mind = self.bot.mind
     local enemy = target_entity(mind.bestEnemy)
     local enemy_visible = enemy and ctx:isVisibleEntity(enemy) or false
-    local enemy_in_range = enemy and mind.bestEnemy.distance
+    local enemy_in_range = enemy and mind.bestEnemy and mind.bestEnemy.distance
         and mind.bestEnemy.distance <= 500 or false
     local weapon_attr = weapons[client.weapon]
     local state = {
