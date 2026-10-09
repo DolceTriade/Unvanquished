@@ -1567,7 +1567,7 @@ static void BuildOverloadCatalog()
 	// Alien lifeforms: advanced granger, dretch, mantis, marauder, advanced marauder, dragoon, advanced dragoon, tyrant.
 	AddClassUnlock( TEAM_ALIENS, PCL_ALIEN_BUILDER0_UPG );
 	AddUpgrade( TEAM_ALIENS, DefaultUpgradeBaseCost( 0 ), DefaultUpgradeStepCost( 0 ), OVERLOAD_UNCAPPED_RANKS, "level0", "Dretch", "damage", "damage", "Dretch Damage", "Increase dretch bite damage.",
-	            { GameplayEffect( "LEVEL0_BITE_DMG", ExponentialGrowth( 5.0, 1.25 ) ) } );
+	            { GameplayEffect( "LEVEL0_BITE_DMG", ExponentialGrowth( 5.0, 1.15 ) ) } );
 	AddUpgrade( TEAM_ALIENS, DefaultUpgradeBaseCost( 0 ), DefaultUpgradeStepCost( 0 ), OVERLOAD_UNCAPPED_RANKS, "level1", "Mantis", "damage", "damage", "Mantis Damage", "Increase mantis claw damage.",
 	            { GameplayEffect( "LEVEL1_CLAW_DMG", ExponentialGrowth( 5.0, 1.25 ) ) } );
 	AddClassUnlock( TEAM_ALIENS, PCL_ALIEN_LEVEL2 );
@@ -1594,9 +1594,9 @@ static void BuildOverloadCatalog()
 	            { AttributeEffect( BG_ATTR_WEAPON, "shotgun", "ammo", 1.0, 1.0 ) } );
 
 	// Human weapons: stage 2 unlocks.
-	AddUpgrade( TEAM_HUMANS, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), DefaultUpgradeStepCost( OVERLOAD_STAGE2_COUNT ), OVERLOAD_UNCAPPED_RANKS, "lgun", "Lasgun", "damage", "damage", "Lasgun Damage", "Increase lasgun damage.",
+	AddUpgrade( TEAM_HUMANS, ExponentialGrowth( 1300.0, 2.0 ), OVERLOAD_UNCAPPED_RANKS, "lgun", "Lasgun", "damage", "damage", "Lasgun Damage", "Increase lasgun damage.",
 	            { GameplayEffect( "LASGUN_DAMAGE", 2.0 ) } );
-	AddUpgrade( TEAM_HUMANS, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), DefaultUpgradeStepCost( OVERLOAD_STAGE2_COUNT ), OVERLOAD_UNCAPPED_RANKS, "lgun", "Lasgun", "ammo", "ammo", "Lasgun Ammo", "Increase lasgun ammo reserve.",
+	AddUpgrade( TEAM_HUMANS, ExponentialGrowth( 1300.0, 2.0 ), OVERLOAD_UNCAPPED_RANKS, "lgun", "Lasgun", "ammo", "ammo", "Lasgun Ammo", "Increase lasgun ammo reserve.",
 	            { AttributeEffect( BG_ATTR_WEAPON, "lgun", "ammo", 10.0, 1.0 ) } );
 	AddUpgrade( TEAM_HUMANS, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), DefaultUpgradeStepCost( OVERLOAD_STAGE2_COUNT ), OVERLOAD_UNCAPPED_RANKS, "mdriver", "Mass Driver", "damage", "damage", "Mass Driver Damage", "Increase mass driver damage.",
 	            { GameplayEffect( "MDRIVER_DMG", 10.0 ) } );
@@ -1608,9 +1608,9 @@ static void BuildOverloadCatalog()
 	            { AttributeEffect( BG_ATTR_WEAPON, "chaingun", "ammo", 20.0, 1.0 ) } );
 	AddUpgrade( TEAM_HUMANS, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), DefaultUpgradeStepCost( OVERLOAD_STAGE2_COUNT ), OVERLOAD_UNCAPPED_RANKS, "flamer", "Flamethrower", "ammo", "ammo", "Flamer Ammo", "Increase flamer ammo reserve.",
 	            { AttributeEffect( BG_ATTR_WEAPON, "flamer", "ammo", 25.0, 1.0 ) } );
-	AddUpgrade( TEAM_HUMANS, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), DefaultUpgradeStepCost( OVERLOAD_STAGE2_COUNT ), OVERLOAD_UNCAPPED_RANKS, "prifle", "Pulse Rifle", "damage", "damage", "Pulse Rifle Damage", "Increase pulse rifle projectile damage.",
+	AddUpgrade( TEAM_HUMANS, ExponentialGrowth( 1300.0, 2.0 ), OVERLOAD_UNCAPPED_RANKS, "prifle", "Pulse Rifle", "damage", "damage", "Pulse Rifle Damage", "Increase pulse rifle projectile damage.",
 	            { AttributeEffect( BG_ATTR_MISSILE, "prifle", "damage", 2.0, 1.0 ) } );
-	AddUpgrade( TEAM_HUMANS, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), DefaultUpgradeStepCost( OVERLOAD_STAGE2_COUNT ), OVERLOAD_UNCAPPED_RANKS, "prifle", "Pulse Rifle", "ammo", "ammo", "Pulse Rifle Ammo", "Increase pulse rifle ammo reserve.",
+	AddUpgrade( TEAM_HUMANS, ExponentialGrowth( 1300.0, 2.0 ), OVERLOAD_UNCAPPED_RANKS, "prifle", "Pulse Rifle", "ammo", "ammo", "Pulse Rifle Ammo", "Increase pulse rifle ammo reserve.",
 	            { AttributeEffect( BG_ATTR_WEAPON, "prifle", "ammo", 5.0, 1.0 ) } );
 
 	// Human weapons: stage 3 unlocks.
@@ -1679,7 +1679,7 @@ static void BuildOverloadCatalog()
 	// Alien class upgrades.
 	// Covered classes: dretch, level1 scout, marauder, advanced marauder, Shrike, dragoon, advanced dragoon, tyrant.
 	// Intentionally missing for now: granger, advanced granger.
-	AddUpgrade( TEAM_ALIENS, DefaultUpgradeBaseCost( 0 ), DefaultUpgradeStepCost( OVERLOAD_STAGE2_COUNT ), OVERLOAD_UNCAPPED_RANKS, "aliens", "Alien Lifeforms", "vitality", "vitality", "Alien Vitality", "Increase max health for all alien classes.",
+	AddUpgrade( TEAM_ALIENS, 375, 450, OVERLOAD_UNCAPPED_RANKS, "aliens", "Alien Lifeforms", "vitality", "vitality", "Alien Vitality", "Increase max health for all alien classes.",
 	            { PercentAttributeEffect( BG_ATTR_CLASS, "builder", "health", 0.1, 1.0 ),
 	              PercentAttributeEffect( BG_ATTR_CLASS, "builderupg", "health", 0.1, 1.0 ),
 	              PercentAttributeEffect( BG_ATTR_CLASS, "level0", "health", 0.1, 1.0 ),
