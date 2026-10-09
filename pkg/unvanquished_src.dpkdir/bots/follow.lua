@@ -52,7 +52,7 @@ local function maybe_equip(team, mind, ctx)
         return STATUS_FAILURE
     end
 
-    return ctx:equip()
+    return common.equip_and_buy_overload(ctx)
 end
 
 local function maybe_evolve(self, team, client, enemy_visible, ctx)

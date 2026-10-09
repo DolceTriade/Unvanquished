@@ -178,7 +178,7 @@ local function maybe_equip_human_near_armoury(number, team, level, mind, ctx)
         return STATUS_FAILURE
     end
 
-    local status = ctx:equip()
+    local status = common.equip_and_buy_overload(ctx)
     if status == STATUS_FAILURE then
         STATE.human_equip_retry_at[number] = level.time + 2000
         return STATUS_FAILURE
@@ -294,7 +294,7 @@ local RESUPPLY_TASK = {
         end
 
         if task.phase == "equip" then
-            local status = ctx:equip()
+            local status = common.equip_and_buy_overload(ctx)
             if status ~= STATUS_FAILURE then
                 return status
             end
