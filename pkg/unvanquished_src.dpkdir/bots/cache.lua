@@ -25,6 +25,8 @@ local OBSERVED_CVARS = {
     "g_bot_chasetime",
     "g_bot_aliensenseRange",
     "g_bot_humansenseRange",
+    "g_bot_defaultBehaviorAlien",
+    "g_bot_defaultBehaviorHuman",
     "g_maxMiners",
     "g_timelimit",
 }
@@ -248,6 +250,23 @@ end
 
 function M.cvar_number(name)
     return tonumber(M.cvar(name)) or 0
+end
+
+function M.default_behavior(team)
+    local team_name = normalize_team_name(team)
+    if not team_name then
+        return "default"
+    end
+
+    local cvar = team_name == "humans"
+        and "g_bot_defaultBehaviorHuman"
+        or "g_bot_defaultBehaviorAlien"
+    local behavior = M.cvar(cvar)
+    if behavior == "" or not behavior:match("^[%w_-]+$") then
+        return "default"
+    end
+
+    return behavior
 end
 
 function M.chosen_buildable(team)

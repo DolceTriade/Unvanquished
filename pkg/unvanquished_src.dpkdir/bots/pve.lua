@@ -7,6 +7,7 @@ package.loaded["bots/common.lua"] = nil
 
 local cache = require("bots/cache.lua")
 local common = require("bots/common.lua")
+local boss = require("bots/boss.lua")
 local weapons = Unv.weapons
 local random = math.random
 local elapsed_since = common.elapsed_since
@@ -31,6 +32,7 @@ local STATE = {
     build_reposition_until = {},
     human_equip_retry_at = {},
     tasks = {},
+    boss_epoch = {},
 }
 
 local PVE_MAX_BUILDERS = 3
@@ -139,6 +141,25 @@ end
 
 local function clear_task(number)
     STATE.tasks[number] = nil
+end
+
+local function clear_team_state(team)
+    for number, assigned_team in pairs(STATE.builder_assignment) do
+        if common.is_human(assigned_team) == common.is_human(team)
+            and common.is_alien(assigned_team) == common.is_alien(team) then
+            STATE.builder_assignment[number] = nil
+        end
+    end
+
+    for _, entity in pairs(sgame.entity) do
+        if (common.is_human(entity.team) and common.is_human(team))
+            or (common.is_alien(entity.team) and common.is_alien(team)) then
+            clear_alien_target_lock(entity.number)
+            clear_alien_combat_latch(entity.number)
+            clear_task(entity.number)
+            clear_build_failure_state(entity.number)
+        end
+    end
 end
 
 local function current_task(number)
@@ -1300,6 +1321,12 @@ return function(self, ctx)
     local level = sgame.level
     local team_level_data = team_level(team)
     cache.refresh()
+    local team_key = common.is_human(team) and "humans" or "aliens"
+    local boss_epoch = boss.epoch(team)
+    if STATE.boss_epoch[team_key] ~= boss_epoch then
+        clear_team_state(team)
+        STATE.boss_epoch[team_key] = boss_epoch
+    end
     local team_snapshot = cache.team(team)
     local selected_buildable = choose_pve_buildable(team, team_snapshot)
 
@@ -1335,6 +1362,11 @@ return function(self, ctx)
     else
         clear_alien_target_lock(number)
         clear_alien_combat_latch(number)
+    end
+
+    local boss_active = boss.active(team)
+    if boss_active then
+        wants_build = false
     end
 
     local health_frac = health_fraction(client)
