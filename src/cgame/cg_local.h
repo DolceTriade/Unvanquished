@@ -397,6 +397,7 @@ struct particleSystem_t
 	vec3_t   lastNormal;
 
 	int      charge;
+	int      activeEjectors;
 };
 
 struct particleEjector_t
@@ -408,6 +409,7 @@ struct particleEjector_t
 
 	int              count;
 	int              totalParticles;
+	int              activeParticles;
 
 	int              nextEjectionTime;
 

@@ -41,6 +41,7 @@ Maryland 20850 USA.
 #include "sgame/lua/Client.h"
 #include "sgame/lua/Bot.h"
 #include "sgame/lua/Level.h"
+#include "sgame/lua/World.h"
 #include "sgame/lua/Overload.h"
 #include "sgame/lua/Buildable.h"
 #include "sgame/lua/Missile.h"
@@ -57,6 +58,7 @@ using Shared::Lua::CheckVec3;
 
 static Lua::Entity entity;
 static Lua::Level level;
+static Lua::World world;
 static Lua::Overload overload;
 static Lua::Hooks hooks;
 static Lua::Workflow workflow;
@@ -86,6 +88,15 @@ class SGameGlobal
 	static int GetLevel( lua_State* L )
 	{
 		LuaLib<Lua::Level>::push( L, &level );
+		return 1;
+	}
+
+	/// Get access to map collision geometry.
+	// @field world World collision queries and bounds.
+	// @see world
+	static int GetWorld( lua_State* L )
+	{
+		LuaLib<Lua::World>::push( L, &world );
 		return 1;
 	}
 
@@ -185,11 +196,15 @@ class SGameGlobal
 	// @function TrySpawnBuildableAt
 	// @tparam string buildable Name of the buildable (eg, trapper, medistat, etc)
 	// @tparam array origin Position of the buildable.
+	// @tparam array|nil normal Optional surface normal to constrain placement to that surface.
 	// @treturn buildable.BuildableProxy|nil The buildable on success, otherwise nil.
 	static int TrySpawnBuildableAt( lua_State* L )
 	{
 		vec3_t origin;
-		if ( !CheckVec3( L, 2, origin ) || !lua_isstring( L, 1 ) )
+		vec3_t normal;
+		bool hasNormal = !lua_isnoneornil( L, 3 );
+		if ( !CheckVec3( L, 2, origin ) || ( hasNormal && !CheckVec3( L, 3, normal ) ) ||
+		     !lua_isstring( L, 1 ) )
 		{
 			Log::Warn( "invalid arguments to TrySpawnBuildableAt." );
 			lua_pushnil( L );
@@ -205,7 +220,8 @@ class SGameGlobal
 			return 1;
 		}
 
-		gentity_t* buildable = G_TrySpawnBuildableAt( ba->number, origin );
+		gentity_t* buildable = G_TrySpawnBuildableAt( ba->number, origin,
+		                                               hasNormal ? normal : nullptr );
 		if ( !buildable )
 		{
 			lua_pushnil( L );
@@ -265,6 +281,7 @@ RegType<SGameGlobal> SGameGlobalMethods[] = {
 luaL_Reg SGameGlobalGetters[] = {
 	{ "entity", SGameGlobal::GetEntity },
 	{ "level", SGameGlobal::GetLevel },
+	{ "world", SGameGlobal::GetWorld },
 	{ "overload", SGameGlobal::GetOverload },
 	{ "hooks", SGameGlobal::GetHooks },
 	{ "workflow", SGameGlobal::GetWorkflow },
@@ -287,6 +304,7 @@ void InitializeSGameGlobal( lua_State* L )
 	LuaLib<SGameGlobal>::Register( L );
 	LuaLib<Entity>::Register( L );
 	LuaLib<EntityProxy>::Register( L );
+	LuaLib<World>::Register( L );
 	LuaLib<Client>::Register( L );
 	LuaLib<Bot>::Register( L );
 	LuaLib<Level>::Register( L );
