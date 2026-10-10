@@ -372,6 +372,8 @@ set(SGAMELIST
     ${GAMELOGIC_DIR}/sgame/lua/Bot.h
     ${GAMELOGIC_DIR}/sgame/lua/Level.cpp
     ${GAMELOGIC_DIR}/sgame/lua/Level.h
+    ${GAMELOGIC_DIR}/sgame/lua/World.cpp
+    ${GAMELOGIC_DIR}/sgame/lua/World.h
     ${GAMELOGIC_DIR}/sgame/lua/Overload.cpp
     ${GAMELOGIC_DIR}/sgame/lua/Overload.h
     ${GAMELOGIC_DIR}/sgame/lua/Buildable.cpp

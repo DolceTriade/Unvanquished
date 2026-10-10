@@ -1390,7 +1390,22 @@ static bool GuessBuildPlacementCandidate( buildable_t buildable, const vec3_t re
 	VectorMA( requestedOrigin, -128.0f, probeNormal, surfaceTraceEnd );
 	trap_Trace( &surfaceTrace, surfaceTraceStart, mins, maxs, surfaceTraceEnd, ENTITYNUM_NONE, MASK_DEADSOLID, 0 );
 
-	if ( surfaceTrace.startsolid || surfaceTrace.entityNum != ENTITYNUM_WORLD )
+	if ( surfaceTrace.startsolid || surfaceTrace.allsolid || surfaceTrace.fraction >= 1.0f ||
+	     surfaceTrace.entityNum != ENTITYNUM_WORLD ||
+	     ( surfaceTrace.surfaceFlags & ( SURF_SKY | SURF_NODRAW ) ) ||
+	     !( surfaceTrace.contents & CONTENTS_SOLID ) ||
+	     ( surfaceTrace.contents & ( CONTENTS_NODROP | CONTENTS_LAVA | CONTENTS_SLIME ) ) )
+	{
+		return false;
+	}
+	// Check with all entities linked: ghost validation temporarily unlinks buildables
+	// and does not reliably reject a stationary hull whose trace starts in solid.
+	trace_t occupancy;
+	trap_Trace( &occupancy, surfaceTrace.endpos, mins, maxs, surfaceTrace.endpos,
+	            ENTITYNUM_NONE, MASK_PLAYERSOLID | CONTENTS_ITEM, 0 );
+	if ( occupancy.startsolid || occupancy.allsolid || occupancy.fraction < 1.0f ||
+	     ( G_CM_PointContents( surfaceTrace.endpos, ENTITYNUM_NONE ) &
+	       ( CONTENTS_NODROP | CONTENTS_LAVA | CONTENTS_SLIME ) ) )
 	{
 		return false;
 	}
@@ -1451,7 +1466,8 @@ static bool GuessBuildPlacementPlayable( buildable_t buildable, const vec3_t req
 }
 
 static bool GuessBuildPlacement( buildable_t buildable, const vec3_t requestedOrigin,
-                                 vec3_t bestOrigin, vec3_t bestNormal )
+                                 vec3_t bestOrigin, vec3_t bestNormal,
+                                 const vec3_t requestedNormal = nullptr )
 {
 	static const vec3_t humanProbeNormals[] = {
 		{ 0.0f, 0.0f, 1.0f }
@@ -1469,11 +1485,22 @@ static bool GuessBuildPlacement( buildable_t buildable, const vec3_t requestedOr
 	size_t probeCount = ARRAY_LEN( humanProbeNormals );
 	bool found = false;
 	float bestDistanceSquared = 0.0f;
+	vec3_t customProbeNormals[ 1 ];
 
 	if ( BG_Buildable( buildable )->team == TEAM_ALIENS )
 	{
 		probeNormals = alienProbeNormals;
 		probeCount = ARRAY_LEN( alienProbeNormals );
+	}
+	if ( requestedNormal )
+	{
+		VectorCopy( requestedNormal, customProbeNormals[ 0 ] );
+		if ( VectorNormalize( customProbeNormals[ 0 ] ) == 0.0f )
+		{
+			return false;
+		}
+		probeNormals = customProbeNormals;
+		probeCount = ARRAY_LEN( customProbeNormals );
 	}
 
 	for ( size_t i = 0; i < probeCount; ++i )
@@ -1483,6 +1510,12 @@ static bool GuessBuildPlacement( buildable_t buildable, const vec3_t requestedOr
 		float candidateDistanceSquared;
 		if ( !GuessBuildPlacementCandidate( buildable, requestedOrigin, probeNormals[ i ],
 		                                    candidateOrigin, candidateNormal, candidateDistanceSquared ) )
+		{
+			continue;
+		}
+		// A hull can hit a different face at corners. Preserve the surface requested
+		// by Lua instead of silently changing a wall/ceiling placement into a floor.
+		if ( requestedNormal && DotProduct( probeNormals[ i ], candidateNormal ) < 0.99f )
 		{
 			continue;
 		}
@@ -1985,7 +2018,7 @@ bool G_BuildIfValid( gentity_t *ent, buildable_t buildable )
 	return false;
 }
 
-static gentity_t *FinishSpawningBuildable( gentity_t *ent, bool force )
+static gentity_t *FinishSpawningBuildable( gentity_t *ent, bool force, bool checkedPlacement = false )
 {
 	trace_t     tr;
 	vec3_t      normal, dest;
@@ -2015,15 +2048,32 @@ static gentity_t *FinishSpawningBuildable( gentity_t *ent, bool force )
 	built->s.eFlags |= EF_B_SPAWNED;*/
 
 	// drop towards normal surface
-	VectorScale( built->s.origin2, -4096.0f, dest );
+	// A checked placement already touches its support. Do not snap it across a
+	// room, through a missed surface, or into the void during final spawning.
+	VectorScale( built->s.origin2, checkedPlacement ? -4.0f : -4096.0f, dest );
 	VectorAdd( dest, built->s.origin, dest );
 
 	trap_Trace( &tr, built->s.origin, built->r.mins, built->r.maxs, dest, built->num(),
 	            built->clipmask, 0 );
 
-	if ( tr.startsolid && !force )
+	bool invalidPlacement = checkedPlacement &&
+	    ( tr.allsolid || tr.fraction >= 1.0f || tr.entityNum != ENTITYNUM_WORLD ||
+	      ( tr.surfaceFlags & ( SURF_SKY | SURF_NODRAW ) ) ||
+	      !( tr.contents & CONTENTS_SOLID ) ||
+	      ( tr.contents & ( CONTENTS_NODROP | CONTENTS_LAVA | CONTENTS_SLIME ) ) ||
+	      DotProduct( normal, tr.plane.normal ) < 0.99f );
+	if ( checkedPlacement && !tr.startsolid && !invalidPlacement )
 	{
-		Log::Debug( "^3G_FinishSpawningBuildable: %s startsolid at %s",
+		trace_t occupancy;
+		trap_Trace( &occupancy, tr.endpos, built->r.mins, built->r.maxs, tr.endpos,
+		            built->num(), MASK_PLAYERSOLID | CONTENTS_ITEM, 0 );
+		invalidPlacement = occupancy.startsolid || occupancy.allsolid || occupancy.fraction < 1.0f ||
+		    ( G_CM_PointContents( tr.endpos, built->num() ) &
+		      ( CONTENTS_NODROP | CONTENTS_LAVA | CONTENTS_SLIME ) );
+	}
+	if ( ( tr.startsolid && !force ) || invalidPlacement )
+	{
+		Log::Debug( "^3G_FinishSpawningBuildable: %s invalid placement at %s",
 		          built->classname, vtos( built->s.origin ) );
 		Entities::Kill( built, ent, MOD_SUICIDE );
 		G_FreeEntity( built );
@@ -2073,11 +2123,12 @@ gentity_t* G_SpawnBuildableImmediately( gentity_t *ent, buildable_t buildable, b
 	return ret;
 }
 
-gentity_t* G_TrySpawnBuildableAt( buildable_t buildable, const vec3_t origin )
+gentity_t* G_TrySpawnBuildableAt( buildable_t buildable, const vec3_t origin,
+                                  const vec3_t normal )
 {
 	vec3_t guessedOrigin;
 	vec3_t guessedNormal;
-	if ( !GuessBuildPlacement( buildable, origin, guessedOrigin, guessedNormal ) )
+	if ( !GuessBuildPlacement( buildable, origin, guessedOrigin, guessedNormal, normal ) )
 	{
 		return nullptr;
 	}
@@ -2088,7 +2139,7 @@ gentity_t* G_TrySpawnBuildableAt( buildable_t buildable, const vec3_t origin )
 	VectorClear( placeholder->s.angles );
 	VectorCopy( guessedNormal, placeholder->s.origin2 );
 
-	gentity_t* built = FinishSpawningBuildable( placeholder, false );
+	gentity_t* built = FinishSpawningBuildable( placeholder, false, true );
 	G_FreeEntity( placeholder );
 	return built;
 }
