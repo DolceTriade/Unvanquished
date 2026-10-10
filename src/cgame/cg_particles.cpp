@@ -114,6 +114,11 @@ Destroy an individual particle
 */
 static void CG_DestroyParticle( particle_t *p, vec3_t impactNormal )
 {
+	if ( p->valid )
+	{
+		p->parent->activeParticles--;
+	}
+
 	//this particle has an onDeath particle system attached
 	if ( p->class_->onDeathSystemName[ 0 ] != '\0' )
 	{
@@ -335,6 +340,7 @@ static particle_t *CG_SpawnNewParticle( baseParticle_t *bp, particleEjector_t *p
 			p->lastEvalTime = cg.time;
 
 			p->valid = true;
+			pe->activeParticles++;
 
 			//this particle has a child particle system attached
 			if ( bp->childSystemName[ 0 ] != '\0' )
@@ -427,22 +433,11 @@ static void CG_SpawnNewParticles()
 
 			if ( pe->count == 0 || ps->lazyRemove )
 			{
-				int count = 0;
-
 				//wait for child particles to die before declaring this pe invalid
-				for ( int j = 0; j < MAX_PARTICLES; j++ )
-				{
-					particle_t *p = &particles[ j ];
-
-					if ( p->valid && p->parent == pe )
-					{
-						count++;
-					}
-				}
-
-				if ( !count )
+				if ( pe->activeParticles == 0 )
 				{
 					pe->valid = false;
+					ps->activeEjectors--;
 				}
 			}
 		}
@@ -483,6 +478,7 @@ static particleEjector_t *CG_SpawnNewParticleEjector( baseParticleEjector_t *bpe
 			              ( int ) rint( CG_RandomiseValue( ( float ) bpe->totalParticles, bpe->totalParticlesRandFrac ) );
 
 			pe->valid = true;
+			ps->activeEjectors++;
 
 			if ( cg_debugParticles.Get() >= 1 )
 			{
@@ -2082,18 +2078,7 @@ static void CG_GarbageCollectParticleSystems()
 			continue;
 		}
 
-		int count = 0;
-		for ( int j = 0; j < MAX_PARTICLE_EJECTORS; j++ )
-		{
-			particleEjector_t *pe = &particleEjectors[ j ];
-
-			if ( pe->valid && pe->parent == ps )
-			{
-				count++;
-			}
-		}
-
-		if ( !count )
+		if ( ps->activeEjectors == 0 )
 		{
 			ps->valid = false;
 		}
@@ -2425,36 +2410,16 @@ CG_CompactAndSortParticles
 Depth sort the particles
 ===============
 */
-static void CG_CompactAndSortParticles()
+static int CG_CompactAndSortParticles()
 {
+	int numParticles = 0;
 	for ( int i = 0; i < MAX_PARTICLES; i++ )
 	{
-		sortedParticles[ i ] = &particles[ i ];
-	}
-
-	int n = 0;
-	for ( n = MAX_PARTICLES - 1; n >= 0; n-- )
-	{
-		int i = 0;
-		if ( sortedParticles[ n ]->valid )
+		if ( particles[ i ].valid )
 		{
-			//find the first hole
-			while ( i < MAX_PARTICLES && sortedParticles[ i ]->valid )
-			{
-				i++;
-			}
-
-			//no more holes
-			if ( i >= n )
-			{
-				break;
-			}
-
-			sortedParticles[ i ] = sortedParticles[ n ];
+			sortedParticles[ numParticles++ ] = &particles[ i ];
 		}
 	}
-
-	int numParticles = n;
 
 	//set sort keys
 	for ( int i = 0; i < numParticles; i++ )
@@ -2477,6 +2442,8 @@ static void CG_CompactAndSortParticles()
 	{
 		sortedParticles[ i ] = radixBuffer[ i ];
 	}
+
+	return numParticles;
 }
 
 /*
@@ -2651,9 +2618,9 @@ void CG_AddParticles()
 	CG_SpawnNewParticles();
 
 	//sorting
-	CG_CompactAndSortParticles();
+	int numParticles = CG_CompactAndSortParticles();
 
-	for ( int i = 0; i < MAX_PARTICLES; i++ )
+	for ( int i = 0; i < numParticles; i++ )
 	{
 		particle_t *p = sortedParticles[ i ];
 
@@ -2663,7 +2630,10 @@ void CG_AddParticles()
 			{
 				//particle is active
 				CG_EvaluateParticlePhysics( p );
-				CG_RenderParticle( p );
+				if ( p->valid )
+				{
+					CG_RenderParticle( p );
+				}
 			}
 			else
 			{
