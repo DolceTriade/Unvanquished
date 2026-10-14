@@ -73,6 +73,10 @@ GET_FUNC( connected,
 // @tfield string name Read/Write.
 // @within Client
 GET_FUNC( name, lua_pushstring( L, c->ent->client->pers.netname ) )
+/// The client's persistent unique identifier.
+// @tfield string guid Read only.
+// @within Client
+GET_FUNC( guid, lua_pushstring( L, c->ent->client->pers.guid ) )
 /// The client's credits. Only writable for humans.
 // @tfield integer credits Read/Write.
 // @within Client
@@ -563,6 +567,7 @@ RegType<::Lua::Client> ClientMethods[] = {
 luaL_Reg ClientGetters[] = {
 	GETTER( connected ),
 	GETTER( name ),
+	GETTER( guid ),
 	GETTER( clean_name ),
 	GETTER( credits ),
 	GETTER( evos ),

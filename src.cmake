@@ -360,6 +360,7 @@ set(SGAMELIST
 
     ${GAMELOGIC_DIR}/sgame/lua/Interpreter.cpp
     ${GAMELOGIC_DIR}/sgame/lua/Interpreter.h
+    ${GAMELOGIC_DIR}/sgame/lua/File.cpp
     ${GAMELOGIC_DIR}/sgame/lua/register_lua_extensions.h
     ${GAMELOGIC_DIR}/sgame/lua/SGameGlobal.cpp
     ${GAMELOGIC_DIR}/sgame/lua/Entity.cpp

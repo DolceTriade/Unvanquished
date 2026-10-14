@@ -37,5 +37,6 @@ Maryland 20850 USA.
 namespace Lua {
 
 void InitializeSGameGlobal( lua_State *L );
+void RegisterFile( lua_State *L );
 
 }  // namespace Lua

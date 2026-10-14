@@ -1824,6 +1824,11 @@ void LogExit( const char *string )
 	G_OverloadEmitEndGameSummary();
 
 	level.intermissionQueued = level.time;
+	if ( !level.gameEndNotificationSent )
+	{
+		level.gameEndNotificationSent = true;
+		Lua::ExecGameEndNotificationHooks( level.lastWin );
+	}
 
 	// this will keep the clients from playing any voice sounds
 	// that will get cut off when the queued intermission starts
