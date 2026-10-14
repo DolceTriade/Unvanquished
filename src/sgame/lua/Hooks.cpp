@@ -56,6 +56,7 @@ static HookList clientConnectHooks;
 static HookList teamChangeHooks;
 static HookList playerSpawnHooks;
 static HookList gameEndHooks;
+static HookList gameEndNotificationHooks;
 static HookList buildableSpawnedHooks;
 static HookList missileSpawnedHooks;
 static HookList shutdownHooks;
@@ -115,6 +116,7 @@ void ClearAllHooks()
 	ClearHooks( teamChangeHooks );
 	ClearHooks( playerSpawnHooks );
 	ClearHooks( gameEndHooks );
+	ClearHooks( gameEndNotificationHooks );
 	ClearHooks( buildableSpawnedHooks );
 	ClearHooks( missileSpawnedHooks );
 	ClearHooks( shutdownHooks );
@@ -332,6 +334,43 @@ team_t ExecGameEndHooks()
 	return TEAM_NONE;
 }
 
+/// Install a callback that will be called after the game ends.
+// The callback should be function(team), where team is 'human', 'alien', or
+// 'spectator' when the game ends without a winning team.
+// @function RegisterGameEndNotificationHook
+// @tparam function callback function(team)
+// @treturn integer Opaque token for unregistering the hook.
+int RegisterGameEndNotificationHook( lua_State* L )
+{
+	return RegisterHook( L, gameEndNotificationHooks );
+}
+
+/// Unregister a game end notification hook previously returned by RegisterGameEndNotificationHook.
+// @function UnregisterGameEndNotificationHook
+// @tparam integer token Opaque hook token returned by RegisterGameEndNotificationHook.
+// @treturn boolean True if the hook was removed.
+int UnregisterGameEndNotificationHook( lua_State* L )
+{
+	return UnregisterHook( L, gameEndNotificationHooks );
+}
+
+void ExecGameEndNotificationHooks( team_t team )
+{
+	lua_State* L = State();
+	const char* teamName = BG_TeamName( team );
+	for ( int ref : gameEndNotificationHooks )
+	{
+		if ( ref == LUA_REFNIL ) continue;
+		lua_rawgeti( L, LUA_REGISTRYINDEX, ref );
+		lua_pushstring( L, teamName );
+		if ( lua_pcall( L, 1, 0, 0 ) != 0 )
+		{
+			Log::Warn( "Could not run lua game end notification hook callback: %s",
+			           lua_tostring( L, -1 ) );
+		}
+	}
+}
+
 /// Install a callback that will be called for every time a buildable is spawned.
 // The callback should be function(EntityProxy).
 // @function RegisterBuildableSpawnedHook
@@ -485,6 +524,10 @@ void ExtraInit<::Lua::Hooks>( lua_State* L, int metatable_index )
 	lua_setfield( L, metatable_index - 1, "RegisterGameEndHook" );
 	lua_pushcfunction( L, ::Lua::UnregisterGameEndHook );
 	lua_setfield( L, metatable_index - 1, "UnregisterGameEndHook" );
+	lua_pushcfunction( L, ::Lua::RegisterGameEndNotificationHook );
+	lua_setfield( L, metatable_index - 1, "RegisterGameEndNotificationHook" );
+	lua_pushcfunction( L, ::Lua::UnregisterGameEndNotificationHook );
+	lua_setfield( L, metatable_index - 1, "UnregisterGameEndNotificationHook" );
 	lua_pushcfunction( L, ::Lua::RegisterBuildableSpawnedHook );
 	lua_setfield( L, metatable_index - 1, "RegisterBuildableSpawnedHook" );
 	lua_pushcfunction( L, ::Lua::UnregisterBuildableSpawnedHook );

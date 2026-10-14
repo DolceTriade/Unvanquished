@@ -618,6 +618,7 @@ struct level_locals_t
 	// frag can be watched.  Disable future
 	// kills during this delay
 	int              intermissiontime; // time the intermission was started
+	bool             gameEndNotificationSent;
 	char             *changemap;
 	bool         readyToExit; // at least one client wants to exit
 	int              exitTime;

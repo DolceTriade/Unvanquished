@@ -301,6 +301,7 @@ namespace Lua {
 
 void InitializeSGameGlobal( lua_State* L )
 {
+	RegisterFile( L );
 	LuaLib<SGameGlobal>::Register( L );
 	LuaLib<Entity>::Register( L );
 	LuaLib<EntityProxy>::Register( L );
