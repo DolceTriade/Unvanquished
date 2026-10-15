@@ -326,6 +326,29 @@ static void CG_AlienLevel4Text( std::string& text, playerState_t *ps )
 
 /*
 ===============
+CG_AlienLevelFlyText
+===============
+*/
+static void CG_AlienLevelFlyText( std::string& text )
+{
+	text += va( _( "While airborne, press %s with enough speed to start gliding." ), CG_KeyNameForCommand( "+moveup" ) );
+	text += '\n';
+
+	text += va( _( "Hold %s while gliding to flap and gain lift. Steer by looking where you want to go." ), CG_KeyNameForCommand( "+moveup" ) );
+	text += '\n';
+
+	text += va( _( "Press %s while airborne to launch or boost in the direction you are looking." ), CG_KeyNameForCommand( "+attack2" ) );
+	text += '\n';
+
+	text += va( _( "Press %s to stop flying." ), CG_KeyNameForCommand( "+movedown" ) );
+	text += '\n';
+
+	text += va( _( "Press %s to rake nearby enemies with your talons." ), CG_KeyNameForCommand( "+attack" ) );
+	text += '\n';
+}
+
+/*
+===============
 CG_HumanCkitText
 ===============
 */
@@ -585,6 +608,10 @@ const std::string& CG_TutorialText()
 
 				case PCL_ALIEN_LEVEL4:
 					CG_AlienLevel4Text( text, ps );
+					break;
+
+				case PCL_ALIEN_LEVELFLY:
+					CG_AlienLevelFlyText( text );
 					break;
 
 				case PCL_HUMAN_NAKED:
