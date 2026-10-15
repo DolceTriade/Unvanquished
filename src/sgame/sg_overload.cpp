@@ -1614,8 +1614,8 @@ static void BuildOverloadCatalog()
 	            { AttributeEffect( BG_ATTR_WEAPON, "prifle", "ammo", 5.0, 1.0 ) } );
 
 	// Human weapons: stage 3 unlocks.
-	AddUpgrade( TEAM_HUMANS, DefaultUpgradeBaseCost( OVERLOAD_STAGE3_COUNT ) / 2,
-	            DefaultUpgradeStepCost( OVERLOAD_STAGE3_COUNT ) / 2, OVERLOAD_UNCAPPED_RANKS, "lcannon",
+	AddUpgrade( TEAM_HUMANS, DefaultUpgradeBaseCost( OVERLOAD_STAGE3_COUNT ),
+	            DefaultUpgradeStepCost( OVERLOAD_STAGE2_COUNT ), OVERLOAD_UNCAPPED_RANKS, "lcannon",
 	            "Lucifer Cannon", "damage", "damage", "Lucifer Cannon Damage",
 	            "Increase lucifer cannon damage.",
 	            { GameplayEffect( "LCANNON_DAMAGE", 15.0 ),
@@ -1662,11 +1662,11 @@ static void BuildOverloadCatalog()
 	AddUpgrade( TEAM_HUMANS, DefaultUpgradeBaseCost( 0 ), DefaultUpgradeStepCost( 0 ), OVERLOAD_UNCAPPED_RANKS, "medistat", "Medistation", "healing_rate", "healing rate", "Medistation Healing Rate", "Increase medistation health restoration.",
 	            { GameplayEffect( "MEDISTAT_HEAL_RATE", 0.0075, 0.0 ),
 				  GameplayEffect( "STAMINA_MEDISTAT_RESTORE", 33, 0 ) } );
-	AddUpgrade( TEAM_HUMANS, DefaultUpgradeBaseCost( 0 ), DefaultUpgradeStepCost( 0 ), OVERLOAD_UNCAPPED_RANKS, "mgturret", "Machinegun Turret", "damage", "damage", "Machinegun Turret Damage", "Increase machinegun turret damage.",
+	AddUpgrade( TEAM_HUMANS, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), DefaultUpgradeStepCost( 0 ), OVERLOAD_UNCAPPED_RANKS, "mgturret", "Machinegun Turret", "damage", "damage", "Machinegun Turret Damage", "Increase machinegun turret damage.",
 	            { GameplayEffect( "MGTURRET_MIN_DAMAGE", 1.0, 0.0 ),
 	              GameplayEffect( "MGTURRET_MAX_DAMAGE", 2.0, 1.0 ) } );
 	AddUpgrade( TEAM_HUMANS, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), DefaultUpgradeStepCost( OVERLOAD_STAGE2_COUNT ), OVERLOAD_UNCAPPED_RANKS, "rocketpod", "Rocket Pod", "damage", "damage", "Rocketpod Damage", "Increase rocketpod rocket damage.",
-	            { AttributeEffect( BG_ATTR_MISSILE, "rocket", "damage", 12.0, 1.0 ),
+	            { AttributeEffect( BG_ATTR_MISSILE, "rocket", "damage", 5.0, 1.0 ),
 	              AttributeEffect( BG_ATTR_MISSILE, "rocket", "splash_damage", 8.0, 0.0 ) } );
 
 	// Alien buildable upgrades.
