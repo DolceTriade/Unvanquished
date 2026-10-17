@@ -49,6 +49,7 @@ Maryland 20850 USA.
 #include "sgame/lua/Command.h"
 #include "sgame/lua/Votes.h"
 #include "sgame/lua/Workflow.h"
+#include "sgame/lua/DataRequest.h"
 
 namespace {
 
@@ -261,6 +262,18 @@ class SGameGlobal
 		return ::Lua::RegisterServerCommand( L );
 	}
 
+	/// Register a client-callable data endpoint.
+	// The handler receives the requesting entity and decoded request parameters. Endpoints are
+	// callable by any connected client, so handlers should only expose data intended for clients.
+	// @function RegisterDataEndpoint
+	// @tparam string name Endpoint name used by cgame.Request.
+	// @tparam function handler Handler called as handler(requestingEntity, params).
+	// @usage sgame.RegisterDataEndpoint('ping', function(ent, params) return { pong = params.message } end)
+	static int RegisterDataEndpoint( lua_State* L )
+	{
+		return ::Lua::RegisterDataEndpoint( L );
+	}
+
 	/// Register a custom vote
 	//
 	// @function RegisterVote
@@ -341,6 +354,8 @@ void ExtraInit<SGameGlobal>( lua_State* L, int metatable_index )
 	lua_setfield( L, metatable_index - 1, "RegisterServerCommand" );
 	lua_pushcfunction( L, SGameGlobal::RegisterVote );
 	lua_setfield( L, metatable_index - 1, "RegisterVote" );
+	lua_pushcfunction( L, SGameGlobal::RegisterDataEndpoint );
+	lua_setfield( L, metatable_index - 1, "RegisterDataEndpoint" );
 }
 
 }  // namespace Lua

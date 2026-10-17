@@ -108,6 +108,8 @@ set(GAMESHAREDLIST
     ${GAMELOGIC_DIR}/shared/lua/Beacons.h
     ${GAMELOGIC_DIR}/shared/lua/Beacons.cpp
     ${GAMELOGIC_DIR}/shared/lua/Timer.cpp
+    ${GAMELOGIC_DIR}/shared/lua/Json.cpp
+    ${GAMELOGIC_DIR}/shared/lua/Json.h
     ${GAMELOGIC_DIR}/shared/lua/Cmd.cpp
     ${GAMELOGIC_DIR}/shared/lua/Cvar.cpp
 )
@@ -164,6 +166,8 @@ set(CGAMELIST
     ${GAMELOGIC_DIR}/cgame/EntityCache.h
 
     ${GAMELOGIC_DIR}/cgame/rocket/rocket.cpp
+    ${GAMELOGIC_DIR}/cgame/rocket/lua/DataRequest.cpp
+    ${GAMELOGIC_DIR}/cgame/rocket/lua/DataRequest.h
     ${GAMELOGIC_DIR}/cgame/rocket/rocket.h
     ${GAMELOGIC_DIR}/cgame/rocket/rocketChatField.h
     ${GAMELOGIC_DIR}/cgame/rocket/rocketColorInput.h
@@ -385,6 +389,8 @@ set(SGAMELIST
     ${GAMELOGIC_DIR}/sgame/lua/Hooks.h
     ${GAMELOGIC_DIR}/sgame/lua/Command.cpp
     ${GAMELOGIC_DIR}/sgame/lua/Command.h
+    ${GAMELOGIC_DIR}/sgame/lua/DataRequest.cpp
+    ${GAMELOGIC_DIR}/sgame/lua/DataRequest.h
     ${GAMELOGIC_DIR}/sgame/lua/Votes.cpp
     ${GAMELOGIC_DIR}/sgame/lua/Votes.h
     ${GAMELOGIC_DIR}/sgame/lua/Workflow.h

@@ -40,9 +40,11 @@ Maryland 20850 USA.
 #include "shared/bg_public.h"
 #include "shared/lua/LuaLib.h"
 #include "shared/lua/Utils.h"
+#include "shared/lua/Json.h"
 #include "sgame/sg_local.h"
 #include "sgame/lua/register_lua_extensions.h"
 #include "sgame/lua/Command.h"
+#include "sgame/lua/DataRequest.h"
 
 using Shared::Lua::LuaLib;
 
@@ -183,6 +185,7 @@ void Initialize()
 
 	L = luaL_newstate();
 	luaL_openlibs( L );
+	Shared::Lua::RegisterJson( L );
 	OverrideGlobalLuaFunctions();
 	BG_InitializeLuaConstants( L );
 	InitializeSGameGlobal( L );
@@ -190,6 +193,7 @@ void Initialize()
 
 void Shutdown()
 {
+	ClearDataEndpoints();
 	CleanupCommands();
 	lua_close( L );
 	L = nullptr;
