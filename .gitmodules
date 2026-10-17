@@ -13,3 +13,6 @@
 [submodule "libs/RmlUi"]
 	path = libs/RmlUi
 	url = https://github.com/Unvanquished/RmlUi.git
+[submodule "libs/lua-cjson"]
+	path = libs/lua-cjson
+	url = https://github.com/mpx/lua-cjson.git

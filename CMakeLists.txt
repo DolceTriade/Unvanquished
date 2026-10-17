@@ -117,6 +117,13 @@ if (BUILDING_ANY_GAMELOGIC)
     prefer_package(Lua ${CMAKE_CURRENT_SOURCE_DIR}/lua.cmake)
     include_directories(${LUA_INCLUDE_DIR})
 
+    # Lua-CJSON is built into both game modules and uses the selected Lua ABI.
+    add_library(srclibs-lua-cjson STATIC
+        ${CMAKE_CURRENT_SOURCE_DIR}/libs/lua-cjson/lua_cjson.c
+        ${CMAKE_CURRENT_SOURCE_DIR}/libs/lua-cjson/strbuf.c
+        ${CMAKE_CURRENT_SOURCE_DIR}/libs/lua-cjson/fpconv.c)
+    target_include_directories(srclibs-lua-cjson PRIVATE ${LUA_INCLUDE_DIR})
+
     # Fastlz
     add_library(srclibs-fastlz EXCLUDE_FROM_ALL ${FASTLZLIST})
 
@@ -215,6 +222,7 @@ if (BUILD_SGAME)
             ${SGAMELIST}
             ${sgame_GENERATED_CBSE}
         LIBS
+            srclibs-lua-cjson
             ${LUA_LIBRARY}
             srclibs-detour
             srclibs-recast
@@ -244,6 +252,7 @@ if (BUILD_CGAME)
     LIBS
         srclibs-rmlui
         ${FREETYPE_LIBRARIES}
+        srclibs-lua-cjson
         ${LUA_LIBRARY}
         srclibs-tinygettext
         srclibs-detour

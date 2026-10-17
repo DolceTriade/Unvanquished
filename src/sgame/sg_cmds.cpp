@@ -40,6 +40,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "sg_votes.h"
 #include "sgame/lua/Hooks.h"
 #include "sgame/lua/Command.h"
+#include "sgame/lua/DataRequest.h"
 
 #define CMD_CHEAT        0x0001
 #define CMD_CHEAT_TEAM   0x0002 // is a cheat when used on a team
@@ -4493,6 +4494,11 @@ void ClientCommand( int clientNum )
 	}
 
 	trap_Argv( 0, cmd, sizeof( cmd ) );
+	if ( !Q_stricmp( cmd, "lua_data_req" ) )
+	{
+		Lua::HandleDataRequest( clientNum );
+		return;
+	}
 
 	command = (commands_t*) bsearch( cmd, cmds, numCmds, sizeof( cmds[ 0 ] ), cmdcmp );
 

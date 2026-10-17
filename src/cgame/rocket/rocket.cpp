@@ -63,6 +63,8 @@ Maryland 20850 USA.
 #include "shared/lua/register_lua_extensions.h"
 #include "../cg_local.h"
 #include "shared/bg_lua.h"
+#include "shared/lua/Json.h"
+#include "cgame/rocket/lua/DataRequest.h"
 
 class DaemonFileInterface : public Rml::FileInterface
 {
@@ -384,6 +386,8 @@ void Rocket_Init()
 
 	// Initialize Lua
 	Rml::Lua::Initialise();
+	Shared::Lua::RegisterJson( Rml::Lua::Interpreter::GetLuaState() );
+	CG_Rocket_RegisterDataRequest( Rml::Lua::Interpreter::GetLuaState() );
 	Rml::Lua::Interpreter::DoString(Str::Format("math.randomseed(%u)", BG_RandomEngine()()));
 	CG_Rocket_RegisterLuaCDataSource(Rml::Lua::Interpreter::GetLuaState());
 	CG_Rocket_RegisterLuaEvents(Rml::Lua::Interpreter::GetLuaState());
@@ -448,6 +452,7 @@ void Rocket_Init()
 
 void Rocket_Shutdown()
 {
+	CG_Rocket_ClearDataRequests();
 	// Only try to destroy the librocket stuff if the cgame is a DLL.
 	// The destructors crash a lot and we don't want that to be a problem for people just playing the game.
 	// If the cgame is a process, freeing the memory is just pedantic since it is about to terminate.

@@ -35,6 +35,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "rocket/rocket.h"
 #include "shared/bg_attributes.h"
 #include "shared/CommonProxies.h"
+#include "cgame/rocket/lua/DataRequest.h"
 
 
 static void ParsePmoveParams() {
@@ -1600,6 +1601,11 @@ static void CG_ServerCommand()
 	consoleCommand_t *command;
 
 	cmd = CG_Argv( 0 );
+	if ( !Q_stricmp( cmd, "lua_data_reply" ) )
+	{
+		CG_Rocket_HandleDataReply();
+		return;
+	}
 
 	if ( !cmd[ 0 ] )
 	{
