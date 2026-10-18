@@ -741,7 +741,7 @@ void G_CheckCkitRepair( gentity_t *self )
 				G_AddEvent(self, EV_BUILD_REPAIR, 0);
 			}
 
-			self->client->ps.weaponTime += BG_Weapon( self->client->ps.weapon )->repeatRate1;
+			self->client->ps.weaponTime += BG_Weapon( self->client->ps.weapon )->repeatRate2;
 		}
 	}
 }
