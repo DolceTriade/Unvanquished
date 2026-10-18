@@ -27,3 +27,14 @@ gfx/colors/backtile
 		map $blackimage
 	}
 }
+
+ui/assets/logos/overload_mod_loading
+{
+    cull disable
+    sort nearest
+    {
+        videoMap ui/assets/logos/overload_mod_nebula_spiral.roq
+        rgbGen vertex
+        blendFunc add
+    }
+}
