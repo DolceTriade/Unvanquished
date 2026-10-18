@@ -24,7 +24,8 @@
     <p>
         Shrike is a disruptor class. It can claw and fire blight barbs which temorarily disable a human buildable.
 
-        Use alt-attack to start flying. Use crouch to stop flying. Use tertiaryAttack to fire barbs.
+        Use alt-attack to air boost. Double jump to start flying and jump to flap. Use crouch to stop flying. Use tertiaryAttack to fire barbs. You must maintain a
+        speed above 350 units to being flying and remain flying.
     </p>
 </div>
 </body>
