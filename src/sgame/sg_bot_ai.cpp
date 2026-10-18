@@ -1082,6 +1082,23 @@ AINodeStatus_t BotActionFight( gentity_t *self, AIGenericNode_t *node )
 		couldChangeToPrimary = BG_GetPlayerWeapon( &self->client->ps ) == WP_BLASTER && primaryWeapon != WP_HBUILD && !WeaponIsEmpty( primaryWeapon, &self->client->ps );
 	}
 
+	// Advanced dragoons can damage buildables with their barbs at range. Hold
+	// position and use that attack while it is available instead of walking
+	// into claw range and switching to a melee attack.
+	if ( G_Team( self ) == TEAM_ALIENS
+			&& self->client->ps.stats[ STAT_CLASS ] == PCL_ALIEN_LEVEL3_UPG
+			&& self->botMind->goal.targetsValidEntity()
+			&& self->botMind->goal.getTargetedEntity()->s.eType == ET_BUILDABLE
+			&& self->client->ps.ammo > 0
+			&& DistanceToGoalSquared( self ) > Square( LEVEL3_CLAW_UPG_RANGE )
+			&& DistanceToGoalSquared( self ) <= Square( 900.0f ) )
+	{
+		BotAimAtEnemy( self );
+		BotStandStill( self );
+		BotFireWeaponAI( self );
+		return STATUS_RUNNING;
+	}
+
 	if ( mind->hasOffmeshGoal )
 	{
 		// The target is visible, but not on the navmesh.
@@ -2044,6 +2061,43 @@ AINodeStatus_t BotActionBuy( gentity_t *self, AIGenericNode_t *node )
 
 			numUpgrades++;
 		}
+
+		if ( G_Team( self ) == TEAM_HUMANS )
+		{
+			bool hasArmor = BG_InventoryContainsUpgrade( UP_LIGHTARMOUR, self->client->ps.stats ) ||
+			                BG_InventoryContainsUpgrade( UP_MEDIUMARMOUR, self->client->ps.stats ) ||
+			                BG_InventoryContainsUpgrade( UP_BATTLESUIT, self->client->ps.stats );
+			bool armorRequested = false;
+			for ( i = 0; i < numUpgrades; i++ )
+			{
+				armorRequested |= upgrades[i] == UP_LIGHTARMOUR || upgrades[i] == UP_MEDIUMARMOUR ||
+				                  upgrades[i] == UP_BATTLESUIT;
+			}
+
+			if ( !hasArmor && !armorRequested )
+			{
+				upgrade_t armor = BotGetDesiredArmor( self );
+				if ( armor == UP_NONE )
+				{
+					weapon_t carriedWeapon = static_cast<weapon_t>( self->client->ps.stats[ STAT_WEAPON ] );
+					if ( carriedWeapon == WP_NONE || carriedWeapon == WP_BLASTER )
+					{
+						weapon = WP_MACHINEGUN;
+						numUpgrades = 0;
+					}
+					else
+					{
+						return STATUS_FAILURE;
+					}
+				}
+				else if ( numUpgrades < static_cast<int>( ARRAY_LEN( upgrades ) ) )
+				{
+					for ( i = numUpgrades; i > 0; i-- ) upgrades[i] = upgrades[i - 1];
+					upgrades[0] = armor;
+					numUpgrades++;
+				}
+			}
+		}
 	}
 
 	if ( !g_bot_buy.Get() )
@@ -2097,24 +2151,68 @@ AINodeStatus_t BotActionBuy( gentity_t *self, AIGenericNode_t *node )
 
 	if ( GoalInRange( self, ENTITY_USE_RANGE ) )
 	{
-		BotSellUpgrades( self );
-		BotSellWeapons( self );
-
+		// Only replace upgrades which conflict with a new requested item.
+		// Including owned armor in the loadout must not sell it or utilities.
+		int conflictingSlots = 0;
+		int purchaseCost = weapon != WP_NONE && !BG_InventoryContainsWeapon( weapon, self->client->ps.stats )
+			? BG_Weapon( weapon )->price : 0;
+		bool replacingArmor = false;
 		for ( i = 0; i < numUpgrades; i++ )
 		{
-			if ( !BotBuyUpgrade( self, upgrades[i] ) )
+			if ( !BG_InventoryContainsUpgrade( upgrades[i], self->client->ps.stats ) )
 			{
-				G_BotSetNavMesh( self );
-				return STATUS_FAILURE;
+				conflictingSlots |= BG_Upgrade( upgrades[i] )->slots;
+				purchaseCost += BG_Upgrade( upgrades[i] )->price;
+				replacingArmor |= upgrades[i] == UP_LIGHTARMOUR || upgrades[i] == UP_MEDIUMARMOUR ||
+				                  upgrades[i] == UP_BATTLESUIT;
+			}
+		}
+		if ( purchaseCost > self->client->pers.credit )
+		{
+			return STATUS_FAILURE;
+		}
+		if ( !replacingArmor )
+		{
+			for ( upgrade_t armor : { UP_LIGHTARMOUR, UP_MEDIUMARMOUR, UP_BATTLESUIT } )
+			{
+				if ( BG_InventoryContainsUpgrade( armor, self->client->ps.stats ) &&
+				     ( BG_Upgrade( armor )->slots & conflictingSlots ) )
+				{
+					return STATUS_FAILURE;
+				}
+			}
+		}
+		if ( conflictingSlots )
+		{
+			BotSellUpgrades( self, conflictingSlots );
+		}
+		if ( weapon != WP_NONE && !BG_InventoryContainsWeapon( weapon, self->client->ps.stats ) )
+		{
+			BotSellWeapons( self );
+		}
+
+		// Armor is the prerequisite purchase. Keep other upgrades for after
+		// the weapon so bots never spend on utilities before their core loadout.
+		for ( i = 0; i < numUpgrades; i++ )
+		{
+			if ( upgrades[i] == UP_LIGHTARMOUR || upgrades[i] == UP_MEDIUMARMOUR ||
+			     upgrades[i] == UP_BATTLESUIT )
+			{
+				if ( !BotBuyUpgrade( self, upgrades[i] ) )
+				{
+					G_BotSetNavMesh( self );
+					return STATUS_FAILURE;
+				}
 			}
 		}
 
-		G_BotSetNavMesh( self );
-
+		bool hasCoreWeapon = self->client->ps.stats[ STAT_WEAPON ] != WP_NONE &&
+		                     self->client->ps.stats[ STAT_WEAPON ] != WP_BLASTER;
 		if ( weapon != WP_NONE )
 		{
 			if ( !BotBuyWeapon( self, weapon ) )
 			{
+				G_BotSetNavMesh( self );
 				return STATUS_FAILURE;
 			}
 
@@ -2123,7 +2221,20 @@ AINodeStatus_t BotActionBuy( gentity_t *self, AIGenericNode_t *node )
 			{
 				G_ForceWeaponChange( self, weapon );
 			}
+			hasCoreWeapon = true;
 		}
+
+		for ( i = 0; hasCoreWeapon && i < numUpgrades; i++ )
+		{
+			if ( upgrades[i] != UP_LIGHTARMOUR && upgrades[i] != UP_MEDIUMARMOUR &&
+			     upgrades[i] != UP_BATTLESUIT && !BotBuyUpgrade( self, upgrades[i] ) )
+			{
+				G_BotSetNavMesh( self );
+				return STATUS_FAILURE;
+			}
+		}
+
+		G_BotSetNavMesh( self );
 
 		return STATUS_SUCCESS;
 	}
@@ -2152,7 +2263,26 @@ AINodeStatus_t BotActionBuyPrimary( gentity_t *self, AIGenericNode_t *node )
 		return STATUS_FAILURE;
 	}
 
-	if ( BG_InventoryContainsWeapon( weapon, self->client->ps.stats ) )
+	bool armorOwned = BG_InventoryContainsUpgrade( UP_LIGHTARMOUR, self->client->ps.stats ) ||
+	                  BG_InventoryContainsUpgrade( UP_MEDIUMARMOUR, self->client->ps.stats ) ||
+	                  BG_InventoryContainsUpgrade( UP_BATTLESUIT, self->client->ps.stats );
+	upgrade_t armor = armorOwned ? UP_NONE : BotGetDesiredArmor( self );
+	if ( !armorOwned && armor == UP_NONE )
+	{
+		weapon_t carriedWeapon = static_cast<weapon_t>( self->client->ps.stats[ STAT_WEAPON ] );
+		if ( carriedWeapon == WP_NONE || carriedWeapon == WP_BLASTER ||
+		     ( weapon == WP_MACHINEGUN && carriedWeapon == WP_HBUILD ) )
+		{
+			// The free rifle is the sole exception when armor is unaffordable.
+			weapon = WP_MACHINEGUN;
+		}
+		else
+		{
+			return STATUS_FAILURE;
+		}
+	}
+
+	if ( armorOwned && BG_InventoryContainsWeapon( weapon, self->client->ps.stats ) )
 	{
 		return STATUS_FAILURE;
 	}
@@ -2178,6 +2308,23 @@ AINodeStatus_t BotActionBuyPrimary( gentity_t *self, AIGenericNode_t *node )
 
 	if ( GoalInRange( self, ENTITY_USE_RANGE ) )
 	{
+		if ( !armorOwned && armor != UP_NONE )
+		{
+			// Armor selection uses actual credits and compatible inventory slots.
+			// Keep existing gear until the prerequisite armor purchase succeeds.
+			if ( !BotBuyUpgrade( self, armor ) )
+			{
+				G_BotSetNavMesh( self );
+				return STATUS_FAILURE;
+			}
+		}
+
+		if ( BG_InventoryContainsWeapon( weapon, self->client->ps.stats ) )
+		{
+			G_BotSetNavMesh( self );
+			return STATUS_SUCCESS;
+		}
+
 		BotSellWeapons( self );
 		if ( !BotBuyWeapon( self, weapon ) )
 		{

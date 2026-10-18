@@ -143,7 +143,7 @@ void G_InitSkilltreeCvars()
 {
 	static Cvar::Callback<Cvar::Cvar<std::string>> g_disabledSkillset(
 		"g_bot_skillset_disabledSkills",
-		"Skills that will not be selected randomly for bots, example: " QQ("mantis-attack-jump, prefer-armor"),
+		"Skills that will not be selected randomly for bots, example: " QQ("mantis-attack-jump, medkit"),
 		Cvar::NONE,
 		"",
 		G_SetDisabledSkillset
@@ -151,11 +151,11 @@ void G_InitSkilltreeCvars()
 
 	static Cvar::Callback<Cvar::Cvar<std::string>> g_skillset_baseSkills(
 		"g_bot_skillset_baseSkills",
-		"Preferred skills for bots depending on levels, this is a level:skillName key:value list, example: " QQ("6:mantis-attack-jump, 3:prefer-armor"),
+		"Preferred skills for bots depending on levels, this is a level:skillName key:value list, example: " QQ("6:mantis-attack-jump, 3:medkit"),
 		Cvar::NONE,
-		"1:movement 1:fighting 1:feels-pain 1:buy-modern-armor 1:medkit "
+		"1:movement 1:fighting 1:feels-pain 1:medkit "
 		"3:strafe-attack "
-		"5:aim-barbs 5:mantis-attack-jump 5:small-attack-jump 5:mara-attack-jump 5:goon-attack-jump 5:tyrant-attack-run 5:a-fast-flee 5:h-fast-flee 5:prefer-armor 5:lcannon-tricks 5:aim-head 5:attack-from-behind "
+		"5:aim-barbs 5:mantis-attack-jump 5:small-attack-jump 5:mara-attack-jump 5:goon-attack-jump 5:tyrant-attack-run 5:a-fast-flee 5:h-fast-flee 5:lcannon-tricks 5:aim-head 5:attack-from-behind "
 		"7:predict-aim 7:safe-barbs "
 		, // unused: fast-aim
 		G_SetBaseSkillset
@@ -240,8 +240,6 @@ static const std::vector<botSkillTreeElement_t> skillTree =
 	{ "a-fast-flee",        BOT_A_FAST_FLEE,               7,  TEAM_ALIENS, needs_one_of({BOT_B_PAIN}) },
 
 	// humans
-	{ "buy-modern-armor",   BOT_H_BUY_MODERN_ARMOR,        10, TEAM_HUMANS, needs_one_of({BOT_B_PAIN}) },
-	{ "prefer-armor",       BOT_H_PREFER_ARMOR,            5,  TEAM_HUMANS, needs_one_of({BOT_H_BUY_MODERN_ARMOR}) },
 	{ "h-fast-flee",        BOT_H_FAST_FLEE,               5,  TEAM_HUMANS, needs_one_of({BOT_B_PAIN}) },
 	{ "medkit",             BOT_H_MEDKIT,                  8,  TEAM_HUMANS, needs_one_of({BOT_B_PAIN}) },
 

@@ -96,8 +96,10 @@ float      PercentAmmoRemaining( weapon_t weapon, playerState_t const* ps );
 void       BotFindDamagedFriendlyStructure( gentity_t *self );
 bool       BotBuyWeapon( gentity_t *self, weapon_t weapon );
 bool       BotBuyUpgrade( gentity_t *self, upgrade_t upgrade );
+AINodeStatus_t BotEnsureWeapon( gentity_t *self );
+upgrade_t  BotGetDesiredArmor( gentity_t *self );
 void       BotSellWeapons( gentity_t *self );
-void       BotSellUpgrades( gentity_t *self );
+void       BotSellUpgrades( gentity_t *self, int slots = -1 );
 int        BotGetDesiredBuy( gentity_t *self, weapon_t &weapon, upgrade_t upgrades[], size_t upgradesSize );
 
 // alien bots

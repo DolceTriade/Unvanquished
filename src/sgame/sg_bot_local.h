@@ -188,8 +188,6 @@ enum bot_skill
 	BOT_A_FAST_FLEE,
 	BOT_H_FAST_FLEE,
 	BOT_A_SAFE_BARBS, // don't barb yourself as adv goon
-	BOT_H_BUY_MODERN_ARMOR, // if this is disabled, bot will buy the second-to-last unlocked armor, and will never buy battlesuit
-	BOT_H_PREFER_ARMOR, // prefer to buy armor rather than guns
 	BOT_H_MEDKIT, // knows the medkit even exist
 
 	// fighting skills
@@ -248,6 +246,7 @@ struct botMemory_t
 		int lastThink;
 		int overloadTargetPurchase;
 		int overloadNextPurchaseTime;
+		int weaponRecoveryRetryTime;
 
 		int stuckTime;
 		glm::vec3 stuckPosition;

@@ -53,18 +53,20 @@ AINodeStatus_t BotActionBuyOverloadUpgrades( gentity_t *ent, AIGenericNode_t * )
 
 	if ( level.time < ent->botMind->overloadNextPurchaseTime )
 	{
-		return STATUS_FAILURE;
+		// This action is polled opportunistically. A cooldown means there is
+		// nothing to do this tick, not that the purchase attempt failed.
+		return STATUS_SUCCESS;
 	}
 
 	if ( !G_ActiveMainBuildable( team ) )
 	{
-		return STATUS_FAILURE;
+		return STATUS_SUCCESS;
 	}
 
 	const int spendableCredits = ent->client->pers.credit - BotReserveCredits( team );
 	if ( spendableCredits <= 0 )
 	{
-		return STATUS_FAILURE;
+		return STATUS_SUCCESS;
 	}
 
 	std::string error;
@@ -73,7 +75,7 @@ AINodeStatus_t BotActionBuyOverloadUpgrades( gentity_t *ent, AIGenericNode_t * )
 		if ( error == "no eligible overload purchase found" )
 		{
 			ent->botMind->overloadNextPurchaseTime = level.time + OVERLOAD_BOT_PURCHASE_COOLDOWN;
-			return STATUS_FAILURE;
+			return STATUS_SUCCESS;
 		}
 
 		Log::Warn( "%s: Bot failed autodonate: %s", ent->client->pers.netname, error.c_str() );

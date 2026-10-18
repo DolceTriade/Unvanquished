@@ -521,18 +521,27 @@ local function choose_pve_buildable(team_name, team_snapshot)
     return nil
 end
 
-local function builder_needed(team_name, number, team_snapshot, level, selected_buildable)
+local function builder_needed(team_name, number, team_snapshot, level, selected_buildable, already_assigned)
     if not team_snapshot or not level or not selected_buildable then
         return false
     end
 
     local chosen_cost = cache.buildable_cost(selected_buildable)
     local usable_build_points = cache.usable_build_points(team_name)
+    -- Use separate enter/exit thresholds so the builder role does not flap
+    -- while build points move around the assignment boundary.
+    if already_assigned then
+        if usable_build_points < 10 then
+            return false
+        end
+    elseif usable_build_points <= 30 then
+        return false
+    end
     local build_enabled = is_alien(team_name) and cache.cvar("g_bot_buildAliens") ~= "0"
         or is_human(team_name) and cache.cvar("g_bot_buildHumans") ~= "0"
 
     return build_enabled
-        and usable_build_points >= chosen_cost
+        and (already_assigned or usable_build_points >= chosen_cost)
         and builder_count(team_name, team_snapshot, number) < PVE_MAX_BUILDERS
 end
 
@@ -547,7 +556,7 @@ end
 
 local function wants_builder(team_name, number, team_snapshot, level, builder, selected_buildable)
     if has_builder_assignment(number) then
-        if builder_needed(team_name, number, team_snapshot, level, selected_buildable) then
+        if builder_needed(team_name, number, team_snapshot, level, selected_buildable, true) then
             return true
         end
 
@@ -555,7 +564,7 @@ local function wants_builder(team_name, number, team_snapshot, level, builder, s
         return false
     end
 
-    if not builder_needed(team_name, number, team_snapshot, level, selected_buildable) then
+    if not builder_needed(team_name, number, team_snapshot, level, selected_buildable, false) then
         return false
     end
 
@@ -569,7 +578,7 @@ end
 
 local function wants_builder_spawn(team_name, number, team_snapshot, level, selected_buildable)
     if has_builder_assignment(number) then
-        if builder_needed(team_name, number, team_snapshot, level, selected_buildable) then
+        if builder_needed(team_name, number, team_snapshot, level, selected_buildable, true) then
             return true
         end
 
@@ -577,7 +586,7 @@ local function wants_builder_spawn(team_name, number, team_snapshot, level, sele
         return false
     end
 
-    if not builder_needed(team_name, number, team_snapshot, level, selected_buildable) then
+    if not builder_needed(team_name, number, team_snapshot, level, selected_buildable, false) then
         return false
     end
 
@@ -747,6 +756,9 @@ local function maybe_retire_builder(team, number, client, builder, wants_build, 
     if is_human(team) then
         if human_repair_target(mind) then
             return STATUS_FAILURE
+        end
+        if client.weapon == "ckit" and cache.usable_build_points(team) < 10 then
+            return ctx:buyPrimary("rifle")
         end
         return common.equip_and_buy_overload(ctx)
     end
@@ -1233,7 +1245,7 @@ local function run_roam_task(task, state, ctx)
             return status
         end
 
-        if state.builder then
+        if state.builder and state.wants_build then
             status = maybe_build(state.builder, state.selected_buildable, state.level, state.mind, state.number, ctx)
             if status ~= STATUS_FAILURE then
                 return status
@@ -1274,7 +1286,7 @@ local function run_roam_task(task, state, ctx)
         return status
     end
 
-    if state.builder then
+    if state.builder and state.wants_build then
         status = maybe_build(state.builder, state.selected_buildable, state.level, state.mind, state.number, ctx)
         if status ~= STATUS_FAILURE then
             return status
