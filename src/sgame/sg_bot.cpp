@@ -617,8 +617,12 @@ void G_BotThink( gentity_t *self )
 	}
 
 	self->botMind->willSprint( false ); //let the BT decide that
-	AINodeStatus_t status =
-		self->botMind->behaviorTree->run( self, ( AIGenericNode_t * ) self->botMind->behaviorTree );
+	// Keep every bot behavior from leaving an unarmed human without a rifle.
+	AINodeStatus_t status = BotEnsureWeapon( self );
+	if ( status == STATUS_SUCCESS )
+	{
+		status = self->botMind->behaviorTree->run( self, ( AIGenericNode_t * ) self->botMind->behaviorTree );
+	}
 
 	self->botMind->lastThink = level.time;
 
@@ -961,6 +965,7 @@ void G_Bot_ResetBehaviorState( botMemory_t &memory )
 	memory.clearNav();
 	memory.overloadTargetPurchase = -1;
 	memory.overloadNextPurchaseTime = 0;
+	memory.weaponRecoveryRetryTime = 0;
 	memory.lastNavconTime = 0;
 	memory.lastNavconDistance = 0;
 	memory.navigationDevolveAttempted = false;

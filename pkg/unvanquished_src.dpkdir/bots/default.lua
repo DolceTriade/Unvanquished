@@ -25,6 +25,7 @@ local STATE = {
     alien_target_lock = {},
     alien_combat_until = {},
     alien_builder_owner = nil,
+    builder_bp_enabled = {},
     tasks = {},
 }
 
@@ -368,7 +369,7 @@ local function has_human_builder(team_snapshot, exclude_entity_num)
     return false
 end
 
-local function builder_needed(team_name, number, team_snapshot, level)
+local function builder_needed(team_name, number, team_snapshot, level, already_builder)
     if not team_snapshot or not level then
         return false
     end
@@ -376,12 +377,31 @@ local function builder_needed(team_name, number, team_snapshot, level)
     local level_time = sgame.level.match_time
     local chosen_cost = cache.chosen_buildable_cost(team_name)
     local usable_build_points = cache.usable_build_points(team_name)
+    local team_key = is_alien(team_name) and "aliens" or "humans"
+    if usable_build_points < 10 then
+        STATE.builder_bp_enabled[team_key] = false
+    elseif usable_build_points > 30 then
+        STATE.builder_bp_enabled[team_key] = true
+    end
+    -- Retirement can take time. Equipment/class must not reactivate a
+    -- retired builder while the team is still waiting to recover BP.
+    if not STATE.builder_bp_enabled[team_key] then
+        return false
+    end
+    -- Keep an active builder through the low-BP range, but only assign a new
+    -- builder after the team has recovered above 30 BP.
+    local bp_threshold = already_builder and 10 or 30
+    if already_builder and usable_build_points < bp_threshold then
+        return false
+    elseif not already_builder and usable_build_points <= bp_threshold then
+        return false
+    end
 
     if is_alien(team_name) then
         return level_time >= 60000
             and level.num_players == 0
             and cache.cvar("g_bot_buildAliens") ~= "0"
-            and usable_build_points >= chosen_cost
+            and (already_builder or usable_build_points >= chosen_cost)
             and not cache.has_teammate_weapon(team_name, "abuild", number)
             and not cache.has_teammate_weapon(team_name, "abuildupg", number)
     end
@@ -390,7 +410,7 @@ local function builder_needed(team_name, number, team_snapshot, level)
         return level_time >= 60000
             and level.num_players == 0
             and cache.cvar("g_bot_buildHumans") ~= "0"
-            and usable_build_points >= chosen_cost
+            and (already_builder or usable_build_points >= chosen_cost)
             and not has_human_builder(team_snapshot, number)
             and not cache.has_teammate_weapon(team_name, "ckit", number)
     end
@@ -408,7 +428,7 @@ local function can_convert_to_builder_now(team, client, level)
 end
 
 local function wants_builder(team_name, number, team_snapshot, level, builder)
-    local wanted = builder_needed(team_name, number, team_snapshot, level)
+    local wanted = builder_needed(team_name, number, team_snapshot, level, builder)
     if not wanted then
         if is_alien(team_name) and not builder then
             clear_alien_builder_owner(number)
@@ -441,7 +461,7 @@ local function wants_builder(team_name, number, team_snapshot, level, builder)
 end
 
 local function wants_builder_spawn(team_name, number, team_snapshot, level)
-    local wanted = builder_needed(team_name, number, team_snapshot, level)
+    local wanted = builder_needed(team_name, number, team_snapshot, level, false)
     if not wanted then
         if is_alien(team_name) then
             clear_alien_builder_owner(number)
@@ -536,8 +556,8 @@ local function can_become_builder(team, client, level)
     return cache.cvar("g_bot_ckit") ~= "0"
 end
 
-local function maybe_build(builder, ctx)
-    if not builder then
+local function maybe_build(builder, team, ctx)
+    if not builder or cache.usable_build_points(team) < cache.chosen_buildable_cost(team) then
         return STATUS_FAILURE
     end
 
@@ -559,6 +579,9 @@ local function maybe_retire_builder(team, number, client, builder, wants_build, 
     if is_human(team) then
         if human_repair_target(mind) then
             return STATUS_FAILURE
+        end
+        if client.weapon == "ckit" and cache.usable_build_points(team) < 10 then
+            return ctx:buyPrimary("rifle")
         end
         return common.equip_and_buy_overload(ctx)
     end
@@ -597,7 +620,7 @@ local function maybe_builder_behavior(team, number, client, builder, wants_build
     end
 
     if anchor_distance == nil or anchor_distance > BUILDER_ANCHOR_RADIUS then
-        status = maybe_build(builder, ctx)
+        status = maybe_build(builder, team, ctx)
         if status ~= STATUS_FAILURE then
             return status
         end
@@ -613,7 +636,7 @@ local function maybe_builder_behavior(team, number, client, builder, wants_build
     end
 
     if builder then
-        status = maybe_build(builder, ctx)
+        status = maybe_build(builder, team, ctx)
         if status ~= STATUS_FAILURE then
             return status
         end
@@ -950,7 +973,11 @@ local function run_roam_task(task, state, ctx)
             return status
         end
 
-        status = maybe_build(state.builder, ctx)
+        if state.wants_build then
+            status = maybe_build(state.builder, state.team, ctx)
+        else
+            status = STATUS_FAILURE
+        end
         if status ~= STATUS_FAILURE then
             return status
         end
@@ -989,7 +1016,7 @@ local function run_roam_task(task, state, ctx)
         return status
     end
 
-    status = maybe_build(state.builder, ctx)
+    status = maybe_build(state.wants_build and state.builder, state.team, ctx)
     if status ~= STATUS_FAILURE then
         return status
     end

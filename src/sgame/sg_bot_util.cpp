@@ -634,26 +634,6 @@ AINodeStatus_t BotActionEvolve( gentity_t *self, AIGenericNode_t* )
 	return STATUS_FAILURE;
 }
 
-static bool BotSkillArmorIsDesirable( const gentity_t *self, upgrade_t armor )
-{
-	if ( self->botMind->skillSet[BOT_H_BUY_MODERN_ARMOR] ) {
-		return true;
-	}
-
-	// let's pretend that we have one less armor rank unlocked:
-	switch ( armor )
-	{
-	case UP_LIGHTARMOUR:
-		return BG_UpgradeUnlocked( UP_MEDIUMARMOUR );
-	case UP_MEDIUMARMOUR:
-		return BG_UpgradeUnlocked( UP_BATTLESUIT );
-	case UP_BATTLESUIT:
-		return false;
-	default:
-		ASSERT_UNREACHABLE();
-	}
-}
-
 // Allow human bots to decide what to buy
 // pre-condition:
 // * weapon is a valid pointer
@@ -663,22 +643,46 @@ static bool BotSkillArmorIsDesirable( const gentity_t *self, upgrade_t armor )
 // * "weapon" contains weapon to use
 // * Returns number of upgrades to buy (does not includes weapons)
 //
-// will favor better armor above everything else. If it is possible
-// to buy an armor, then evaluate other team-utilies and finally choose
-// the most expensive gun possible.
-// TODO: allow bots to buy jetpack, despite the fact they can't use them
-//  (yet): since default cVar prevent bots to buy those, that will be one
-//  less thing to change later and would have no impact.
+// Select armor first, a weapon second, and at most one optional upgrade after.
+upgrade_t BotGetDesiredArmor( gentity_t *self )
+{
+	for ( const auto &armor : armors )
+	{
+		if ( BG_InventoryContainsUpgrade( armor.item, self->client->ps.stats ) )
+		{
+			return armor.item;
+		}
+	}
+
+	int usableCapital = self->client->pers.credit;
+	std::array<const equipment_t<upgrade_t>*, ARRAY_LEN( armors )> candidates;
+	size_t count = 0;
+	for ( const auto &armor : armors )
+	{
+		if ( armor.canBuyNow() && usableCapital >= armor.price() &&
+		     !( BG_SlotsForInventory( self->client->ps.stats ) & armor.slots() ) )
+		{
+			candidates[count++] = &armor;
+		}
+	}
+
+	if ( !count )
+	{
+		return UP_NONE;
+	}
+
+	return candidates[static_cast<size_t>( BG_random() * count ) % count]->item;
+}
+
 int BotGetDesiredBuy( gentity_t *self, weapon_t &weapon, upgrade_t upgrades[], size_t upgradesSize )
 {
 	ASSERT( self && upgrades );
 	ASSERT( self->client->pers.team == TEAM_HUMANS ); // only humans can buy
-	ASSERT( upgradesSize >= 2 ); // we access to 2 elements maximum, and don't really check boundaries (would result in a nerf)
-	int equipmentPrice = BG_GetPlayerPrice( self->client->ps );
-	int credits = self->client->ps.persistant[PERS_CREDIT];
-	int usableCapital = credits + equipmentPrice;
+	ASSERT( upgradesSize >= 2 ); // armor plus one optional upgrade
+	// Existing gear is retained, so only actual credits fund new purchases.
+	int usableCapital = self->client->pers.credit;
 	size_t numUpgrades = 0;
-	int usedSlots = 0;
+	int usedSlots = BG_SlotsForInventory( self->client->ps.stats );
 	bool armorSelected = false;
 
 	unsigned int numTeamUpgrades[UP_NUM_UPGRADES] = {};
@@ -691,26 +695,20 @@ int BotGetDesiredBuy( gentity_t *self, weapon_t &weapon, upgrade_t upgrades[], s
 		upgrades[i] = UP_NONE;
 	}
 
-	auto buyArmors = [&]()
+	auto buyArmor = [&]()
 	{
-	for ( auto const &armor : armors )
-	{
-		// buy armor if one of following is true:
-		// * already worn (assumed that armors are sorted by preference)
-		// * better (more expensive), authorized, and have the slots
-		if ( BG_InventoryContainsUpgrade( armor.item, self->client->ps.stats ) ||
-				( armor.canBuyNow()
-				&& BotSkillArmorIsDesirable( self, armor.item )
-				&& usableCapital >= armor.price()
-				&& ( usedSlots & armor.slots() ) == 0 ) )
+		upgrade_t armorItem = BotGetDesiredArmor( self );
+		if ( armorItem != UP_NONE )
 		{
-			upgrades[numUpgrades] = armor.item;
-			usableCapital -= armor.price();
+			const auto &armor = *std::find( std::begin( armors ), std::end( armors ), armorItem );
+			upgrades[numUpgrades++] = armorItem;
+			if ( !BG_InventoryContainsUpgrade( armorItem, self->client->ps.stats ) )
+			{
+				usableCapital -= armor.price();
+			}
 			usedSlots |= armor.slots();
-			numUpgrades++;
-			break;
+			armorSelected = true;
 		}
-	}
 	};
 
 	//TODO this really needs more generic code, but that would require
@@ -720,112 +718,115 @@ int BotGetDesiredBuy( gentity_t *self, weapon_t &weapon, upgrade_t upgrades[], s
 	int nbRadars = numTeamUpgrades[UP_RADAR];
 	bool teamNeedsRadar = 100 *  nbRadars / nbTeam < g_bot_radarRatio.Get();
 
-	auto buyRadar = [&]()
-	{
-	// others[0] is radar, buying this utility makes sense even if one can't buy
-	// a better weapon, because it helps the whole team.
-	if ( numUpgrades > 0 && teamNeedsRadar
-			&& others[0].canBuyNow() && usableCapital >= others[0].price()
-			&& ( usedSlots & others[0].slots() ) == 0
-			&& numUpgrades < upgradesSize )
-	{
-		upgrades[numUpgrades] = others[0].item;
-		usableCapital -= others[0].price();
-		usedSlots |= others[0].slots();
-		numUpgrades ++;
-	}
-	else if ( numUpgrades > 0
-			  && others[1].canBuyNow() && usableCapital >= others[1].price()
-			  && ( usedSlots & others[1].slots() ) == 0
-			  && numUpgrades < upgradesSize
-			  && usableCapital >= 600 )
-	{
-		upgrades[numUpgrades] = others[1].item;
-		usableCapital -= others[1].price();
-		usedSlots |= others[1].slots();
-		numUpgrades ++;
-	}
-	};
-
 	auto buyWeapons = [&]()
 	{
-	for ( auto const &wp : weapons )
-	{
-		if ( wp.canBuyNow() && usableCapital >= wp.price()
-				&& ( usedSlots & wp.slots() ) == 0 )
+		// Retain purchased weapons, but allow the spawn/fallback rifle to be
+		// replaced with a varied affordable weapon once armor is available.
+		for ( auto const &wp : weapons )
 		{
-			if ( wp.item == WP_FLAMER && numTeamWeapons[WP_FLAMER] > numTeamWeapons[WP_PULSE_RIFLE] )
+			if ( wp.item != WP_MACHINEGUN && BG_InventoryContainsWeapon( wp.item, self->client->ps.stats ) )
 			{
-				continue;
+				weapon = wp.item;
+				return;
 			}
+		}
+
+		std::array<const equipment_t<weapon_t>*, ARRAY_LEN( weapons )> candidates;
+		size_t count = 0;
+		weapon_t currentWeapon = static_cast<weapon_t>( self->client->ps.stats[ STAT_WEAPON ] );
+		int availableSlots = usedSlots & ~BG_Weapon( currentWeapon )->slots;
+		for ( auto const &wp : weapons )
+		{
+			// Builder equipment is selected by the role behavior.
+			if ( wp.item != WP_MACHINEGUN && wp.item != WP_HBUILD &&
+			     wp.canBuyNow() && usableCapital >= wp.price()
+					&& ( availableSlots & wp.slots() ) == 0 )
+			{
+				if ( wp.item == WP_FLAMER && numTeamWeapons[WP_FLAMER] > numTeamWeapons[WP_PULSE_RIFLE] )
+				{
+					continue;
+				}
+				candidates[count++] = &wp;
+			}
+		}
+		if ( count )
+		{
+			const auto &wp = *candidates[static_cast<size_t>( BG_random() * count ) % count];
 			weapon = wp.item;
 			usableCapital -= wp.price();
-			break;
+			usedSlots = availableSlots | wp.slots();
 		}
-	}
+		else if ( currentWeapon == WP_MACHINEGUN )
+		{
+			weapon = currentWeapon;
+		}
 	};
 
 	auto buyRifle = [&]()
 	{
-	for ( auto const &wp : weapons )
-	{
-		if ( wp.item == WP_MACHINEGUN && wp.canBuyNow() && usableCapital >= wp.price()
-				&& ( usedSlots & wp.slots() ) == 0 )
+		for ( auto const &wp : weapons )
 		{
-			weapon = wp.item;
-			usableCapital -= wp.price();
-			break;
+			if ( wp.item == WP_MACHINEGUN && wp.canBuyNow() && usableCapital >= wp.price()
+					&& ( usedSlots & wp.slots() ) == 0 )
+			{
+				weapon = wp.item;
+				usableCapital -= wp.price();
+				usedSlots |= wp.slots();
+				break;
+			}
 		}
-	}
 	};
 
-	auto buyTools = [&]()
+	auto buyOptionalUpgrade = [&]()
 	{
-	for ( auto const &tool : others )
-	{
-		// skip radar checks, since already done
-		if ( tool.item == others[0].item )
+		std::array<const equipment_t<upgrade_t>*, ARRAY_LEN( others )> candidates;
+		size_t count = 0;
+		for ( const auto &tool : others )
 		{
-			continue;
+			bool alreadyOwned = BG_InventoryContainsUpgrade( tool.item, self->client->ps.stats );
+			if ( tool.item == UP_RADAR && !teamNeedsRadar && !alreadyOwned )
+			{
+				continue;
+			}
+			if ( tool.item == UP_JETPACK && usableCapital < 600 && !alreadyOwned )
+			{
+				continue;
+			}
+			if ( !alreadyOwned && tool.canBuyNow()
+					&& usableCapital >= tool.price() && ( usedSlots & tool.slots() ) == 0 )
+			{
+				candidates[count++] = &tool;
+			}
 		}
-		if ( tool.canBuyNow() && usableCapital >= tool.price()
-				&& ( usedSlots & tool.slots() ) == 0
-				&& numUpgrades < upgradesSize )
+		if ( count && numUpgrades < upgradesSize )
 		{
-			upgrades[numUpgrades] = tool.item;
+			const auto &tool = *candidates[static_cast<size_t>( BG_random() * count ) % count];
+			upgrades[numUpgrades++] = tool.item;
 			usableCapital -= tool.price();
 			usedSlots |= tool.slots();
-			numUpgrades ++;
 		}
-	}
 	};
 
-	if ( self->botMind->skillSet[BOT_H_PREFER_ARMOR] )
+	buyArmor();
+	const bool onlyBlaster = self->client->ps.stats[ STAT_WEAPON ] == WP_NONE ||
+	                         self->client->ps.stats[ STAT_WEAPON ] == WP_BLASTER;
+	if ( !armorSelected )
 	{
-		// buy armor before anything else
-		buyArmors();
-		// Armor is a prerequisite for the armor-preferring loadout.  Do not
-		// spend the available credits on a weapon when no armor was affordable.
-		if ( armorSelected )
+		if ( onlyBlaster )
 		{
-			buyWeapons();
-		}
-		else
-		{
-			// Always maintain a usable fallback weapon when armor is not yet
-			// affordable; otherwise the buy action can leave the bot weaponless.
 			buyRifle();
 		}
-		buyTools();
-		buyRadar();
+		return 0;
 	}
-	else
+
+	buyWeapons();
+	if ( weapon == WP_NONE )
 	{
-		buyWeapons();
-		// armor isn't the highest priority in this case
-		buyArmors();
-		buyTools();
-		buyRadar();
+		buyRifle();
+	}
+	if ( weapon != WP_NONE )
+	{
+		buyOptionalUpgrade();
 	}
 
 	return numUpgrades;
@@ -2932,6 +2933,77 @@ bool BotEvolveToClass( gentity_t *ent, class_t newClass )
 	return false;
 }
 
+AINodeStatus_t BotEnsureWeapon( gentity_t *self )
+{
+	if ( !self || !self->client || !self->botMind || !Entities::IsAlive( self ) ||
+	     G_Team( self ) != TEAM_HUMANS )
+	{
+		return STATUS_SUCCESS;
+	}
+
+	AIGenericNode_t *node = reinterpret_cast<AIGenericNode_t *>( self->botMind->behaviorTree );
+	weapon_t carriedWeapon = static_cast<weapon_t>( self->client->ps.stats[ STAT_WEAPON ] );
+	if ( carriedWeapon != WP_NONE && carriedWeapon != WP_BLASTER )
+	{
+		self->botMind->weaponRecoveryRetryTime = 0;
+		// The construction kit counts as a weapon for this safety check.
+		if ( self->botMind->currentNode == node )
+		{
+			self->botMind->currentNode = nullptr;
+		}
+		return STATUS_SUCCESS;
+	}
+
+	if ( !g_bot_buy.Get() || level.time < self->botMind->weaponRecoveryRetryTime )
+	{
+		return STATUS_SUCCESS;
+	}
+
+	const gentity_t *armoury = self->botMind->closestBuildings[ BA_H_ARMOURY ].goal.getTargetedEntity();
+	if ( !armoury || !armoury->powered )
+	{
+		if ( self->botMind->currentNode == node )
+		{
+			self->botMind->currentNode = nullptr;
+		}
+		return STATUS_SUCCESS;
+	}
+
+	if ( self->botMind->currentNode != node || !self->botMind->goal.targetsValidEntity() ||
+	     self->botMind->goal.getTargetedEntity() != armoury )
+	{
+		if ( !BotChangeGoalEntity( self, armoury ) )
+		{
+			self->botMind->currentNode = nullptr;
+			self->botMind->weaponRecoveryRetryTime = level.time + 2000;
+			return STATUS_SUCCESS;
+		}
+		self->botMind->currentNode = node;
+	}
+
+	if ( GoalInRange( self, ENTITY_USE_RANGE ) )
+	{
+		if ( BotBuyWeapon( self, WP_MACHINEGUN ) )
+		{
+			G_BotSetNavMesh( self );
+			self->botMind->currentNode = nullptr;
+			return STATUS_SUCCESS;
+		}
+		self->botMind->currentNode = nullptr;
+		self->botMind->weaponRecoveryRetryTime = level.time + 2000;
+		return STATUS_SUCCESS;
+	}
+
+	if ( !BotMoveToGoal( self ) )
+	{
+		// Let the behavior tree run its recovery actions before trying again.
+		self->botMind->currentNode = nullptr;
+		self->botMind->weaponRecoveryRetryTime = level.time + 2000;
+		return STATUS_SUCCESS;
+	}
+	return STATUS_RUNNING;
+}
+
 //Cmd_Buy_f ripoff, weapon version
 bool BotBuyWeapon( gentity_t *self, weapon_t weapon )
 {
@@ -3128,7 +3200,7 @@ void BotSellWeapons( gentity_t *self )
 		}
 	}
 }
-void BotSellUpgrades( gentity_t *self )
+void BotSellUpgrades( gentity_t *self, int slots )
 {
 	int i;
 
@@ -3143,7 +3215,8 @@ void BotSellUpgrades( gentity_t *self )
 	{
 		//remove upgrade if carried
 		if ( BG_InventoryContainsUpgrade( i, self->client->ps.stats ) &&
-			BG_Upgrade( ( upgrade_t )i )->purchasable )
+			BG_Upgrade( ( upgrade_t )i )->purchasable &&
+			( slots == -1 || ( BG_Upgrade( ( upgrade_t )i )->slots & slots ) ) )
 		{
 
 			if ( i == UP_LIGHTARMOUR || i == UP_MEDIUMARMOUR || i == UP_BATTLESUIT )
