@@ -33,7 +33,6 @@ Maryland 20850 USA.
 */
 
 #include "common/Common.h"
-#include "common/FileSystem.h"
 #include "common/cm/cm_public.h"
 #include "cg_local.h"
 #include "cg_key_name.h"
@@ -1970,12 +1969,8 @@ public:
 		if ( mapIndex_ != rocketInfo.data.mapIndex )
 		{
 			mapIndex_ = rocketInfo.data.mapIndex;
-			std::error_code ignored;
 			const std::string& mapName = rocketInfo.data.mapList[ mapIndex_ ].mapLoadName;
-			const FS::PakInfo &pak = *FS::FindPak( "map-" + mapName );
-			FS::PakPath::LoadPakPrefix( pak, Str::Format( "meta/%s/", mapName ), ignored );
-			// Unfortunately this spams the console with a 2nd "Loading pak" message
-			FS::PakPath::LoadPakPrefix( pak, "levelshots/", ignored );
+			Rocket_LoadMapLevelshotPak( mapName );
 			SetInnerRML( Str::Format( "<img class='levelshot' src='/$levelshot/%s' />", mapName ) );
 		}
 	}

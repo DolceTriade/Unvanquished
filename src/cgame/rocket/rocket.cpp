@@ -35,6 +35,7 @@ Maryland 20850 USA.
 // The basic interfaces for libRocket
 
 #include "common/Common.h"
+#include "common/FileSystem.h"
 #include "rocket.h"
 #include <RmlUi/Core.h>
 #include <RmlUi/Lua/Lua.h>
@@ -65,6 +66,28 @@ Maryland 20850 USA.
 #include "shared/bg_lua.h"
 #include "shared/lua/Json.h"
 #include "cgame/rocket/lua/DataRequest.h"
+
+#include <set>
+
+void Rocket_LoadMapLevelshotPak( Str::StringRef mapName )
+{
+	static std::set<std::string> loadedMaps;
+	std::string name = mapName.str();
+	if ( name.empty() || name.find_first_not_of( "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-" ) != std::string::npos )
+	{
+		return;
+	}
+	if ( loadedMaps.count( name ) ) return;
+
+	const FS::PakInfo* pak = FS::FindPak( "map-" + name );
+	if ( !pak ) return;
+
+	std::error_code ignored;
+	FS::PakPath::LoadPakPrefix( *pak, Str::Format( "meta/%s/", name ), ignored );
+	ignored.clear();
+	FS::PakPath::LoadPakPrefix( *pak, "levelshots/", ignored );
+	loadedMaps.emplace( std::move( name ) );
+}
 
 class DaemonFileInterface : public Rml::FileInterface
 {
@@ -310,6 +333,7 @@ private:
 		else if ( Str::IsPrefix( "$levelshot/", source ) )
 		{
 			const char *map = source.c_str() + 11;
+			Rocket_LoadMapLevelshotPak( map );
 			qhandle_t h = trap_R_RegisterShader(
 				Str::Format( "meta/%s/%s", map, map ).c_str(), flags );
 
