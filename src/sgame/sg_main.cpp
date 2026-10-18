@@ -34,6 +34,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "botlib/bot_api.h"
 #include "common/FileSystem.h"
 #include "lua/Interpreter.h"
+#include "lua/DataRequest.h"
 #include "lua/Hooks.h"
 #include "lua/Workflow.h"
 #include "shared/bg_attributes.h"
@@ -2307,6 +2308,7 @@ void G_RunFrame( int levelTime )
 	level.previousTime = level.time;
 	level.time = levelTime;
 	level.matchTime = levelTime - level.startTime;
+	Lua::UpdateDataRequestStreams();
 
 	msec = level.time - level.previousTime;
 

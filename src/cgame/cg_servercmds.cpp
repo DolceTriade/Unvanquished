@@ -1606,6 +1606,11 @@ static void CG_ServerCommand()
 		CG_Rocket_HandleDataReply();
 		return;
 	}
+	if ( !Q_stricmp( cmd, "lua_data_chunk" ) )
+	{
+		CG_Rocket_HandleDataChunk();
+		return;
+	}
 
 	if ( !cmd[ 0 ] )
 	{

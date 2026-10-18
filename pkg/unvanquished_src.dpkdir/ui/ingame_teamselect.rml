@@ -55,6 +55,9 @@
 		<!-- High z-index, so we are placed 'ontop' of the drag-handle at the top of the window -->
 		<translate>Auto-select a team</translate>
 	</button>
+	<button class="wide" onclick='Events.pushcmd("hide ingame_teamselect; show welcome")'>
+		<translate>Change Game mode</translate>
+	</button>
 
 	<p><translate>Aliens are highly mobile and possess a wide variety of movement-based attacks. They are sturdy, but must rely on stealth and evasion.</translate></p>
 	<p><translate>Humans can equip themselves with an assortment of weapons and equipment. They are flexible and lethal at a distance, but fragile.</translate></p>

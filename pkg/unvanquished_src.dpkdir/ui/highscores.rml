@@ -1,0 +1,37 @@
+<rml>
+	<head>
+		<link type="text/rcss" href="/ui/shared/basics.rcss" />
+		<link type="text/template" href="/ui/shared/window.rml" />
+		<style>
+			body#highscores { width: 56em; margin: 5% auto auto auto; }
+			#highscores window { max-height: 90%; }
+			#highscoreMapList select { width: 34em; }
+			#mapSearchProgress { width: 34em; height: .45em; margin: .4em 0; overflow: hidden; background-color: #333; }
+			#mapSearchProgressBar { position: relative; left: -30%; width: 30%; height: 100%; background-color: #1ab0b5; animation: 1.2s linear infinite map-search-indeterminate; }
+			@keyframes map-search-indeterminate {
+				from { left: -30%; }
+				to { left: 100%; }
+			}
+			#highscoreLevelshot { width: 100%; height: 24em; margin-top: 1em; }
+			#highscoreLevelshot img { width: 100%; height: 100%; }
+			#highscoreResults { max-height: 22em; overflow-y: auto; }
+			.scoreCategory { color: #80d8d8; margin-top: .8em; }
+			.scoreEntry { margin-left: 1em; }
+		</style>
+		<script src="lua/game_menus.lua" />
+	</head>
+	<body id="highscores" template="window" onshow="GameMenus.SearchMaps(document, '')">
+		<h1><translate>High Scores</translate></h1>
+		<row id="highscoreMapList">
+			<input id="mapSearch" type="text" class="text" maxlength="64" />
+			<button onclick="GameMenus.SearchMaps(document)"><translate>Search maps</translate></button>
+			<select id="mapResults" onchange="GameMenus.SelectMap(document)">
+				<option value=""><translate>Search for a map</translate></option>
+			</select>
+		</row>
+		<div id="mapSearchProgress" style="display:none"><div id="mapSearchProgressBar"></div></div>
+		<div id="highscoreLevelshot"></div>
+		<div id="highscoreResults"><translate>Select a map to see its high scores.</translate></div>
+		<button id="moreMaps" style="display:none" onclick="GameMenus.MoreMaps(document)"><translate>More maps</translate></button>
+	</body>
+</rml>

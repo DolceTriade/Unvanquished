@@ -41,6 +41,8 @@ namespace Lua
 // Lua API: sgame.RegisterDataEndpoint(name, function(requestingEntity, params) ... end)
 int RegisterDataEndpoint( lua_State *L );
 bool HandleDataRequest( int clientNum );
+bool HandleDataRequestAck( int clientNum );
+void UpdateDataRequestStreams();
 void ClearDataEndpoints();
 }  // namespace Lua
 
