@@ -77,6 +77,7 @@ std::string CG_EscapeHTMLText( Str::StringRef text );
 
 Rml::String Rocket_QuakeToRML( Str::StringRef in, bool emoticons = true );
 std::string CG_KeyBinding( const char *bind, int team );
+void Rocket_LoadMapLevelshotPak( Str::StringRef mapName );
 
 void Rocket_AddEvent( RocketEvent_t *event );
 void Rocket_SetDocumentScale( Rml::ElementDocument& document );
