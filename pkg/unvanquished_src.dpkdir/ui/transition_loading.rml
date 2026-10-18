@@ -100,6 +100,14 @@
 				text-align: center;
 			}
 
+			.loading-logo {
+				position: absolute;
+				right: 1em;
+				bottom: 1em;
+				width: 20em;
+				height: 10em;
+			}
+
 			changelog {
 				display: block;
 				position: absolute;
@@ -146,6 +154,8 @@
 			<div class="servername"><hostname/></div>
 			<div class="servermotd"><motd/></div>
 		</infobox>
+
+		<img class="loading-logo" src="/ui/assets/logos/overload_mod_loading" />
 
 		<barbox>
 			<progresselement src="overall" targetAttribute="value">
