@@ -65,6 +65,7 @@
 		ui/callvote_draw.rml
 		ui/callvote_map.rml
 		ui/callvote_fillbots.rml
+		ui/highscores.rml
 
 	}
 	cursor ui/assets/cursor

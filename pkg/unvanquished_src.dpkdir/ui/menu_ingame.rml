@@ -33,6 +33,7 @@
 						<br/>
 						<button-menu style="width:87%" onclick='Events.pushcmd("show spawn_location")'><translate>Spawn locations</translate></button-menu>
 						<button-menu style="width:87%" onclick='Events.pushcmd("show options_democracy")'><translate>Democracy</translate></button-menu>
+						<button-menu style="width:87%" onclick='Events.pushcmd("show highscores")'><translate>High scores</translate></button-menu>
 					</indent>
 
 					<if cvar="sv_running" condition="==" value="1">

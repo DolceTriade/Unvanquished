@@ -1,65 +1,48 @@
-﻿<rml>
+<rml>
 	<head>
+		<link type="text/rcss" href="/ui/shared/basics.rcss" />
 		<link type="text/template" href="/ui/shared/window.rml" />
 		<style>
-		panel {
-			width: 65%;
-			padding: 0.5em;
-		}
+			body#welcome { position: absolute; top: 0; right: 0; width: 30em; height: 100%; margin: 0; }
+			body#welcome window { width: 100%; height: 100%; box-sizing: border-box; }
+			#welcomeScores, #welcomeError { max-height: 18em; overflow-y: auto; }
+			#welcomeError { color: #ff7777; }
+			#welcomeVote { margin-top: 1em; padding-top: 1em; border-top: .1em #666; }
+			#welcomeLevelshot { width: 100%; height: 12em; }
+			#welcomeLevelshot img { width: 100%; height: 100%; }
+			#welcome select { width: 100%; margin-bottom: .5em; }
+			#welcome label { display: block; margin-top: .35em; }
 		</style>
+		<script src="lua/game_menus.lua" />
 	</head>
-	<body template="window" id="welcome" style="width:45em; margin: 1em;">
-		<h1><translate>Welcome to Unvanquished</translate></h1>
-		<tabset>
-			<tab>
-				<img class="emoticon" src="/emoticons/official" />
-				<translate>Welcome</translate>
-			</tab>
-			<panel>
-				<translate>Welcome to Unvanquished</translate>
-				<br />
-				<br />
-				<translate>Close this menu and click anywhere to join a team and begin playing!</translate>
-				Look at the side bar for more information about the gamemodes.
-				Use /callvote juggernaut or /callvote towerdefense to start any of those modes.
-				Of course, /callvote alienpve and /callvote humanpve work too!
-
-				<include src="ui/changelog.rml" />
-			</panel>
-			<tab>
-				<img class="emoticon" src="/emoticons/official" />
-				<translate>Old Changelogs</translate>
-			</tab>
-			<panel>
-				    <p><h3>2024-06-21</h3>
-						<ul>
-							<li>New Chaingun</li>
-							<li>New Psaw</li>
-							<li>Uscaled luci and ckit textures</li>
-							<li>Upscaled creep texture</li>
-							<li>Tower defense and Juggernaut game modes</li>
-							<li>Redsky's circle menus</li>
-						</ul>
-					</p>
-			</panel>
-			<tab>
-				<img class="emoticon" src="/emoticons/official" />
-				<translate>Juggernaut</translate>
-			</tab>
-			<panel>
-				<p>The Juggernaut game mode designates a juggernaut.</p>
-				<p>The juggernaut must get a specific number of kills as the juggernaut to win (10 by default).</p>
-				<p>The number of kills can be changed using /callvote jugkills.</p>
-			</panel>
-			<tab>
-				<img class="emoticon" src="/emoticons/official" />
-				<translate>Tower Defense</translate>
-			</tab>
-			<panel>
-				<p>In tower defense, you have 5 minutes to build enough to survive 4 alien waves. Each wave is ~100 aliens.</p>
-				<p>During the wave, you cannot build, however between each wave, you have 1 minute to rebuild.</p>
-				<p>Good luck!</p>
-			</panel>
-		</tabset>
+	<body id="welcome" template="window" onshow="GameMenus.LoadWelcome(document)">
+		<h1><translate>Welcome</translate></h1>
+		<p id="welcomeMap"><translate>Loading match information…</translate></p>
+		<div id="welcomeVote">
+			<h2><translate>Choose the next game mode</translate></h2>
+			<label for="welcomeMode"><translate>Game mode</translate></label>
+			<select id="welcomeMode" onchange="GameMenus.ModeChanged(document)">
+				<option value="pve"><translate>PVE</translate></option>
+				<option value="raid"><translate>Raid</translate></option>
+				<option value="towerdefense"><translate>Tower Defense</translate></option>
+			</select>
+			<div id="welcomeModeSettings">
+				<label id="welcomeTeamLabel" for="welcomeTeam"><translate>Team</translate></label>
+				<select id="welcomeTeam" onchange="GameMenus.TeamChanged(document)"><option value="human"><translate>Humans</translate></option><option value="alien"><translate>Aliens</translate></option></select>
+				<label id="welcomeDifficultyLabel" for="welcomeDifficulty"><translate>Difficulty</translate></label>
+				<select id="welcomeDifficulty">
+					<option value="easy"><translate>Easy</translate></option>
+					<option value="medium" selected><translate>Medium</translate></option>
+					<option value="hard"><translate>Hard</translate></option>
+				</select>
+				<label for="welcomeLayout"><translate>Layout</translate></label>
+				<select id="welcomeLayout"></select>
+				<button id="welcomeCallVote" onclick="GameMenus.CallModeVote(document)"><translate>Call vote</translate></button>
+			</div>
+		</div>
+		<p id="welcomeError"></p>
+		<h2><translate>High scores</translate></h2>
+		<div id="welcomeLevelshot"></div>
+		<div id="welcomeScores"><translate>Loading scores…</translate></div>
 	</body>
 </rml>

@@ -6,6 +6,7 @@
 #include <cstdlib>
 #include <string>
 #include <unordered_map>
+#include <utility>
 
 #include "common/Command.h"
 #include "shared/lua/Json.h"
@@ -19,6 +20,9 @@ struct Callbacks
 {
 	int success = LUA_NOREF;
 	int error = LUA_NOREF;
+	std::string response;
+	unsigned nextSequence = 0;
+	bool assembling = false;
 };
 
 std::unordered_map<unsigned, Callbacks> pending;
@@ -120,15 +124,12 @@ void CG_Rocket_RegisterDataRequest( lua_State *L )
 	lua_setglobal( L, "cgame" );
 }
 
-void CG_Rocket_HandleDataReply()
+namespace
 {
-	char idBuffer[ 32 ], jsonBuffer[ MAX_STRING_CHARS ];
-	Q_strncpyz( idBuffer, CG_Argv( 1 ), sizeof( idBuffer ) );
-	Q_strncpyz( jsonBuffer, CG_Argv( 2 ), sizeof( jsonBuffer ) );
-	char *end = nullptr;
-	unsigned id = static_cast<unsigned>( std::strtoul( idBuffer, &end, 10 ) );
+void DeliverReply( unsigned id, const char *jsonBuffer )
+{
 	auto it = pending.find( id );
-	if ( !*idBuffer || !end || *end || it == pending.end() )
+	if ( it == pending.end() )
 	{
 		return;
 	}
@@ -193,6 +194,71 @@ void CG_Rocket_HandleDataReply()
 	lua_settop( L, base );
 	luaL_unref( L, LUA_REGISTRYINDEX, callbacks.success );
 	luaL_unref( L, LUA_REGISTRYINDEX, callbacks.error );
+}
+} // namespace
+
+void CG_Rocket_HandleDataReply()
+{
+	char idBuffer[ 32 ], jsonBuffer[ MAX_STRING_CHARS ];
+	Q_strncpyz( idBuffer, CG_Argv( 1 ), sizeof( idBuffer ) );
+	Q_strncpyz( jsonBuffer, CG_Argv( 2 ), sizeof( jsonBuffer ) );
+	char *end = nullptr;
+	unsigned id = static_cast<unsigned>( std::strtoul( idBuffer, &end, 10 ) );
+	if ( !*idBuffer || !end || *end ) return;
+	if ( pending.find( id ) == pending.end() ) return;
+	trap_SendClientCommand( Str::Format( "lua_data_ack %u -1\n", id ).c_str() );
+	DeliverReply( id, jsonBuffer );
+}
+
+void CG_Rocket_HandleDataChunk()
+{
+	char idBuffer[ 32 ], sequenceBuffer[ 32 ], part[ MAX_STRING_CHARS ];
+	char doneBuffer[ 8 ], truncatedBuffer[ 8 ];
+	Q_strncpyz( idBuffer, CG_Argv( 1 ), sizeof( idBuffer ) );
+	Q_strncpyz( sequenceBuffer, CG_Argv( 2 ), sizeof( sequenceBuffer ) );
+	Q_strncpyz( part, CG_Argv( 3 ), sizeof( part ) );
+	Q_strncpyz( doneBuffer, CG_Argv( 4 ), sizeof( doneBuffer ) );
+	Q_strncpyz( truncatedBuffer, CG_Argv( 5 ), sizeof( truncatedBuffer ) );
+	char *idEnd = nullptr, *sequenceEnd = nullptr;
+	unsigned id = static_cast<unsigned>( std::strtoul( idBuffer, &idEnd, 10 ) );
+	unsigned sequence = static_cast<unsigned>( std::strtoul( sequenceBuffer, &sequenceEnd, 10 ) );
+	auto it = pending.find( id );
+	if ( !*idBuffer || !idEnd || *idEnd || !sequenceEnd || *sequenceEnd ||
+	     it == pending.end() || sequence != it->second.nextSequence ) return;
+	Callbacks &callbacks = it->second;
+	callbacks.assembling = true;
+	callbacks.response += part;
+	callbacks.nextSequence++;
+	if ( std::atoi( truncatedBuffer ) != 0 )
+	{
+		trap_SendClientCommand( Str::Format( "lua_data_ack %u -1\n", id ).c_str() );
+		lua_State *L = Rml::Lua::Interpreter::GetLuaState();
+		if ( !L ) return;
+		Callbacks finished = callbacks;
+		pending.erase( it );
+		int base = lua_gettop( L );
+		if ( finished.error != LUA_NOREF )
+		{
+			lua_rawgeti( L, LUA_REGISTRYINDEX, finished.error );
+			lua_pushliteral( L, "response truncated by server" );
+			if ( lua_pcall( L, 1, 0, 0 ) != LUA_OK )
+			{
+				Log::Warn( "cgame data request callback failed: %s", lua_tostring( L, -1 ) );
+			}
+			lua_settop( L, base );
+		}
+		if ( finished.success != LUA_NOREF ) luaL_unref( L, LUA_REGISTRYINDEX, finished.success );
+		if ( finished.error != LUA_NOREF ) luaL_unref( L, LUA_REGISTRYINDEX, finished.error );
+		return;
+	}
+	if ( std::atoi( doneBuffer ) != 0 )
+	{
+		trap_SendClientCommand( Str::Format( "lua_data_ack %u -1\n", id ).c_str() );
+		std::string response = std::move( callbacks.response );
+		DeliverReply( id, response.c_str() );
+		return;
+	}
+	trap_SendClientCommand( Str::Format( "lua_data_ack %u %u\n", id, sequence ).c_str() );
 }
 
 void CG_Rocket_ClearDataRequests()

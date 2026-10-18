@@ -4499,6 +4499,11 @@ void ClientCommand( int clientNum )
 		Lua::HandleDataRequest( clientNum );
 		return;
 	}
+	if ( !Q_stricmp( cmd, "lua_data_ack" ) )
+	{
+		Lua::HandleDataRequestAck( clientNum );
+		return;
+	}
 
 	command = (commands_t*) bsearch( cmd, cmds, numCmds, sizeof( cmds[ 0 ] ), cmdcmp );
 
