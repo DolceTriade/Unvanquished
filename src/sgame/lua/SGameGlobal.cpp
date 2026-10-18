@@ -33,6 +33,7 @@ Maryland 20850 USA.
 */
 
 #include "sgame/sg_local.h"
+#include "common/FileSystem.h"
 #include "shared/lua/LuaLib.h"
 #include "shared/lua/Utils.h"
 #include "sgame/lua/register_lua_extensions.h"
@@ -50,6 +51,9 @@ Maryland 20850 USA.
 #include "sgame/lua/Votes.h"
 #include "sgame/lua/Workflow.h"
 #include "sgame/lua/DataRequest.h"
+
+#include <set>
+#include <string>
 
 namespace {
 
@@ -70,6 +74,22 @@ static Lua::Workflow workflow;
 class SGameGlobal
 {
 	public:
+
+	/// Get names of maps available to the server, including maps installed as packages.
+	// @function GetAvailableMaps
+	// @treturn array Map load names in sorted order.
+	static int GetAvailableMaps( lua_State* L )
+	{
+		static const std::set<std::string> maps = FS::GetAvailableMaps( false );
+		lua_createtable( L, static_cast<int>( maps.size() ), 0 );
+		int index = 1;
+		for ( const std::string& map : maps )
+		{
+			lua_pushlstring( L, map.data(), map.size() );
+			lua_rawseti( L, -2, index++ );
+		}
+		return 1;
+	}
 
 	/// Get in game entities.
 	// @field entity Get in game entities. Analogous to the g_entities global in C++.
@@ -356,6 +376,8 @@ void ExtraInit<SGameGlobal>( lua_State* L, int metatable_index )
 	lua_setfield( L, metatable_index - 1, "RegisterVote" );
 	lua_pushcfunction( L, SGameGlobal::RegisterDataEndpoint );
 	lua_setfield( L, metatable_index - 1, "RegisterDataEndpoint" );
+	lua_pushcfunction( L, SGameGlobal::GetAvailableMaps );
+	lua_setfield( L, metatable_index - 1, "GetAvailableMaps" );
 }
 
 }  // namespace Lua
