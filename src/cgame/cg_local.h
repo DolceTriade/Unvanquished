@@ -1464,7 +1464,6 @@ struct cgTeamEconomyState_t
 	int investedCredits[ MAX_OVERLOAD_PURCHASES ];
 	int repeatCounts[ MAX_OVERLOAD_PURCHASES ];
 	int nextCosts[ MAX_OVERLOAD_PURCHASES ];
-	int remainingCosts[ MAX_OVERLOAD_PURCHASES ];
 	bool ownedPurchases[ MAX_OVERLOAD_PURCHASES ];
 };
 

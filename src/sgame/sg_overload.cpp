@@ -609,23 +609,6 @@ static std::string EncodeOwnedPurchases( const bool* values )
 	return stream.str();
 }
 
-static int OverloadDisplayRemainingCost( const overloadPurchaseDef_t& entry, int entryIndex, team_t team )
-{
-	const TeamEconomyState& economy = TeamEconomy( team );
-	if ( entry.kind == overloadPurchaseKind_t::UNLOCK && economy.ownedPurchases[ entryIndex ] )
-	{
-		return 0;
-	}
-
-	if ( entry.kind == overloadPurchaseKind_t::UPGRADE && entry.maxRanks != OVERLOAD_UNCAPPED_RANKS &&
-	     economy.repeatCounts[ entryIndex ] >= entry.maxRanks )
-	{
-		return 0;
-	}
-
-	return std::max( 0, OverloadNextCost( entry, entryIndex, team ) - economy.investedCredits[ entryIndex ] );
-}
-
 static void PublishOverloadStateInternal( team_t team )
 {
 	if ( !G_IsPlayableTeam( team ) )
@@ -635,11 +618,9 @@ static void PublishOverloadStateInternal( team_t team )
 
 	const TeamEconomyState& economy = TeamEconomy( team );
 	int nextCosts[ MAX_OVERLOAD_PURCHASES ] = {};
-	int remainingCosts[ MAX_OVERLOAD_PURCHASES ] = {};
 	for ( int i = 0; i < G_OverloadPurchaseCount(); ++i )
 	{
 		nextCosts[ i ] = OverloadNextCost( overloadPurchases[ i ], i, team );
-		remainingCosts[ i ] = OverloadDisplayRemainingCost( overloadPurchases[ i ], i, team );
 	}
 
 	std::ostringstream stream;
@@ -650,7 +631,6 @@ static void PublishOverloadStateInternal( team_t team )
 	       << ";ic=" << EncodeIndexValuePairs( economy.investedCredits )
 	       << ";rc=" << EncodeIndexValuePairs( economy.repeatCounts )
 	       << ";nc=" << EncodeIndexValuePairs( nextCosts )
-	       << ";rm=" << EncodeIndexValuePairs( remainingCosts )
 	       << ";op=" << EncodeOwnedPurchases( economy.ownedPurchases );
 
 	std::string config = stream.str();
