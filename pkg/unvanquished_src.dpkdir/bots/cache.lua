@@ -14,6 +14,7 @@ local M = {
 local REFRESH_INTERVAL = 3000
 
 local OBSERVED_CVARS = {
+    "lua_pve_max_builders",
     "g_bot_buildAliens",
     "g_bot_buildHumans",
     "g_bot_buildNumEggs",

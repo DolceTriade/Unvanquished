@@ -539,10 +539,11 @@ local function builder_needed(team_name, number, team_snapshot, level, selected_
     end
     local build_enabled = is_alien(team_name) and cache.cvar("g_bot_buildAliens") ~= "0"
         or is_human(team_name) and cache.cvar("g_bot_buildHumans") ~= "0"
+    local max_builders = tonumber(cache.cvar("lua_pve_max_builders")) or PVE_MAX_BUILDERS
 
     return build_enabled
         and (already_assigned or usable_build_points >= chosen_cost)
-        and builder_count(team_name, team_snapshot, number) < PVE_MAX_BUILDERS
+        and builder_count(team_name, team_snapshot, number) < max_builders
 end
 
 local function can_convert_to_builder_now(team, client, level)

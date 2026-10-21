@@ -2298,10 +2298,26 @@ static bool G_NearOverloadTerminal( gentity_t *ent )
 	team_t team = (team_t) ent->client->pers.team;
 	gentity_t* mainBuildable = G_MainBuildable( team );
 
-	return mainBuildable &&
-	       mainBuildable->spawned &&
-	       Entities::IsAlive( mainBuildable ) &&
-	       G_Distance( ent, mainBuildable ) <= ENTITY_USE_RANGE * 3;
+	if ( mainBuildable && mainBuildable->spawned && Entities::IsAlive( mainBuildable ) &&
+	     G_Distance( ent, mainBuildable ) <= ENTITY_USE_RANGE * 3 )
+	{
+		return true;
+	}
+
+	const buildable_t miner = team == TEAM_HUMANS ? BA_H_DRILL : BA_A_LEECH;
+	gentity_t* neighbor = nullptr;
+	while ( ( neighbor = G_IterateEntitiesWithinRadius( neighbor, VEC2GLM( ent->client->ps.origin ),
+	                                                  ENTITY_USE_RANGE * 3 ) ) )
+	{
+		if ( neighbor->s.eType == entityType_t::ET_BUILDABLE && neighbor->s.modelindex == miner &&
+		     neighbor->buildableTeam == team && neighbor->spawned && Entities::IsAlive( neighbor ) &&
+		     ( team != TEAM_HUMANS || neighbor->powered ) )
+		{
+			return true;
+		}
+	}
+
+	return false;
 }
 
 static void Cmd_TeamBuy_f( gentity_t *ent )
@@ -2312,7 +2328,7 @@ static void Cmd_TeamBuy_f( gentity_t *ent )
 	{
 		trap_SendServerCommand( ent->num(),
 		                        va( "print_tr %s",
-		                            QQ( N_("You must be near your team's main structure to buy Overload upgrades.") ) ) );
+		                            QQ( N_("You must be near your team's main structure, Drill, or Leech to buy Overload upgrades.") ) ) );
 		return;
 	}
 
@@ -2347,7 +2363,7 @@ static void Cmd_AutoDonate_f( gentity_t *ent )
 	{
 		trap_SendServerCommand( ent->num(),
 		                        va( "print_tr %s",
-		                            QQ( N_("You must be near your team's main structure to donate to Overload.") ) ) );
+		                            QQ( N_("You must be near your team's main structure, Drill, or Leech to donate to Overload.") ) ) );
 		return;
 	}
 
