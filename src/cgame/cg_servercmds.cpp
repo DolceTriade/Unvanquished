@@ -267,11 +267,11 @@ void CG_ParseTeamEconomyConfig( team_t team, const char* config )
 			continue;
 		}
 
-		if ( key == "ic" || key == "rc" || key == "nc" || key == "rm" )
+		if ( key == "ic" || key == "rc" || key == "nc" )
 		{
 			int* target = key == "ic" ? state.investedCredits :
 			               key == "rc" ? state.repeatCounts :
-			               key == "nc" ? state.nextCosts : state.remainingCosts;
+			               state.nextCosts;
 			std::stringstream pairs( value );
 			std::string pair;
 			while ( std::getline( pairs, pair, ',' ) )

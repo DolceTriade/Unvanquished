@@ -630,28 +630,47 @@
 			end
 
 			local remaining = tonumber(row.remaining) or 0
-			local buttonClass = status == "locked" and row.kind == "unlock" and ' class="locked"' or ""
-			local buttons = string.format(
-				'<button%s onclick="OverloadBuy(\'%s\', %d)">%s</button>',
-				buttonClass, row.command, remaining, ActionLabel(row.kind, status))
+			local credits = math.max(0, tonumber(player.credits) or 0)
+			local spendable = math.min(remaining, credits)
+			local canFinish = spendable >= remaining and remaining > 0
+			local actionLabel = canFinish and ActionLabel(row.kind, status) or "Contribute Available"
 
-			if remaining > 100 then
-				buttons = buttons .. string.format(
-					'<button%s onclick="OverloadBuy(\'%s\', 100)">%s</button>',
-					buttonClass, row.command, row.quickBuySmallLabel)
+			local buttonClass = status == "locked" and row.kind == "unlock" and ' class="locked"' or ""
+			local buttons
+			if spendable <= 0 then
+				local label = remaining > 0 and "Need More Credits" or "Complete"
+				buttons = string.format('<button class="locked" onclick="return false;">%s</button>', label)
+			else
+				buttons = string.format(
+					'<button%s onclick="OverloadBuy(\'%s\', %d, %d)">%s</button>',
+					buttonClass, row.command, spendable, row.index, actionLabel)
 			end
 
-			if remaining > 500 then
+			if spendable > 100 then
 				buttons = buttons .. string.format(
-					'<button%s onclick="OverloadBuy(\'%s\', 500)">%s</button>',
-					buttonClass, row.command, row.quickBuyLargeLabel)
+					'<button%s onclick="OverloadBuy(\'%s\', 100, %d)">%s</button>',
+					buttonClass, row.command, row.index, row.quickBuySmallLabel)
+			end
+
+			if spendable > 500 then
+				buttons = buttons .. string.format(
+					'<button%s onclick="OverloadBuy(\'%s\', 500, %d)">%s</button>',
+					buttonClass, row.command, row.index, row.quickBuyLargeLabel)
+			end
+
+			if spendable > 2000 then
+				local capLabel = row.currencyLabel == "morph points" and "+20.0" or "+2000"
+				buttons = buttons .. string.format(
+					'<button%s onclick="OverloadBuy(\'%s\', 2000, %d)">%s</button>',
+					buttonClass, row.command, row.index, capLabel)
 			end
 
 			return buttons
 		end
 
-		function OverloadBuy(command, spend)
-			Cmd.exec("teambuy " .. command .. " " .. spend)
+		function OverloadBuy(command, spend, index)
+			local commandLine = "teambuy " .. command .. " " .. spend
+			Cmd.exec(commandLine)
 		end
 
 		function ReadRows()

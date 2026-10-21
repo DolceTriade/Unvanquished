@@ -168,6 +168,11 @@ static bool OverloadEntryMaxed( const cgOverloadCatalogEntry_t& entry, int index
 	       state.repeatCounts[ index ] >= entry.maxRanks;
 }
 
+static int OverloadRemainingCost( int index, const cgTeamEconomyState_t& state )
+{
+	return std::max( 0, state.nextCosts[ index ] - state.investedCredits[ index ] );
+}
+
 static bool OverloadUpgradeHiddenUntilUnlocked( const cgOverloadCatalogEntry_t& entry, team_t team, const cgTeamEconomyState_t& state )
 {
 	if ( entry.kind != overloadPurchaseKind_t::UPGRADE )
@@ -258,7 +263,7 @@ static const char* OverloadStatusForEntry( const cgOverloadCatalogEntry_t& entry
 		return "partial";
 	}
 
-	if ( credits < state.remainingCosts[ index ] )
+	if ( credits < OverloadRemainingCost( index, state ) )
 	{
 		return "expensive";
 	}
@@ -1737,7 +1742,7 @@ static void CG_Rocket_BuildOverloadList( const char *table )
 		Info_SetValueForKey( buf, "description", entry.description, false );
 		Info_SetValueForKey( buf, "command", OverloadCommandForEntry( entry ).c_str(), false );
 		Info_SetValueForKey( buf, "cost", OverloadFormatCurrency( state.nextCosts[ i ], team ).c_str(), false );
-		Info_SetValueForKey( buf, "remaining", va( "%d", state.remainingCosts[ i ] ), false );
+		Info_SetValueForKey( buf, "remaining", va( "%d", OverloadRemainingCost( i, state ) ), false );
 		Info_SetValueForKey( buf, "investedAmount", va( "%d", state.investedCredits[ i ] ), false );
 		Info_SetValueForKey( buf, "nextCostAmount", va( "%d", state.nextCosts[ i ] ), false );
 		Info_SetValueForKey( buf, "currencyLabel", usesMorphPoints ? "morph points" : "credits", false );
