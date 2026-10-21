@@ -1857,6 +1857,8 @@ static gentity_t *SpawnBuildable( gentity_t *builder, buildable_t buildable, con
 			break;
 
 		case BA_A_LEECH:
+			built->use = MainStructure_Use;
+			built->s.eFlags |= EF_USABLE;
 			break;
 
 		case BA_A_SPIKER:
@@ -1887,6 +1889,8 @@ static gentity_t *SpawnBuildable( gentity_t *builder, buildable_t buildable, con
 			break;
 
 		case BA_H_DRILL:
+			built->use = MainStructure_Use;
+			built->s.eFlags |= EF_USABLE;
 			break;
 
 		case BA_H_REACTOR:
