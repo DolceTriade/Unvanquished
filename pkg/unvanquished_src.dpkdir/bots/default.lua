@@ -26,6 +26,7 @@ local STATE = {
     alien_combat_until = {},
     alien_builder_owner = nil,
     builder_bp_enabled = {},
+    rush_retry_at = {},
     tasks = {},
 }
 
@@ -35,6 +36,7 @@ local function enemy_seen_recently(level, mind, duration)
 end
 
 local BUILDER_ANCHOR_RADIUS = 700
+local RUSH_RETRY_COOLDOWN_MS = 5000
 local ALIEN_EVOLVE_TARGETS = common.ALIEN_EVOLVE_TARGETS
 local ALIEN_COMBAT_TARGETS = common.ALIEN_COMBAT_TARGETS
 
@@ -871,12 +873,22 @@ local function maybe_flee_human(team, weapon, enemy_visible, ctx)
     return ctx:flee()
 end
 
-local function maybe_rush(builder, base_rush_score, ctx)
+local function maybe_rush(builder, base_rush_score, number, now, ctx)
     if builder or base_rush_score <= 0.5 then
         return STATUS_FAILURE
     end
 
-    return ctx:rush()
+    local retry_at = STATE.rush_retry_at[number]
+    if retry_at and retry_at > now then
+        return STATUS_FAILURE
+    end
+
+    STATE.rush_retry_at[number] = nil
+    local status = ctx:rush()
+    if status == STATUS_FAILURE then
+        STATE.rush_retry_at[number] = now + RUSH_RETRY_COOLDOWN_MS
+    end
+    return status
 end
 
 local function combat_active(state)
@@ -982,7 +994,7 @@ local function run_roam_task(task, state, ctx)
             return status
         end
 
-        status = maybe_rush(state.builder, state.base_rush_score, ctx)
+        status = maybe_rush(state.builder, state.base_rush_score, state.number, state.level.time, ctx)
         if status ~= STATUS_FAILURE then
             return status
         end
@@ -1021,7 +1033,7 @@ local function run_roam_task(task, state, ctx)
         return status
     end
 
-    status = maybe_rush(state.builder, state.base_rush_score, ctx)
+    status = maybe_rush(state.builder, state.base_rush_score, state.number, state.level.time, ctx)
     if status ~= STATUS_FAILURE then
         return status
     end
@@ -1066,6 +1078,7 @@ return function(self, ctx)
     if should_spawn(self, PMF_QUEUED) then
         clear_alien_target_lock(number)
         clear_alien_combat_latch(number)
+        STATE.rush_retry_at[number] = nil
         clear_task(number)
         return choose_spawn(team, number, team_snapshot, team_level_data, ctx)
     end
