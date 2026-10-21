@@ -25,12 +25,28 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "common/Common.h"
 #include "sg_bot_ai.h"
+#include "sg_bot_public.h"
 #include "sg_bot_util.h"
 #include "botlib/bot_api.h"
 #include "Entities.h"
 #include "CBSE.h"
 
 #include <glm/gtx/norm.hpp>
+
+static void TraceBotNavigationFailure( gentity_t *self, const char *action,
+									const char *reason, const botTarget_t& target )
+{
+	if ( G_BotTraceClient() != self->num() )
+	{
+		return;
+	}
+
+	glm::vec3 pos = target.isValid() ? target.getPos() : VEC2GLM( self->s.origin );
+	Log::defaultLogger.WithoutSuppression().Notice(
+		"bot %d navigation %s failed: %s (target %.0f %.0f %.0f%s)",
+		self->num(), action, reason, pos.x, pos.y, pos.z,
+		target.isValid() ? "" : ", invalid" );
+}
 
 //NOTE: kept as constant to let compiler optimise Square( MAX_HUMAN_DANCE_DIST );
 //how far away we can be before we stop going forward when fighting an alien
@@ -1347,17 +1363,22 @@ AINodeStatus_t BotActionRoamInRadius( gentity_t *self, AIGenericNode_t *node )
 
 		if ( !BotFindRandomPointInRadius( self->s.number, goal.goal.getPos(), point, radius ) )
 		{
+			TraceBotNavigationFailure( self, "roamInRadius", "no random point in radius", goal.goal );
 			return STATUS_FAILURE;
 		}
 
 		if ( !BotChangeGoalPos( self, point ) )
 		{
+			botTarget_t failedPoint;
+			failedPoint = point;
+			TraceBotNavigationFailure( self, "roamInRadius", "could not set route to random point", failedPoint );
 			return STATUS_FAILURE;
 		}
 		self->botMind->currentNode = node;
 	}
 	else if ( !self->botMind->goal.isValid() )
 	{
+		TraceBotNavigationFailure( self, "roamInRadius", "active goal is invalid", self->botMind->goal );
 		self->botMind->currentNode = nullptr;
 		return STATUS_FAILURE;
 	}
@@ -1377,12 +1398,15 @@ AINodeStatus_t BotActionRoam( gentity_t *self, AIGenericNode_t *node )
 		botTarget_t target = BotGetRoamTarget( self );
 		if ( !BotChangeGoal( self, target ) )
 		{
+			TraceBotNavigationFailure( self, "roam",
+				target.isValid() ? "could not set route to selected point" : "selected point is invalid", target );
 			return STATUS_FAILURE;
 		}
 		self->botMind->currentNode = node;
 	}
 	else if ( !self->botMind->goal.isValid() )
 	{
+		TraceBotNavigationFailure( self, "roam", "active goal is invalid", self->botMind->goal );
 		self->botMind->currentNode = nullptr;
 		return STATUS_FAILURE;
 	}
@@ -1665,8 +1689,11 @@ AINodeStatus_t BotActionRush( gentity_t *self, AIGenericNode_t *node )
 {
 	if ( self->botMind->currentNode != node )
 	{
-		if ( !BotChangeGoal( self, BotGetRushTarget( self ) ) )
+		botTarget_t target = BotGetRushTarget( self );
+		if ( !BotChangeGoal( self, target ) )
 		{
+			TraceBotNavigationFailure( self, "rush",
+				target.isValid() ? "could not set route to selected target" : "selected target is invalid", target );
 			return STATUS_FAILURE;
 		}
 		else
@@ -1678,6 +1705,7 @@ AINodeStatus_t BotActionRush( gentity_t *self, AIGenericNode_t *node )
 
 	if ( !self->botMind->goal.isValid() )
 	{
+		TraceBotNavigationFailure( self, "rush", "active goal is invalid", self->botMind->goal );
 		return STATUS_FAILURE;
 	}
 
