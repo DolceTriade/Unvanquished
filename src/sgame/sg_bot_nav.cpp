@@ -24,6 +24,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 */
 
 #include "common/Common.h"
+#include "sg_bot_public.h"
 #include "sg_bot_util.h"
 #include "botlib/bot_types.h"
 #include "botlib/bot_local.h"
@@ -40,6 +41,29 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 //this is a constant as fiddling with this value will impact both
 //server performance and efficiency of AI obstacle procedures.
 constexpr float BOT_OBSTACLE_AVOID_RANGE = 20.0f;
+
+static void TraceBotMoveFailure( gentity_t *self, const char *reason )
+{
+	if ( G_BotTraceClient() != self->num() )
+	{
+		return;
+	}
+
+	const char *action = "unknown";
+	if ( self->botMind->currentNode && self->botMind->currentNode->type == AINode_t::ACTION_NODE )
+	{
+		const AIActionNode_t *actionNode =
+			reinterpret_cast<const AIActionNode_t *>( self->botMind->currentNode );
+		action = actionNode->name;
+	}
+
+	glm::vec3 target = self->botMind->goal.isValid()
+		? self->botMind->goal.getPos() : VEC2GLM( self->s.origin );
+	Log::defaultLogger.WithoutSuppression().Notice(
+		"bot %d navigation %s movement failed: %s (target %.0f %.0f %.0f%s)",
+		self->num(), action, reason, target.x, target.y, target.z,
+		self->botMind->goal.isValid() ? "" : ", invalid" );
+}
 
 static bool BotDevolveIfNavigationBlocked( gentity_t *self, int stuckTime )
 {
@@ -789,7 +813,9 @@ static obstacle_t BotDetectObstacle( gentity_t *self, const gentity_t *blocker, 
 	trap_Trace( &tr2, origin, playerMins, playerMaxs, end, self->s.number, MASK_PLAYERSOLID, 0 );
 
 	classAttributes_t const* pcl = BG_Class( pClass );
-	bool ladder = ( pcl->abilities & SCA_CANUSELADDERS )
+	bool canUseLadder = pcl->abilities & SCA_CANUSELADDERS;
+	bool canWallwalk = pcl->abilities & SCA_WALLCLIMBER;
+	bool ladder = ( canUseLadder || canWallwalk )
 		&& ( ( tr1.entityNum == ENTITYNUM_WORLD && tr1.surfaceFlags & SURF_LADDER )
 		|| ( tr2.entityNum == ENTITYNUM_WORLD && tr2.surfaceFlags & SURF_LADDER ) )
 		;
@@ -975,7 +1001,12 @@ static bool BotAvoidObstacles( gentity_t *self, glm::vec3 &dir, bool ignoreGeome
 	}
 	else if ( obst == OBSTACLE_LADDER )
 	{
-		// look up to climb the ladder
+		// Look up to climb the ladder. Wall-climbing aliens use upmove to
+		// engage their wall-walk controller when they contact the ladder.
+		if ( BG_ClassHasAbility( self->client->ps.stats[ STAT_CLASS ], SCA_WALLCLIMBER ) )
+		{
+			self->botMind->cmdBuffer.upmove = -127;
+		}
 		dir.z += 200.f;
 		return false;
 	}
@@ -1362,7 +1393,11 @@ bool BotMoveToGoal( gentity_t *self )
 
 		// No displacement for long enough means this objective is not
 		// currently actionable. Returning failure lets the behavior tree
-		// select another objective instead of steering forever.
+		// select another objective instead of steering forever. Restart the
+		// stuck timer as well, so the replacement objective gets time to move
+		// the bot before it too is rejected as stuck.
+		TraceBotMoveFailure( self, "stuck timeout" );
+		BotResetStuckTime( self );
 		return false;
 	}
 
@@ -1392,6 +1427,7 @@ bool BotMoveToGoal( gentity_t *self )
 		BotSeek( self, dir );
 		// if we have not moved much for some time, let's propagate
 		// a failure status, so we can find another goal
+		TraceBotMoveFailure( self, "obstacle avoidance" );
 		return false;
 	}
 
