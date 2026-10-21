@@ -54,7 +54,7 @@ int Read( lua_State* L )
 	}
 
 	std::string contents( length, '\0' );
-	int read = length ? trap_FS_Read( contents.data(), length, file ) : 0;
+	int read = length ? trap_FS_Read( const_cast<char *>( contents.data() ), length, file ) : 0;
 	trap_FS_FCloseFile( file );
 	if ( read != length )
 	{
