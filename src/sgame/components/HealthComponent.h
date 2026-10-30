@@ -61,10 +61,12 @@ class HealthComponent: public HealthComponentBase {
 		float Health() const { return health; }
 		float MaxHealth() const { return maxHealth; }
 		float HealthFraction() const { return Math::Clamp(health / maxHealth, 0.0f, 1.0f); }
+		bool Overkilled() const { return overkilled; }
 
 	private:
 
 		float health;
+		bool overkilled = false;
 
 		/**
 		 * @brief Whenever health is restored, this makes sure the damage accounts are scaled down

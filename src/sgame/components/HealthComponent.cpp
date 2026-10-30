@@ -179,6 +179,8 @@ Util::optional<glm::vec3> direction, int flags, meansOfDeath_t meansOfDeath) {
 		take *= client->pers.damageReceivedMultiplier;
 	}
 
+	overkilled = client && client->pers.team == TEAM_ALIENS && take > maxHealth;
+
 	// if we don't actually take damage, stop here
 	if ( take == 0.0f )
 	{

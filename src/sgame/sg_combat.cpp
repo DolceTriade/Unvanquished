@@ -495,6 +495,18 @@ void G_PlayerDie( gentity_t *self, gentity_t *inflictor, gentity_t *attacker, in
 	// g_forcerespawn may force spawning at some later time
 	self->client->respawnTime = level.time + 1700;
 
+	HealthComponent *healthComponent = self->entity->Get<HealthComponent>();
+	if ( self->client->pers.team == TEAM_ALIENS && healthComponent && healthComponent->Overkilled() )
+	{
+		self->r.contents = 0;
+		self->client->ps.eFlags |= EF_NODRAW;
+		G_AddEvent( self, EV_ALIEN_BUILDABLE_EXPLOSION, DirToByte( self->s.origin2 ) );
+		Beacon::DetachTags( self );
+		trap_LinkEntity( self );
+		self->client->pers.infoChangeTime = level.time;
+		return;
+	}
+
 	// clear misc
 	memset( self->client->ps.misc, 0, sizeof( self->client->ps.misc ) );
 
