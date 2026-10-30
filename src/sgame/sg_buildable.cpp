@@ -1707,6 +1707,8 @@ static gentity_t *QueueBuildable( gentity_t *builder, buildable_t buildable,
 	queued->s.modelindex = buildable;
 	queued->s.modelindex2 = attr->team;
 	queued->buildableTeam = (team_t) queued->s.modelindex2;
+	queued->r.svFlags = SVF_CLIENTMASK;
+	G_TeamToClientmask( queued->buildableTeam, &queued->r.loMask, &queued->r.hiMask );
 	BG_BuildableBoundingBox( buildable, queued->r.mins, queued->r.maxs );
 
 	queued->s.time = queued->creationTime;
