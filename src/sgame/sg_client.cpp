@@ -461,6 +461,13 @@ static void SpawnCorpse( gentity_t *ent )
 	int       contents;
 	vec3_t    origin, mins;
 
+	// If we overkill someone, don't spawn the corpse.
+	if ( ent->client->ps.eFlags & EF_NODRAW )
+	{
+		trap_UnlinkEntity( ent );
+		return;
+	}
+
 	VectorCopy( ent->r.currentOrigin, origin );
 
 	trap_UnlinkEntity( ent );
