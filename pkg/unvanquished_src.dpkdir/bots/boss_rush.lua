@@ -1,14 +1,16 @@
 -- Team behavior used while a boss is active. Prepare builders, then run the
 -- regular attack behavior without changing that behavior's implementation.
 
-STATUS_FAILURE = 0
-STATUS_SUCCESS = 1
-STATUS_RUNNING = 2
+local constants = require("bots/consts.lua")
+local STATUS_FAILURE = constants.STATUS_FAILURE
+local STATUS_SUCCESS = constants.STATUS_SUCCESS
+local STATUS_RUNNING = constants.STATUS_RUNNING
 
 local common = require("bots/common.lua")
+local behavior_state = require("bots/state.lua")
 local boss = require("bots/boss.lua")
 local attack = require("bots/attack.lua")
-local STATE = {}
+local STATE = behavior_state.new_behavior("boss_rush", { equip_retry_at = {} }, { "equip_retry_at" })
 
 local function same_boss(ref, entity)
     return ref
@@ -36,7 +38,8 @@ local function prepare_builder(self, ctx, boss_entity)
             return STATUS_FAILURE
         end
 
-        local status = common.equip_and_buy_overload(ctx)
+        local status = common.equip_and_buy_overload(
+            ctx, STATE.equip_retry_at, number, sgame.level.time)
         if status == STATUS_FAILURE or status == STATUS_SUCCESS then
             STATE[number] = {
                 number = boss_entity.number,

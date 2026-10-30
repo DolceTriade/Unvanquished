@@ -1,10 +1,11 @@
-STATUS_FAILURE = 0
-STATUS_SUCCESS = 1
-STATUS_RUNNING = 2
-
-local PMF_QUEUED = 1 << 12
+local constants = require("bots/consts.lua")
+local STATUS_FAILURE = constants.STATUS_FAILURE
+local STATUS_SUCCESS = constants.STATUS_SUCCESS
+local STATUS_RUNNING = constants.STATUS_RUNNING
+local PMF_QUEUED = constants.PMF_QUEUED
 
 local common = require("bots/common.lua")
+local behavior_state = require("bots/state.lua")
 local task_runtime = require("bots/task.lua")
 local weapons = Unv.weapons
 local is_alien = common.is_alien
@@ -19,7 +20,7 @@ local unstick = common.unstick
 
 local ALIEN_EVOLVE_TARGETS = common.ALIEN_EVOLVE_TARGETS
 local TASKS = task_runtime.new_runtime()
-local STATE = {}
+local STATE = behavior_state.new_behavior("follow", { equip_retry_at = {} }, { "equip_retry_at" })
 local FOLLOW_FAILURE_TIMEOUT = 10000
 local COMBAT_RETRY_DELAY = 1000
 
@@ -42,7 +43,7 @@ local function maybe_use_medkit(team, client, ctx)
     return use_medkit_if_low(team, client, ctx, 50)
 end
 
-local function maybe_equip(team, mind, ctx)
+local function maybe_equip(team, number, mind, ctx)
     if not is_human(team) then
         return STATUS_FAILURE
     end
@@ -52,7 +53,7 @@ local function maybe_equip(team, mind, ctx)
         return STATUS_FAILURE
     end
 
-    return common.equip_and_buy_overload(ctx)
+    return common.equip_and_buy_overload(ctx, STATE.equip_retry_at, number, sgame.level.time)
 end
 
 local function maybe_evolve(self, team, client, enemy_visible, ctx)
@@ -137,7 +138,7 @@ local ESCORT_TASK = {
                 return status
             end
 
-            status = maybe_equip(state.team, state.mind, ctx)
+            status = maybe_equip(state.team, state.number, state.mind, ctx)
             if status == STATUS_RUNNING then
                 return status
             end

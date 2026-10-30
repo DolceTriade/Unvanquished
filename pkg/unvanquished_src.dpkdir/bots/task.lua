@@ -1,4 +1,7 @@
 local M = {}
+local constants = require("bots/consts.lua")
+local STATUS_FAILURE = constants.STATUS_FAILURE
+local STATUS_RUNNING = constants.STATUS_RUNNING
 
 local function copy_task(task)
     local instance = {}

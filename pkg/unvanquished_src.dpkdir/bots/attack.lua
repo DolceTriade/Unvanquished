@@ -1,11 +1,12 @@
-STATUS_FAILURE = 0
-STATUS_SUCCESS = 1
-STATUS_RUNNING = 2
-
-local PMF_QUEUED = 1 << 12
+local constants = require("bots/consts.lua")
+local STATUS_FAILURE = constants.STATUS_FAILURE
+local STATUS_SUCCESS = constants.STATUS_SUCCESS
+local STATUS_RUNNING = constants.STATUS_RUNNING
+local PMF_QUEUED = constants.PMF_QUEUED
 
 local cache = require("bots/cache.lua")
 local common = require("bots/common.lua")
+local behavior_state = require("bots/state.lua")
 local task_runtime = require("bots/task.lua")
 local weapons = Unv.weapons
 local is_alien = common.is_alien
@@ -19,9 +20,10 @@ local try_evolve_targets = common.try_evolve_targets
 local roam_buildings = common.roam_buildings
 local unstick = common.unstick
 local TASKS = task_runtime.new_runtime()
-local STATE = {
+local STATE = behavior_state.new_behavior("attack", {
     human_equip_retry_at = {},
-}
+    equip_retry_at = {},
+}, { "human_equip_retry_at", "equip_retry_at" })
 
 local function target_is_buildable(target)
     local entity = target_entity(target)
@@ -178,7 +180,7 @@ local function maybe_equip_human_near_armoury(number, team, level, mind, ctx)
         return STATUS_FAILURE
     end
 
-    local status = common.equip_and_buy_overload(ctx)
+    local status = common.equip_and_buy_overload(ctx, STATE.equip_retry_at, number, level.time)
     if status == STATUS_FAILURE then
         STATE.human_equip_retry_at[number] = level.time + 2000
         return STATUS_FAILURE
@@ -294,7 +296,8 @@ local RESUPPLY_TASK = {
         end
 
         if task.phase == "equip" then
-            local status = common.equip_and_buy_overload(ctx)
+            local status = common.equip_and_buy_overload(
+                ctx, STATE.equip_retry_at, state.number, state.level.time)
             if status ~= STATUS_FAILURE then
                 return status
             end

@@ -1,13 +1,14 @@
-STATUS_FAILURE = 0
-STATUS_SUCCESS = 1
-STATUS_RUNNING = 2
-
-local PMF_QUEUED = 1 << 12
+local constants = require("bots/consts.lua")
+local STATUS_FAILURE = constants.STATUS_FAILURE
+local STATUS_SUCCESS = constants.STATUS_SUCCESS
+local STATUS_RUNNING = constants.STATUS_RUNNING
+local PMF_QUEUED = constants.PMF_QUEUED
 
 package.loaded["bots/common.lua"] = nil
 
 local cache = require("bots/cache.lua")
 local common = require("bots/common.lua")
+local behavior_state = require("bots/state.lua")
 local task_runtime = require("bots/task.lua")
 local weapons = Unv.weapons
 local elapsed_since = common.elapsed_since
@@ -22,9 +23,10 @@ local try_evolve_targets = common.try_evolve_targets
 local human_repair_target_info = common.human_repair_target_info
 local unstick = common.unstick
 
-local STATE = {
+local STATE = behavior_state.new_behavior("build", {
     alien_builder_owner = nil,
-}
+    equip_retry_at = {},
+}, { "equip_retry_at" })
 local TASKS = task_runtime.new_runtime()
 
 local BUILDER_ANCHOR_RADIUS = 700
@@ -325,13 +327,7 @@ local function maybe_use_medkit(team, client, ctx)
     return use_medkit_if_low(team, client, ctx, 50)
 end
 
-local function maybe_extinguish_fire(team, client, ctx)
-    if not is_alien(team) or client.class ~= "builderupg" or cache.cvar("g_bot_extinguishFire") == "0" then
-        return STATUS_FAILURE
-    end
-
-    return ctx:extinguishFire()
-end
+local maybe_extinguish_fire = common.maybe_extinguish_fire
 
 local function maybe_evolve(self, team, client, builder, health_frac, level, mind, enemy_visible, ctx)
     if not is_alien(team) or builder or enemy_visible then
@@ -445,7 +441,7 @@ local function maybe_retire_builder(team, number, client, builder, wants_build, 
             return STATUS_FAILURE
         end
 
-        return common.equip_and_buy_overload(ctx)
+        return common.equip_and_buy_overload(ctx, STATE.equip_retry_at, number, level.time)
     end
 
     if is_alien(team) then
@@ -560,14 +556,14 @@ local function maybe_reload(team, client, weapon_attr, level, mind, enemy_visibl
     return ctx:reload()
 end
 
-local function maybe_equip(team, level, mind, enemy_visible, ctx)
+local function maybe_equip(team, number, level, mind, enemy_visible, ctx)
     if not is_human(team)
         or enemy_visible
         or elapsed_since(level.time, mind.enemyLastSeen) <= 1000 then
         return STATUS_FAILURE
     end
 
-    return common.equip_and_buy_overload(ctx)
+    return common.equip_and_buy_overload(ctx, STATE.equip_retry_at, number, level.time)
 end
 
 local function maybe_empty_ammo_resupply(team, client, weapon_attr, ctx)
@@ -716,7 +712,7 @@ local SUPPORT_TASK = {
                 return status
             end
 
-            status = maybe_equip(state.team, state.level, state.mind, state.enemy_visible, ctx)
+            status = maybe_equip(state.team, state.number, state.level, state.mind, state.enemy_visible, ctx)
             if status ~= STATUS_FAILURE then
                 return status
             end

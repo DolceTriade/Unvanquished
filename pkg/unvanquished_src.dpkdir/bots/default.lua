@@ -1,12 +1,13 @@
-STATUS_FAILURE = 0
-STATUS_SUCCESS = 1
-STATUS_RUNNING = 2
-
-local PMF_QUEUED = 1 << 12
+local constants = require("bots/consts.lua")
+local STATUS_FAILURE = constants.STATUS_FAILURE
+local STATUS_SUCCESS = constants.STATUS_SUCCESS
+local STATUS_RUNNING = constants.STATUS_RUNNING
+local PMF_QUEUED = constants.PMF_QUEUED
 package.loaded["bots/common.lua"] = nil
 
 local cache = require("bots/cache.lua")
 local common = require("bots/common.lua")
+local behavior_state = require("bots/state.lua")
 local weapons = Unv.weapons
 local elapsed_since = common.elapsed_since
 local is_alien = common.is_alien
@@ -21,14 +22,15 @@ local use_medkit_if_low = common.use_medkit_if_low
 local try_evolve_targets = common.try_evolve_targets
 local human_repair_target_info = common.human_repair_target_info
 local unstick = common.unstick
-local STATE = {
+local STATE = behavior_state.new_behavior("default", {
     alien_target_lock = {},
     alien_combat_until = {},
     alien_builder_owner = nil,
     builder_bp_enabled = {},
+    equip_retry_at = {},
     rush_retry_at = {},
     tasks = {},
-}
+}, { "alien_target_lock", "alien_combat_until", "equip_retry_at", "rush_retry_at", "tasks" })
 
 local function enemy_seen_recently(level, mind, duration)
     return mind.enemyLastSeen and mind.enemyLastSeen > 0
@@ -571,6 +573,10 @@ local function human_repair_target(mind)
     return info and info.target or nil
 end
 
+local function equip_and_buy_overload_for_bot(number, ctx)
+    return common.equip_and_buy_overload(ctx, STATE.equip_retry_at, number, sgame.level.time)
+end
+
 local maybe_fight
 
 local function maybe_retire_builder(team, number, client, builder, wants_build, level, ctx, mind)
@@ -585,7 +591,7 @@ local function maybe_retire_builder(team, number, client, builder, wants_build, 
         if client.weapon == "ckit" and cache.usable_build_points(team) < 10 then
             return ctx:buyPrimary("rifle")
         end
-        return common.equip_and_buy_overload(ctx)
+        return equip_and_buy_overload_for_bot(number, ctx)
     end
 
     if is_alien(team) then
@@ -622,26 +628,14 @@ local function maybe_builder_behavior(team, number, client, builder, wants_build
     end
 
     if anchor_distance == nil or anchor_distance > BUILDER_ANCHOR_RADIUS then
-        status = maybe_build(builder, team, ctx)
-        if status ~= STATUS_FAILURE then
-            return status
-        end
-
         if anchor then
-            status = ctx:roamInRadius(anchor, BUILDER_ANCHOR_RADIUS)
-            if status ~= STATUS_FAILURE then
-                return status
-            end
+            return ctx:roamInRadius(anchor, BUILDER_ANCHOR_RADIUS)
         end
-
         return ctx:roam()
     end
 
     if builder then
-        status = maybe_build(builder, team, ctx)
-        if status ~= STATUS_FAILURE then
-            return status
-        end
+        return maybe_build(builder, team, ctx)
     end
 
     if anchor then
@@ -693,13 +687,7 @@ local function maybe_use_medkit(team, client, ctx, enemy_visible, level, mind)
     return STATUS_FAILURE
 end
 
-local function maybe_extinguish_fire(team, client, ctx)
-    if not is_alien(team) or client.class ~= "builderupg" or cache.cvar("g_bot_extinguishFire") == "0" then
-        return STATUS_FAILURE
-    end
-
-    return ctx:extinguishFire()
-end
+local maybe_extinguish_fire = common.maybe_extinguish_fire
 
 local function maybe_evolve(self, team, client, builder, health_frac, ctx, level, mind, enemy_visible)
     if not is_alien(team) then
@@ -855,14 +843,29 @@ local function maybe_reload(team, client, weapon_attr, level, ctx, mind, enemy_v
     return ctx:reload()
 end
 
-local function maybe_equip(team, client, level, ctx, mind, enemy_visible)
+local function maybe_return_for_ammo(team, number, client, weapon_attr, mind, ctx)
+    if not is_human(team) or client.weapon == "ckit" or not weapon_attr or weapon_attr.ammo <= 0
+        or (client.ammo or 0) > 0 then
+        return STATUS_FAILURE
+    end
+    local armoury = mind:closestBuilding("arm")
+    if not armoury then
+        return STATUS_FAILURE
+    end
+    if armoury.distance and armoury.distance <= 100 then
+        return equip_and_buy_overload_for_bot(number, ctx)
+    end
+    return ctx:moveTo("arm")
+end
+
+local function maybe_equip(team, number, client, level, ctx, mind, enemy_visible)
     if not is_human(team) or client.weapon == "ckit" or enemy_visible
         or enemy_seen_recently(level, mind, 3000)
         or human_repair_target(mind) then
         return STATUS_FAILURE
     end
 
-    return common.equip_and_buy_overload(ctx)
+    return equip_and_buy_overload_for_bot(number, ctx)
 end
 
 local function maybe_flee_human(team, weapon, enemy_visible, ctx)
@@ -999,6 +1002,10 @@ local function run_roam_task(task, state, ctx)
             return status
         end
 
+        if state.builder then
+            local anchor = main_building_name(state.team)
+            return anchor and ctx:roamInRadius(anchor, BUILDER_ANCHOR_RADIUS) or STATUS_FAILURE
+        end
         return ctx:roam()
     end
 
@@ -1013,12 +1020,17 @@ local function run_roam_task(task, state, ctx)
         return status
     end
 
+    status = maybe_return_for_ammo(state.team, state.number, state.client, state.weapon_attr, state.mind, ctx)
+    if status ~= STATUS_FAILURE then
+        return status
+    end
+
     status = maybe_reload(state.team, state.client, state.weapon_attr, state.level, ctx, state.mind, state.enemy_visible)
     if status ~= STATUS_FAILURE then
         return status
     end
 
-    status = maybe_equip(state.team, state.client, state.level, ctx, state.mind, state.enemy_visible)
+    status = maybe_equip(state.team, state.number, state.client, state.level, ctx, state.mind, state.enemy_visible)
     if status ~= STATUS_FAILURE then
         return status
     end
@@ -1038,6 +1050,10 @@ local function run_roam_task(task, state, ctx)
         return status
     end
 
+    if state.builder then
+        local anchor = main_building_name(state.team)
+        return anchor and ctx:roamInRadius(anchor, BUILDER_ANCHOR_RADIUS) or STATUS_FAILURE
+    end
     return ctx:roam()
 end
 
@@ -1179,7 +1195,7 @@ return function(self, ctx)
     -- another task.  Previously equip was only reached after the newly
     -- started task had failed, so long-running tasks could prevent bots with
     -- enough credits from ever attempting to buy armor or other equipment.
-    status = maybe_equip(state.team, state.client, state.level, ctx, state.mind, state.enemy_visible)
+    status = maybe_equip(state.team, state.number, state.client, state.level, ctx, state.mind, state.enemy_visible)
     if status ~= STATUS_FAILURE then
         return status
     end

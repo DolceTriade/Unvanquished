@@ -1,11 +1,12 @@
-STATUS_FAILURE = 0
-STATUS_SUCCESS = 1
-STATUS_RUNNING = 2
-
-local PMF_QUEUED = 1 << 12
+local constants = require("bots/consts.lua")
+local STATUS_FAILURE = constants.STATUS_FAILURE
+local STATUS_SUCCESS = constants.STATUS_SUCCESS
+local STATUS_RUNNING = constants.STATUS_RUNNING
+local PMF_QUEUED = constants.PMF_QUEUED
 
 local cache = require("bots/cache.lua")
 local common = require("bots/common.lua")
+local behavior_state = require("bots/state.lua")
 local task_runtime = require("bots/task.lua")
 local weapons = Unv.weapons
 local is_alien = common.is_alien
@@ -22,9 +23,13 @@ local human_repair_target_info = common.human_repair_target_info
 local roam_buildings = common.roam_buildings
 local unstick = common.unstick
 local TASKS = task_runtime.new_runtime()
-local STATE = {
-    human_equip_retry_at = {},
-}
+local STATE = behavior_state.new_behavior("defend", {
+    equip_retry_at = {},
+}, { "equip_retry_at" })
+
+local function equip_and_buy_overload_for_bot(number, level, ctx)
+    return common.equip_and_buy_overload(ctx, STATE.equip_retry_at, number, level.time)
+end
 
 local function entity_is_alive(entity)
     if not entity then
@@ -48,13 +53,7 @@ local function maybe_use_medkit(team, client, ctx)
     return use_medkit_if_low(team, client, ctx, 50)
 end
 
-local function maybe_extinguish_fire(team, client, ctx)
-    if not is_alien(team) or client.class ~= "builderupg" or cache.cvar("g_bot_extinguishFire") == "0" then
-        return STATUS_FAILURE
-    end
-
-    return ctx:extinguishFire()
-end
+local maybe_extinguish_fire = common.maybe_extinguish_fire
 
 local ALIEN_EVOLVE_TARGETS = common.ALIEN_EVOLVE_TARGETS
 
@@ -83,7 +82,7 @@ local function repair_target_info(mind)
     return human_repair_target_info(mind)
 end
 
-local function maybe_retire_repair_kit(team, client, mind, ctx)
+local function maybe_retire_repair_kit(team, number, client, level, mind, ctx)
     if not is_human(team) or client.weapon ~= "ckit" then
         return STATUS_FAILURE
     end
@@ -92,7 +91,7 @@ local function maybe_retire_repair_kit(team, client, mind, ctx)
         return STATUS_FAILURE
     end
 
-    return common.equip_and_buy_overload(ctx)
+    return equip_and_buy_overload_for_bot(number, level, ctx)
 end
 
 local function maybe_repair(team, number, client, ctx, mind)
@@ -132,7 +131,21 @@ local function maybe_reload(team, client, weapon_attr, enemy_visible, level, min
     return ctx:reload()
 end
 
-local function maybe_equip(team, enemy_visible, level, mind, ctx)
+local function maybe_return_for_ammo(team, number, client, weapon_attr, level, mind, ctx)
+    if not is_human(team) or not weapon_attr or weapon_attr.ammo <= 0 or (client.ammo or 0) > 0 then
+        return STATUS_FAILURE
+    end
+    local armoury = mind:closestBuilding("arm")
+    if not armoury then
+        return STATUS_FAILURE
+    end
+    if armoury.distance and armoury.distance <= 100 then
+        return equip_and_buy_overload_for_bot(number, level, ctx)
+    end
+    return ctx:moveTo("arm")
+end
+
+local function maybe_equip(team, number, enemy_visible, level, mind, ctx)
     if not is_human(team)
         or enemy_visible
         or elapsed_since(level.time, mind.enemyLastSeen) <= 1000 then
@@ -148,7 +161,7 @@ local function maybe_equip(team, enemy_visible, level, mind, ctx)
         return ctx:moveTo("arm")
     end
 
-    return common.equip_and_buy_overload(ctx)
+    return equip_and_buy_overload_for_bot(number, level, ctx)
 end
 
 local function maybe_fight_human(team, client, enemy_visible, attack_active, mind, ctx)
@@ -244,11 +257,17 @@ local function roam_friendly_base(state, ctx)
         if status ~= STATUS_FAILURE then
             return status
         end
+        if state.client.class == "builder" or state.client.class == "builderupg" then
+            return ctx:roamInRadius("overmind", 500)
+        end
         status = roam_buildings(ctx, { "overmind", "eggpod", "booster" }, 500)
         return status ~= STATUS_FAILURE and status or ctx:roam()
     end
 
     if is_human(state.team) then
+        if state.client.weapon == "ckit" then
+            return ctx:roamInRadius("reactor", 500)
+        end
         local status = roam_buildings(ctx, { "reactor", "telenode", "arm", "medistat" }, 500)
         return status ~= STATUS_FAILURE and status or ctx:roam()
     end
@@ -328,7 +347,7 @@ local function human_should_equip(number, team, enemy_visible, level, mind)
         return false
     end
 
-    local retry_at = STATE.human_equip_retry_at[number]
+    local retry_at = STATE.equip_retry_at[number]
     if retry_at and retry_at > level.time then
         return false
     end
@@ -411,7 +430,13 @@ local REPAIR_HEAL_TASK = {
             return status
         end
 
-        status = maybe_retire_repair_kit(state.team, state.client, state.mind, ctx)
+        status = maybe_retire_repair_kit(state.team, state.number, state.client, state.level, state.mind, ctx)
+        if status ~= STATUS_FAILURE then
+            return status
+        end
+
+        status = maybe_return_for_ammo(state.team, state.number, state.client, state.weapon_attr,
+            state.level, state.mind, ctx)
         if status ~= STATUS_FAILURE then
             return status
         end
@@ -423,13 +448,10 @@ local REPAIR_HEAL_TASK = {
         end
 
         if human_should_equip(state.number, state.team, state.enemy_visible, state.level, state.mind) then
-            status = maybe_equip(state.team, state.enemy_visible, state.level, state.mind, ctx)
+            status = maybe_equip(state.team, state.number, state.enemy_visible, state.level, state.mind, ctx)
             if status == STATUS_FAILURE then
-                STATE.human_equip_retry_at[state.number] = state.level.time + 2000
                 return STATUS_FAILURE
             end
-
-            STATE.human_equip_retry_at[state.number] = nil
             return status
         end
 
@@ -526,6 +548,13 @@ return function(self, ctx)
     status = TASKS.run(task, state, ctx)
     if status ~= STATUS_FAILURE then
         return status
+    end
+
+    if is_human(self.team) and client.weapon == "ckit" then
+        return ctx:roamInRadius("reactor", 500)
+    end
+    if is_alien(self.team) and (client.class == "builder" or client.class == "builderupg") then
+        return ctx:roamInRadius("overmind", 500)
     end
 
     return ctx:roam()

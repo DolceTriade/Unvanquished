@@ -2057,11 +2057,20 @@ AINodeStatus_t BotActionBuy( gentity_t *self, AIGenericNode_t *node )
 	upgrade_t upgrades[ARRAY_LENGTH];
 	int numUpgrades;
 	int i;
+	const bool forceLoadoutRefresh = buy->nparams == 0;
 
 	if ( buy->nparams == 0 )
 	{
 		// equip action
-		numUpgrades = BotGetDesiredBuy( self, weapon, upgrades, ARRAY_LENGTH);
+		if ( forceLoadoutRefresh )
+		{
+			weapon = WP_NONE;
+			numUpgrades = 0;
+		}
+		else
+		{
+			numUpgrades = BotGetDesiredBuy( self, weapon, upgrades, ARRAY_LENGTH);
+		}
 	}
 	else
 	{
@@ -2139,7 +2148,8 @@ AINodeStatus_t BotActionBuy( gentity_t *self, AIGenericNode_t *node )
 	}
 
 	//check if we already have everything
-	if ( BG_InventoryContainsWeapon( weapon, self->client->ps.stats ) || weapon == WP_NONE )
+	if ( !forceLoadoutRefresh &&
+	     ( BG_InventoryContainsWeapon( weapon, self->client->ps.stats ) || weapon == WP_NONE ) )
 	{
 		int numContain = 0;
 
@@ -2179,6 +2189,14 @@ AINodeStatus_t BotActionBuy( gentity_t *self, AIGenericNode_t *node )
 
 	if ( GoalInRange( self, ENTITY_USE_RANGE ) )
 	{
+		if ( forceLoadoutRefresh )
+		{
+			// Sell first so the refunded credits and freed slots inform the new loadout.
+			BotSellWeapons( self );
+			BotSellUpgrades( self, -1 );
+			numUpgrades = BotGetDesiredBuy( self, weapon, upgrades, ARRAY_LENGTH);
+		}
+
 		// Only replace upgrades which conflict with a new requested item.
 		// Including owned armor in the loadout must not sell it or utilities.
 		int conflictingSlots = 0;
