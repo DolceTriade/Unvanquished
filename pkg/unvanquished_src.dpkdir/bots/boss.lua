@@ -1,13 +1,25 @@
-local PMF_QUEUED = 1 << 12
+local constants = require("bots/consts.lua")
+local STATUS_FAILURE = constants.STATUS_FAILURE
+local STATUS_RUNNING = constants.STATUS_RUNNING
+local PMF_QUEUED = constants.PMF_QUEUED
 
 local common = require("bots/common.lua")
 local cache = require("bots/cache.lua")
+local behavior_state = require("bots/state.lua")
 
 local M = {}
-local CONTROLLERS = {}
-local PENDING_ADDS = {}
-local ACTIVE_BOSSES = {}
-local BOSS_EPOCHS = { humans = 0, aliens = 0 }
+local STATE = behavior_state.new_behavior("boss", {
+    controllers = {},
+    pending_adds = {},
+    active_bosses = {},
+    equip_retry_at = {},
+    epochs = { humans = 0, aliens = 0 },
+}, { "equip_retry_at" })
+local CONTROLLERS = STATE.controllers
+local PENDING_ADDS = STATE.pending_adds
+local ACTIVE_BOSSES = STATE.active_bosses
+local EQUIP_RETRY_AT = STATE.equip_retry_at
+local BOSS_EPOCHS = STATE.epochs
 
 local function team_name(team)
     if common.is_human(team) then
@@ -148,7 +160,8 @@ local function ensure_human_loadout(spec, self, ctx, state)
             return STATUS_RUNNING
         end
     else
-        local status = common.equip_and_buy_overload(ctx)
+        local status = common.equip_and_buy_overload(
+            ctx, EQUIP_RETRY_AT, self.number, sgame.level.time)
         if status ~= STATUS_FAILURE then
             return STATUS_RUNNING
         end

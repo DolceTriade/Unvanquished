@@ -809,7 +809,8 @@ int BotGetDesiredBuy( gentity_t *self, weapon_t &weapon, upgrade_t upgrades[], s
 
 	buyArmor();
 	const bool onlyBlaster = self->client->ps.stats[ STAT_WEAPON ] == WP_NONE ||
-	                         self->client->ps.stats[ STAT_WEAPON ] == WP_BLASTER;
+	                         self->client->ps.stats[ STAT_WEAPON ] == WP_BLASTER ||
+	                         self->client->ps.stats[ STAT_WEAPON ] == WP_HBUILD;
 	if ( !armorSelected )
 	{
 		if ( onlyBlaster )

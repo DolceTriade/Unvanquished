@@ -1,12 +1,13 @@
-STATUS_FAILURE = 0
-STATUS_SUCCESS = 1
-STATUS_RUNNING = 2
-
-local PMF_QUEUED = 1 << 12
+local constants = require("bots/consts.lua")
+local STATUS_FAILURE = constants.STATUS_FAILURE
+local STATUS_SUCCESS = constants.STATUS_SUCCESS
+local STATUS_RUNNING = constants.STATUS_RUNNING
+local PMF_QUEUED = constants.PMF_QUEUED
 package.loaded["bots/common.lua"] = nil
 
 local cache = require("bots/cache.lua")
 local common = require("bots/common.lua")
+local behavior_state = require("bots/state.lua")
 local boss = require("bots/boss.lua")
 local weapons = Unv.weapons
 local random = math.random
@@ -23,7 +24,7 @@ local try_evolve_targets = common.try_evolve_targets
 local human_repair_target_info = common.human_repair_target_info
 local roam_buildings = common.roam_buildings
 local unstick = common.unstick
-local STATE = {
+local STATE = behavior_state.new_behavior("pve", {
     alien_target_lock = {},
     alien_combat_until = {},
     builder_assignment = {},
@@ -31,9 +32,15 @@ local STATE = {
     build_retry_after = {},
     build_reposition_until = {},
     human_equip_retry_at = {},
+    equip_retry_at = {},
+    spawn_evolve_attempt_time = {},
     tasks = {},
     boss_epoch = {},
-}
+}, {
+    "alien_target_lock", "alien_combat_until", "builder_assignment", "build_failures",
+    "build_retry_after", "build_reposition_until", "human_equip_retry_at", "equip_retry_at",
+    "spawn_evolve_attempt_time", "tasks",
+})
 
 local PVE_MAX_BUILDERS = 3
 local PVE_BUILD_JITTER_MS = 5000
@@ -45,6 +52,10 @@ local PVE_HUMAN_BUILDER_SEARCH_MS = 4000
 local PVE_HUMAN_PRESSURE_RADIUS = 500
 local ALIEN_EVOLVE_TARGETS = common.ALIEN_EVOLVE_TARGETS
 local ALIEN_COMBAT_TARGETS = common.ALIEN_COMBAT_TARGETS
+
+local function enemy_seen_since_spawn(mind)
+    return mind.enemyLastSeen and mind.spawnTime and mind.enemyLastSeen >= mind.spawnTime
+end
 local function random_choice(options)
     if not options or #options == 0 then
         return nil
@@ -546,6 +557,11 @@ local function builder_needed(team_name, number, team_snapshot, level, selected_
         and builder_count(team_name, team_snapshot, number) < max_builders
 end
 
+local function main_buildable_missing(team_name, team_snapshot)
+    local main = is_human(team_name) and "reactor" or is_alien(team_name) and "overmind" or nil
+    return main ~= nil and team_snapshot and (team_snapshot.buildables[main] or 0) == 0
+end
+
 local function can_convert_to_builder_now(team, client, level)
     if not is_alien(team) then
         return true
@@ -556,6 +572,20 @@ local function can_convert_to_builder_now(team, client, level)
 end
 
 local function wants_builder(team_name, number, team_snapshot, level, builder, selected_buildable)
+    if main_buildable_missing(team_name, team_snapshot) and selected_buildable == (is_human(team_name) and "reactor" or "overmind") then
+        if has_builder_assignment(number, team_name) then
+            return true
+        end
+
+        -- One builder can restore the missing main structure. Leave the other
+        -- alien bots free to evolve and fight.
+        if builder_count(team_name, team_snapshot, number) == 0 then
+            assign_builder(number, team_name)
+            return true
+        end
+
+        return false
+    end
     if has_builder_assignment(number) then
         if builder_needed(team_name, number, team_snapshot, level, selected_buildable, true) then
             return true
@@ -578,6 +608,18 @@ local function wants_builder(team_name, number, team_snapshot, level, builder, s
 end
 
 local function wants_builder_spawn(team_name, number, team_snapshot, level, selected_buildable)
+    if main_buildable_missing(team_name, team_snapshot) and selected_buildable == (is_human(team_name) and "reactor" or "overmind") then
+        if has_builder_assignment(number, team_name) then
+            return true
+        end
+
+        if builder_count(team_name, team_snapshot, number) == 0 then
+            assign_builder(number, team_name)
+            return true
+        end
+
+        return false
+    end
     if has_builder_assignment(number) then
         if builder_needed(team_name, number, team_snapshot, level, selected_buildable, true) then
             return true
@@ -739,7 +781,7 @@ end
 local function human_resupply_phase(number, level, client, weapon_attr, mind)
     if out_of_human_ammo(client, weapon_attr) then
         local armoury_distance = human_armoury_distance(mind)
-        if armoury_distance and armoury_distance < 500 then
+        if armoury_distance and armoury_distance <= 100 then
             return "equip"
         end
 
@@ -761,7 +803,7 @@ local function maybe_retire_builder(team, number, client, builder, wants_build, 
         if client.weapon == "ckit" and cache.usable_build_points(team) < 10 then
             return ctx:buyPrimary("rifle")
         end
-        return common.equip_and_buy_overload(ctx)
+        return common.equip_and_buy_overload(ctx, STATE.equip_retry_at, number, level.time)
     end
 
     if is_alien(team) then
@@ -786,15 +828,10 @@ local function maybe_use_medkit(team, client, ctx)
     return STATUS_FAILURE
 end
 
-local function maybe_extinguish_fire(team, client, ctx)
-    if not is_alien(team) or client.class ~= "builderupg" or cache.cvar("g_bot_extinguishFire") == "0" then
-        return STATUS_FAILURE
-    end
+local maybe_extinguish_fire = common.maybe_extinguish_fire
 
-    return ctx:extinguishFire()
-end
-
-local function maybe_evolve(self, team, client, builder, health_frac, ctx, level, mind, enemy_visible)
+local function maybe_evolve(self, team, client, builder, health_frac, ctx, level, mind, enemy_visible,
+    post_spawn_attempt)
     if not is_alien(team) then
         return STATUS_FAILURE
     end
@@ -803,12 +840,12 @@ local function maybe_evolve(self, team, client, builder, health_frac, ctx, level
         return STATUS_FAILURE
     end
 
-    if enemy_visible then
+    if enemy_visible and not post_spawn_attempt then
         return STATUS_FAILURE
     end
 
     local spawn_elapsed = elapsed_since(level.time, mind.spawnTime)
-    if spawn_elapsed <= 1500 then
+    if spawn_elapsed <= 1500 and not post_spawn_attempt then
         return STATUS_FAILURE
     end
 
@@ -816,7 +853,8 @@ local function maybe_evolve(self, team, client, builder, health_frac, ctx, level
         return STATUS_FAILURE
     end
 
-    return try_evolve_targets(self, ctx, client, level, ALIEN_EVOLVE_TARGETS)
+    local status = try_evolve_targets(self, ctx, client, level, ALIEN_EVOLVE_TARGETS)
+    return status, true
 end
 
 maybe_fight = function(team, weapon, enemy, enemy_target, hostile_goal, enemy_visible, ctx)
@@ -849,7 +887,8 @@ local function maybe_heal_or_fight_alien(number, health_frac, enemy, enemy_targe
     local booster_distance = building_distance(mind, "booster")
     local in_safe_heal_area = (overmind_distance and overmind_distance <= 200)
         or (booster_distance and booster_distance <= 200)
-    local recently_in_combat = elapsed_since(level.time, mind.enemyLastSeen) < 2000
+        local recently_in_combat = enemy_seen_since_spawn(mind)
+            and elapsed_since(level.time, mind.enemyLastSeen) < 2000
     local recently_attacked = recently_attacked(level, mind, 2000)
     local latched = alien_combat_latched(number, level.time)
     local alerted = enemy ~= nil or hostile_goal or recently_in_combat or latched
@@ -961,7 +1000,7 @@ local function maybe_equip(team, number, level, ctx, mind, enemy_visible)
         return STATUS_FAILURE
     end
 
-    return common.equip_and_buy_overload(ctx)
+    return common.equip_and_buy_overload(ctx, STATE.equip_retry_at, number, level.time)
 end
 
 local function maybe_resupply_human(team, number, level, client, weapon_attr, mind, ctx)
@@ -975,11 +1014,11 @@ local function maybe_resupply_human(team, number, level, client, weapon_attr, mi
 
     local phase = human_resupply_phase(number, level, client, weapon_attr, mind)
     if phase == "equip" then
-        return common.equip_and_buy_overload(ctx)
+        return common.equip_and_buy_overload(ctx, STATE.equip_retry_at, number, level.time)
     end
 
     if phase == "move_to_arm" then
-        local status = ctx:roamInRadius("arm", PVE_HUMAN_PRESSURE_RADIUS)
+        local status = ctx:roamInRadius("arm", 1500)
         if status ~= STATUS_FAILURE then
             return status
         end
@@ -1026,7 +1065,8 @@ local function combat_active(state)
     end
 
     if is_alien(state.team) then
-        local recently_in_combat = elapsed_since(state.level.time, state.mind.enemyLastSeen) < 2000
+        local recently_in_combat = enemy_seen_since_spawn(state.mind)
+            and elapsed_since(state.level.time, state.mind.enemyLastSeen) < 2000
         return recently_in_combat or alien_combat_latched(state.number, state.level.time)
     end
 
@@ -1054,7 +1094,7 @@ local function run_builder_task(task, state, ctx)
             task.phase = "search"
             task.search_until = state.level.time + PVE_HUMAN_BUILDER_SEARCH_MS
         else
-            return common.equip_and_buy_overload(ctx)
+            return common.equip_and_buy_overload(ctx, STATE.equip_retry_at, state.number, state.level.time)
         end
     end
 
@@ -1348,6 +1388,7 @@ return function(self, ctx)
         clear_alien_combat_latch(number)
         clear_task(number)
         clear_build_failure_state(number)
+        STATE.spawn_evolve_attempt_time[number] = nil
         return choose_spawn(team, number, team_snapshot, team_level_data, selected_buildable, ctx)
     end
 
@@ -1430,6 +1471,17 @@ return function(self, ctx)
         base_rush_score = base_rush_score,
         mind = mind,
     }
+
+    if is_alien(team) and STATE.spawn_evolve_attempt_time[number] ~= mind.spawnTime then
+        status = maybe_evolve(self, team, client, builder, health_frac, ctx,
+            level, mind, enemy_visible, true)
+        if builder or status ~= STATUS_FAILURE then
+            STATE.spawn_evolve_attempt_time[number] = mind.spawnTime
+        end
+        if status ~= STATUS_FAILURE then
+            return status
+        end
+    end
 
     local task = current_task(number)
     if task then

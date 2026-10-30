@@ -1,5 +1,10 @@
 local M = {}
 local RUNNING_ACTIONS = {}
+local constants = require("bots/consts.lua")
+local STATUS_FAILURE = constants.STATUS_FAILURE
+local STATUS_SUCCESS = constants.STATUS_SUCCESS
+local STATUS_RUNNING = constants.STATUS_RUNNING
+local cache = require("bots/cache.lua")
 
 M.ALIEN_EVOLVE_TARGETS = {
     "level4",
@@ -34,6 +39,14 @@ end
 
 function M.is_human(team)
     return team == "human" or team == "humans"
+end
+
+function M.maybe_extinguish_fire(team, client, ctx)
+    if not M.is_alien(team) or client.class ~= "builderupg" or cache.cvar("g_bot_extinguishFire") == "0" then
+        return STATUS_FAILURE
+    end
+
+    return ctx:extinguishFire()
 end
 
 function M.alive(self)
@@ -276,9 +289,19 @@ function M.buy_overload_upgrades(self, ctx)
     return ctx:buyOverloadUpgrades()
 end
 
-function M.equip_and_buy_overload(ctx)
+local EQUIP_RETRY_COOLDOWN_MS = 30000
+
+function M.equip_and_buy_overload(ctx, retry_times, slot, now)
+    local retry_at = retry_times and slot and retry_times[slot]
+    if now and retry_at and retry_at > now then
+        return STATUS_FAILURE
+    end
+
     local status = ctx:equip()
     M.buy_overload_upgrades(true, ctx)
+    if status == STATUS_SUCCESS and retry_times and slot and now then
+        retry_times[slot] = now + EQUIP_RETRY_COOLDOWN_MS
+    end
     return status
 end
 

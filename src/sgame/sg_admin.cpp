@@ -6130,6 +6130,7 @@ static void BotUsage( gentity_t *ent )
 	                                        "            bot names (clear | list)\n"
 	                                        "            bot behavior (<name> | <slot#>) <behavior> [<name> | <slot#> | <x> <y> <z>]\n"
 	                                        "            bot unloadBehavior <behavior>\n"
+	                                        "            bot forceReloadBehaviors\n"
 	                                        "            bot skill <skill level> [<team>]" ) );
 	ADMP( bot_usage );
 }
@@ -6491,6 +6492,19 @@ bool G_admin_bot( gentity_t *ent )
 		{
 			G_admin_action( QQ( N_("^3bot:^* $1$^* unloaded cached behavior ^3$2$") ),
 			                "%s %s", ent, Quote( behavior ) );
+		}
+	}
+	else if ( !Q_stricmp( arg1, "forceReloadBehaviors" ) && args.Argc() == 2 )
+	{
+		int reloaded = G_BotForceReloadBehaviors();
+		if ( ent )
+		{
+			G_admin_action( QQ( N_( "^3bot:^* $1$^* force-reloaded behaviors for $2$ bots" ) ),
+			                "%s %d", ent, reloaded );
+		}
+		else
+		{
+			ADMP( va( "%d bot behaviors force-reloaded", reloaded ) );
 		}
 	}
 	else if ( !Q_stricmp( arg1, "names" ) && args.Argc() >= 3 )

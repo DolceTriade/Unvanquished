@@ -364,6 +364,45 @@ bool G_BotSetBehavior( botMemory_t *botMind, team_t team, Str::StringRef behavio
 	return true;
 }
 
+int G_BotForceReloadBehaviors()
+{
+	struct botBehavior {
+		std::string behavior;
+		int slot;
+	};
+	std::vector<botBehavior> behaviors;
+	behaviors.reserve( level.numPlayingBots );
+
+	for ( int i = 0; i < MAX_CLIENTS; ++i )
+	{
+		gentity_t *bot = &g_entities[ i ];
+		if ( !bot->client || bot->client->pers.connected == CON_DISCONNECTED
+		     || !bot->client->pers.isBot || !bot->botMind )
+		{
+			continue;
+		}
+
+		std::string behavior = bot->botMind->behaviorTree
+		                     ? bot->botMind->behaviorTree->name
+		                     : G_BotDefaultBehavior( static_cast<team_t>( bot->client->pers.team ) );
+		behaviors.push_back( { std::move( behavior ), i } );
+
+		// Detach every bot before freeing the cache so no live mind points into it.
+		G_Bot_ResetBehaviorState( *bot->botMind );
+		bot->botMind->behaviorTree = nullptr;
+	}
+
+	FreeTreeList( &treeList );
+
+	for ( const auto &bb : behaviors )
+	{
+		gentity_t *bot = &g_entities[ bb.slot ];
+		G_BotSetBehavior( bot->botMind, static_cast<team_t>( bot->client->pers.team ), bb.behavior );
+	}
+
+	return behaviors.size();
+}
+
 static void G_InitBotMind( int clientNum )
 {
 	gentity_t *self = &g_entities[ clientNum ];

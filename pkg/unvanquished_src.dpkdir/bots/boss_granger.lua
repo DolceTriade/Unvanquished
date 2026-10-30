@@ -1,10 +1,12 @@
-STATUS_FAILURE = 0
-STATUS_SUCCESS = 1
-STATUS_RUNNING = 2
+local constants = require("bots/consts.lua")
+local STATUS_FAILURE = constants.STATUS_FAILURE
+local STATUS_SUCCESS = constants.STATUS_SUCCESS
+local STATUS_RUNNING = constants.STATUS_RUNNING
 
 package.loaded["bots/common.lua"] = nil
 
 local common = require("bots/common.lua")
+local behavior_state = require("bots/state.lua")
 local boss = require("bots/boss.lua")
 local task_runtime = require("bots/task.lua")
 
@@ -23,7 +25,7 @@ local STANDOFF_RETRY_MS = 400
 local STANDOFF_MIN_SEPARATION_GAIN = 24
 local RECOVERY_ABORT_ATTEMPTS = 3
 local TARGET_ABANDON_DURATION_MS = 4000
-local LOOK_STATE = {}
+local LOOK_STATE = behavior_state.new_behavior("boss_granger", { look = {} }, { "look" }).look
 local RECOVERY_DIRS = { "left", "right", "backward", "forward" }
 
 local GRANGER_SPAWN_CANDIDATES = {
