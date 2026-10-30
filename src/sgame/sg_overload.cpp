@@ -1642,10 +1642,10 @@ static void BuildOverloadCatalog()
 	AddUpgrade( TEAM_HUMANS, DefaultUpgradeBaseCost( 0 ), DefaultUpgradeStepCost( 0 ), OVERLOAD_UNCAPPED_RANKS, "medistat", "Medistation", "healing_rate", "healing rate", "Medistation Healing Rate", "Increase medistation health restoration.",
 	            { GameplayEffect( "MEDISTAT_HEAL_RATE", 0.0075, 0.0 ),
 				  GameplayEffect( "STAMINA_MEDISTAT_RESTORE", 33, 0 ) } );
-	AddUpgrade( TEAM_HUMANS, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), DefaultUpgradeStepCost( 0 ), OVERLOAD_UNCAPPED_RANKS, "mgturret", "Machinegun Turret", "damage", "damage", "Machinegun Turret Damage", "Increase machinegun turret damage.",
+	AddUpgrade( TEAM_HUMANS, ExponentialGrowth( DefaultUpgradeBaseCost( OVERLOAD_STAGE3_COUNT ), 2.0 ), OVERLOAD_UNCAPPED_RANKS, "mgturret", "Machinegun Turret", "damage", "damage", "Machinegun Turret Damage", "Increase machinegun turret damage.",
 	            { GameplayEffect( "MGTURRET_MIN_DAMAGE", 1.0, 0.0 ),
 	              GameplayEffect( "MGTURRET_MAX_DAMAGE", 2.0, 1.0 ) } );
-	AddUpgrade( TEAM_HUMANS, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), DefaultUpgradeStepCost( OVERLOAD_STAGE2_COUNT ), OVERLOAD_UNCAPPED_RANKS, "rocketpod", "Rocket Pod", "damage", "damage", "Rocketpod Damage", "Increase rocketpod rocket damage.",
+	AddUpgrade( TEAM_HUMANS, DefaultUpgradeBaseCost( OVERLOAD_STAGE3_COUNT ), DefaultUpgradeStepCost( OVERLOAD_STAGE3_COUNT ), OVERLOAD_UNCAPPED_RANKS, "rocketpod", "Rocket Pod", "damage", "damage", "Rocketpod Damage", "Increase rocketpod rocket damage.",
 	            { AttributeEffect( BG_ATTR_MISSILE, "rocket", "damage", 5.0, 1.0 ),
 	              AttributeEffect( BG_ATTR_MISSILE, "rocket", "splash_damage", 8.0, 0.0 ) } );
 
