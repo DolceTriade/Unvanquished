@@ -26,6 +26,7 @@ local unstick = common.unstick
 local STATE = behavior_state.new_behavior("build", {
     alien_builder_owner = nil,
     equip_retry_at = {},
+    no_build_points_announced = { humans = false, aliens = false },
 }, { "equip_retry_at" })
 local TASKS = task_runtime.new_runtime()
 
@@ -578,6 +579,25 @@ local function maybe_empty_ammo_resupply(team, client, weapon_attr, ctx)
     return ctx:moveTo("arm")
 end
 
+local function maybe_retire_when_out_of_build_points(team, ctx)
+    local team_name = is_human(team) and "humans" or is_alien(team) and "aliens" or nil
+    if not team_name then
+        return STATUS_FAILURE
+    end
+
+    if cache.usable_build_points(team) > 0 then
+        STATE.no_build_points_announced[team_name] = false
+        return STATUS_FAILURE
+    end
+
+    if not STATE.no_build_points_announced[team_name] then
+        ctx:say("No build points left. Switching back to default behavior.", 1)
+        STATE.no_build_points_announced[team_name] = true
+    end
+
+    return ctx:changeBehavior(cache.default_behavior(team))
+end
+
 local function maybe_rush(builder, base_rush_score, ctx)
     if builder or base_rush_score <= 0.5 then
         return STATUS_FAILURE
@@ -801,6 +821,11 @@ return function(self, ctx)
     cache.refresh()
     local team_snapshot = cache.team(team)
 
+    local status = maybe_retire_when_out_of_build_points(team, ctx)
+    if status ~= STATUS_FAILURE then
+        return status
+    end
+
     if should_spawn(self, PMF_QUEUED) then
         return choose_spawn(team, number, team_snapshot, team_level_data, ctx)
     end
@@ -845,7 +870,7 @@ return function(self, ctx)
         mind.stuckTimer = level.time
     end
 
-    local status = unstick(level.time, ctx, mind, enemy, enemy_visible, team, client, builder)
+    status = unstick(level.time, ctx, mind, enemy, enemy_visible, team, client, builder)
     if status ~= STATUS_FAILURE then
         return status
     end
