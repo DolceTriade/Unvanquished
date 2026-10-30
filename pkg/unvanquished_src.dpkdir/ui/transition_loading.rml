@@ -102,8 +102,8 @@
 
 			.loading-logo {
 				position: absolute;
-				right: 1em;
-				bottom: 1em;
+				right: 0.25em;
+				bottom: 6em;
 				width: 20em;
 				height: 10em;
 			}
