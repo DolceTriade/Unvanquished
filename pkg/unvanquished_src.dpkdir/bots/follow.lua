@@ -190,6 +190,7 @@ local function select_task(state)
 end
 
 return function(self, ctx)
+    behavior_state.announce_first_execution("follow", self.number, ctx)
     if should_spawn(self, PMF_QUEUED) then
         return common.spawn_as_team_default(self.team, ctx, "level0", "rifle")
     end

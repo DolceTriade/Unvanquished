@@ -897,6 +897,7 @@ local function maybe_heal_or_fight_alien(number, health_frac, enemy, enemy_targe
     local stuck_for = elapsed_since(level.time, mind.stuckTime)
 
     if is_alien(team) and stuck_for > 45000 then
+        ctx:say("I've been stuck for too long and can't get free.")
         return ctx:suicide()
     end
 

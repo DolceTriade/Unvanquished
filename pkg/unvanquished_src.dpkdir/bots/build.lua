@@ -591,7 +591,7 @@ local function maybe_retire_when_out_of_build_points(team, ctx)
     end
 
     if not STATE.no_build_points_announced[team_name] then
-        ctx:say("No build points left. Switching back to default behavior.", 1)
+        ctx:say("No build points left. Retiring from builder duty and switching back to default behavior.", 1)
         STATE.no_build_points_announced[team_name] = true
     end
 
@@ -812,6 +812,7 @@ local function select_task(state)
 end
 
 return function(self, ctx)
+    behavior_state.announce_first_execution("build", self.number, ctx)
     local client = self.client
     local team = self.team
     local number = self.number

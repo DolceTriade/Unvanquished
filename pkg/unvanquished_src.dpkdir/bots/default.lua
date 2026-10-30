@@ -784,6 +784,7 @@ local function maybe_heal_or_fight_alien(number, health_frac, enemy, enemy_targe
     end
 
     if low_tier_alien and health_frac < 0.4 then
+        ctx:say("I'm too weak to continue as this alien class.")
         return ctx:suicide()
     end
 
@@ -1083,6 +1084,7 @@ select_task = function(state)
 end
 
 return function(self, ctx)
+    behavior_state.announce_first_execution("default", self.number, ctx)
     local client = self.client
     local team = self.team
     local number = self.number
