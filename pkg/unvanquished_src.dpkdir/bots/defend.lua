@@ -486,6 +486,7 @@ local function select_task(state)
 end
 
 return function(self, ctx)
+    behavior_state.announce_first_execution("defend", self.number, ctx)
     cache.refresh()
 
     if should_spawn(self, PMF_QUEUED) then

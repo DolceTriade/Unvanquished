@@ -2,6 +2,13 @@
 -- in their think loops.
 local M = {}
 local BEHAVIORS = {}
+local ANNOUNCED = {}
+function M.announce_first_execution(name, number, ctx)
+    local key = tostring(number) .. ":" .. name
+    if ANNOUNCED[key] then return end
+    ANNOUNCED[key] = true
+    ctx:say("Starting " .. name .. " behavior.", 1)
+end
 
 function M.new_behavior(name, initial, per_slot_fields)
     BEHAVIORS[name] = {
