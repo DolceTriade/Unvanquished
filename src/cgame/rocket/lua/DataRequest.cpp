@@ -1,15 +1,19 @@
 #include "cgame/rocket/lua/DataRequest.h"
 
+#include "cgame/rocket/rocket.h"
 #include <RmlUi/Lua/Interpreter.h>
 #include "cgame/cg_local.h"
 
+#include <algorithm>
 #include <cstdlib>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <utility>
 
 #include "common/Command.h"
 #include "shared/lua/Json.h"
+#include "shared/lua/Push.h"
 
 /// Request structured data from the server from cgame Lua.
 // @module cgame
@@ -27,6 +31,23 @@ struct Callbacks
 
 std::unordered_map<unsigned, Callbacks> pending;
 unsigned nextId = 1;
+std::unordered_map<std::string, int> pushHandlers;
+std::unordered_set<std::string> appliedPushIds;
+unsigned pushSequence = 0;
+
+int RegisterPushHandler( lua_State *L )
+{
+	const char *name = luaL_checkstring( L, 1 );
+	luaL_checktype( L, 2, LUA_TFUNCTION );
+	auto it = pushHandlers.find( name );
+	if ( it != pushHandlers.end() )
+	{
+		luaL_unref( L, LUA_REGISTRYINDEX, it->second );
+	}
+	lua_pushvalue( L, 2 );
+	pushHandlers[ name ] = luaL_ref( L, LUA_REGISTRYINDEX );
+	return 0;
+}
 
 /// Attach callbacks to a server data request.
 // @function Then
@@ -124,6 +145,164 @@ void CG_Rocket_RegisterDataRequest( lua_State *L )
 	lua_setglobal( L, "cgame" );
 }
 
+void CG_Rocket_RegisterPushCommands( lua_State *L )
+{
+	lua_getglobal( L, "cgame" );
+	if ( !lua_istable( L, -1 ) )
+	{
+		lua_pop( L, 1 );
+		lua_newtable( L );
+	}
+	lua_pushcfunction( L, RegisterPushHandler );
+	lua_setfield( L, -2, "RegisterPushHandler" );
+	lua_setglobal( L, "cgame" );
+}
+
+void CG_Rocket_PushCommandsReady()
+{
+	trap_SendClientCommand( "lua_push_reset\n" );
+}
+
+void CG_Rocket_HandlePushCommand()
+{
+	char seqBuffer[ 32 ], idBuffer[ 128 ], kindBuffer[ 8 ], payloadBuffer[ MAX_STRING_CHARS ];
+	Q_strncpyz( seqBuffer, CG_Argv( 1 ), sizeof( seqBuffer ) );
+	Q_strncpyz( idBuffer, CG_Argv( 2 ), sizeof( idBuffer ) );
+	Q_strncpyz( kindBuffer, CG_Argv( 3 ), sizeof( kindBuffer ) );
+	Q_strncpyz( payloadBuffer, CG_Argv( 4 ), sizeof( payloadBuffer ) );
+	char *end = nullptr;
+	unsigned seq = static_cast<unsigned>( std::strtoul( seqBuffer, &end, 10 ) );
+	if ( !*seqBuffer || !end || *end || !*idBuffer )
+	{
+		return;
+	}
+	std::string id( idBuffer );
+	if ( seq <= pushSequence && appliedPushIds.count( id ) )
+	{
+		trap_SendClientCommand( Str::Format( "lua_push_ack %u\n", pushSequence ).c_str() );
+		return;
+	}
+	if ( seq != pushSequence + 1 )
+	{
+		trap_SendClientCommand( "lua_push_resume\n" );
+		return;
+	}
+	lua_State *L = Rml::Lua::Interpreter::GetLuaState();
+	if ( !L )
+	{
+		return;
+	}
+	std::string payload( payloadBuffer );
+	int base = lua_gettop( L );
+	std::string jsonError;
+	bool ok = Shared::Lua::DecodeJson( L, payload.c_str(), jsonError );
+	int payloadIndex = 0;
+	if ( ok && lua_istable( L, -1 ) )
+	{
+		payloadIndex = lua_absindex( L, -1 );
+	}
+	else
+	{
+		ok = false;
+	}
+	std::string name;
+	if ( ok && kindBuffer[ 0 ] == Shared::Lua::Push::SKIP )
+	{
+		// A retracted command still consumes its original stream position.
+	}
+	else if ( ok && kindBuffer[ 0 ] == Shared::Lua::Push::HANDLER )
+	{
+		lua_getfield( L, payloadIndex, "handler" );
+		if ( lua_type( L, -1 ) == LUA_TSTRING )
+		{
+			name = lua_tostring( L, -1 );
+		}
+		else
+		{
+			ok = false;
+		}
+		lua_pop( L, 1 );
+		auto handler = pushHandlers.find( name );
+		if ( handler == pushHandlers.end() )
+		{
+			ok = false;
+		}
+		else
+		{
+			lua_getfield( L, payloadIndex, "data" );
+			lua_rawgeti( L, LUA_REGISTRYINDEX, handler->second );
+			lua_insert( L, -2 );
+			ok = lua_pcall( L, 1, 0, 0 ) == LUA_OK;
+		}
+	}
+	else if ( ok && kindBuffer[ 0 ] == Shared::Lua::Push::LUA )
+	{
+		lua_getfield( L, payloadIndex, "source" );
+		if ( lua_type( L, -1 ) == LUA_TSTRING )
+		{
+			name = lua_tostring( L, -1 );
+		}
+		else
+		{
+			ok = false;
+		}
+		lua_pop( L, 1 );
+		std::string wrapped = "local data = ...\n" + name;
+		lua_getfield( L, payloadIndex, "data" );
+		if ( ok && luaL_loadstring( L, wrapped.c_str() ) == LUA_OK )
+		{
+			lua_insert( L, -2 );
+			ok = lua_pcall( L, 1, 0, 0 ) == LUA_OK;
+		}
+		else
+		{
+			ok = false;
+		}
+	}
+	else
+	{
+		ok = false;
+	}
+	if ( !ok )
+	{
+		const char *error = lua_tostring( L, -1 );
+		Log::Warn( "cgame push command %s at sequence %u rejected: %s", id.c_str(), seq,
+		           error ? error : "invalid payload or unknown handler" );
+		lua_settop( L, base );
+		pushSequence = seq;
+		appliedPushIds.insert( id );
+		trap_SendClientCommand( Str::Format( "lua_push_nack %u\n", seq ).c_str() );
+		return;
+	}
+	lua_settop( L, base );
+	appliedPushIds.insert( id );
+	pushSequence = seq;
+	trap_SendClientCommand( Str::Format( "lua_push_ack %u\n", pushSequence ).c_str() );
+}
+
+void CG_Rocket_ClearPushCommands()
+{
+	lua_State *L = Rml::Lua::Interpreter::GetLuaState();
+	if ( L )
+	{
+		for ( const auto &handler : pushHandlers )
+		{
+			luaL_unref( L, LUA_REGISTRYINDEX, handler.second );
+		}
+	}
+	pushHandlers.clear();
+}
+
+void CG_Rocket_ResetPushCommands()
+{
+	pushSequence = 0;
+	appliedPushIds.clear();
+	// Client commands sent during CG_Init can be dropped before ClientBegin.
+	// Re-send readiness after the server's ClientBegin reset reaches cgame.
+	trap_SendClientCommand( "lua_push_reset\n" );
+	Rocket_ReinitializeScoreboard();
+}
+
 namespace
 {
 void DeliverReply( unsigned id, const char *jsonBuffer )
@@ -195,7 +374,7 @@ void DeliverReply( unsigned id, const char *jsonBuffer )
 	luaL_unref( L, LUA_REGISTRYINDEX, callbacks.success );
 	luaL_unref( L, LUA_REGISTRYINDEX, callbacks.error );
 }
-} // namespace
+}  // namespace
 
 void CG_Rocket_HandleDataReply()
 {
@@ -204,8 +383,14 @@ void CG_Rocket_HandleDataReply()
 	Q_strncpyz( jsonBuffer, CG_Argv( 2 ), sizeof( jsonBuffer ) );
 	char *end = nullptr;
 	unsigned id = static_cast<unsigned>( std::strtoul( idBuffer, &end, 10 ) );
-	if ( !*idBuffer || !end || *end ) return;
-	if ( pending.find( id ) == pending.end() ) return;
+	if ( !*idBuffer || !end || *end )
+	{
+		return;
+	}
+	if ( pending.find( id ) == pending.end() )
+	{
+		return;
+	}
 	trap_SendClientCommand( Str::Format( "lua_data_ack %u -1\n", id ).c_str() );
 	DeliverReply( id, jsonBuffer );
 }
@@ -223,8 +408,11 @@ void CG_Rocket_HandleDataChunk()
 	unsigned id = static_cast<unsigned>( std::strtoul( idBuffer, &idEnd, 10 ) );
 	unsigned sequence = static_cast<unsigned>( std::strtoul( sequenceBuffer, &sequenceEnd, 10 ) );
 	auto it = pending.find( id );
-	if ( !*idBuffer || !idEnd || *idEnd || !sequenceEnd || *sequenceEnd ||
-	     it == pending.end() || sequence != it->second.nextSequence ) return;
+	if ( !*idBuffer || !idEnd || *idEnd || !sequenceEnd || *sequenceEnd || it == pending.end() ||
+	     sequence != it->second.nextSequence )
+	{
+		return;
+	}
 	Callbacks &callbacks = it->second;
 	callbacks.assembling = true;
 	callbacks.response += part;
@@ -233,7 +421,10 @@ void CG_Rocket_HandleDataChunk()
 	{
 		trap_SendClientCommand( Str::Format( "lua_data_ack %u -1\n", id ).c_str() );
 		lua_State *L = Rml::Lua::Interpreter::GetLuaState();
-		if ( !L ) return;
+		if ( !L )
+		{
+			return;
+		}
 		Callbacks finished = callbacks;
 		pending.erase( it );
 		int base = lua_gettop( L );
@@ -247,8 +438,14 @@ void CG_Rocket_HandleDataChunk()
 			}
 			lua_settop( L, base );
 		}
-		if ( finished.success != LUA_NOREF ) luaL_unref( L, LUA_REGISTRYINDEX, finished.success );
-		if ( finished.error != LUA_NOREF ) luaL_unref( L, LUA_REGISTRYINDEX, finished.error );
+		if ( finished.success != LUA_NOREF )
+		{
+			luaL_unref( L, LUA_REGISTRYINDEX, finished.success );
+		}
+		if ( finished.error != LUA_NOREF )
+		{
+			luaL_unref( L, LUA_REGISTRYINDEX, finished.error );
+		}
 		return;
 	}
 	if ( std::atoi( doneBuffer ) != 0 )

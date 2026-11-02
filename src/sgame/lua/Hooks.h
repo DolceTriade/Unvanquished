@@ -53,6 +53,7 @@ void ExecMissileSpawnedHooks( gentity_t* ent );
 team_t ExecGameEndHooks();
 void ExecGameEndNotificationHooks( team_t team );
 void ExecShutdownHooks();
+void ClearAllHooks();
 
 }  // namespace Lua
 

@@ -28,6 +28,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "common/Common.h"
 #include "cg_local.h"
+#include "cgame/rocket/lua/DataRequest.h"
 #include "common/cm/cm_public.h"
 #include "shared/bg_attributes.h"
 #include "cg_key_name.h"
@@ -1383,6 +1384,7 @@ void CG_Init( int serverMessageNum, int clientNum, const WindowConfig& windowCon
 
 	CG_UpdateLoadingStep( LOAD_HUDS );
 	CG_Rocket_LoadHuds();
+	CG_Rocket_PushCommandsReady();
 	CG_LoadBeaconsConfig();
 
 	// update state from configstrings

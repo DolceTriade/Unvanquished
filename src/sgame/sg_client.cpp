@@ -33,6 +33,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "sg_bot_local.h"
 #include "sgame/lua/Hooks.h"
 #include "sgame/lua/Command.h"
+#include "sgame/lua/DataRequest.h"
 
 // sg_client.c -- client functions that don't happen every frame
 
@@ -1216,6 +1217,8 @@ const char *ClientConnect( int clientNum, bool firstTime )
 	}
 
 	client->pers.connected = CON_CONNECTING;
+	// Discard any backlog left in a reused client slot.
+	Lua::ClearPushClient( clientNum );
 
 	// read or initialize the session data
 	if ( firstTime )
@@ -1432,6 +1435,9 @@ void ClientBegin( int clientNum )
 	ent->client = client;
 
 	client->pers.connected = CON_CONNECTED;
+	// Reset the cgame's sequence once it can receive reliable server commands.
+	Lua::ResetPushClient( clientNum );
+	Lua::QueuePersistentPushes( clientNum );
 	client->pers.enterTime = level.time;
 	client->pers.lastPrivateMessageSender = -1;
 
@@ -1979,6 +1985,7 @@ void ClientDisconnect( int clientNum )
 	}
 
 	ent->client->pers.connected = CON_DISCONNECTED;
+	Lua::DisconnectPushClient( clientNum );
 	ent->client->sess.spectatorState = SPECTATOR_NOT;
 	ent->client->ps.persistant[ PERS_SPECSTATE ] = SPECTATOR_NOT;
 

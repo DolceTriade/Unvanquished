@@ -81,6 +81,7 @@ void Rocket_LoadMapLevelshotPak( Str::StringRef mapName );
 
 void Rocket_AddEvent( RocketEvent_t *event );
 void Rocket_SetDocumentScale( Rml::ElementDocument& document );
+void Rocket_ReinitializeScoreboard();
 
 bool CG_AnyMenuOpen();
 
