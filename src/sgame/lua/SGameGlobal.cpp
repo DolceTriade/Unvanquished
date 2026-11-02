@@ -293,6 +293,25 @@ class SGameGlobal
 	{
 		return ::Lua::RegisterDataEndpoint( L );
 	}
+	/// Queue a named client handler on the ordered push stream.
+	// @function PushCommand
+	// @tparam number|string|table target Client number, client number array, -1 or "all" for connected players, or "humans"/"aliens" for the current team.
+	// @tparam string handler Registered cgame handler name.
+	// @tparam[opt] table data JSON-compatible data passed to the handler.
+	// @treturn number Opaque command ID accepted by RetractCommand.
+	static int PushCommand( lua_State* L ) { return ::Lua::PushCommand( L ); }
+	/// Queue Lua source for execution on target clients. The source receives data as its local `data` value.
+	// @function PushLua
+	// @tparam number|string|table target Client number, client number array, -1 or "all" for connected players, or "humans"/"aliens" for the current team.
+	// @tparam string source Lua source code.
+	// @tparam[opt] table data JSON-compatible data available as `data`.
+	// @treturn number Opaque command ID accepted by RetractCommand.
+	static int PushLua( lua_State* L ) { return ::Lua::PushLua( L ); }
+	/// Remove a retained command from future delivery and replay.
+	// @function RetractCommand
+	// @tparam number|table target Client number, an array of client numbers, or -1 for all clients.
+	// @tparam number id Opaque ID returned by PushLua or PushCommand.
+	static int RetractCommand( lua_State* L ) { return ::Lua::RetractCommand( L ); }
 
 	/// Register a custom vote
 	//
@@ -376,6 +395,9 @@ void ExtraInit<SGameGlobal>( lua_State* L, int metatable_index )
 	lua_setfield( L, metatable_index - 1, "RegisterVote" );
 	lua_pushcfunction( L, SGameGlobal::RegisterDataEndpoint );
 	lua_setfield( L, metatable_index - 1, "RegisterDataEndpoint" );
+	lua_pushcfunction( L, SGameGlobal::PushCommand ); lua_setfield( L, metatable_index - 1, "PushCommand" );
+	lua_pushcfunction( L, SGameGlobal::PushLua ); lua_setfield( L, metatable_index - 1, "PushLua" );
+	lua_pushcfunction( L, SGameGlobal::RetractCommand ); lua_setfield( L, metatable_index - 1, "RetractCommand" );
 	lua_pushcfunction( L, SGameGlobal::GetAvailableMaps );
 	lua_setfield( L, metatable_index - 1, "GetAvailableMaps" );
 }

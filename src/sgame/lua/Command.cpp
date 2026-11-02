@@ -198,6 +198,7 @@ void CleanupCommands()
     {
         luaL_unref( State(), LUA_REGISTRYINDEX, it.second );
     }
+    clientCmdMap.clear();
 }
 
 void SendLuaCommands( gentity_t* ent )

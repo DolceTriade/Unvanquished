@@ -28,6 +28,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "sg_local.h"
 #include "Entities.h"
 #include "sgame/lua/Hooks.h"
+#include "sgame/lua/DataRequest.h"
 
 /*
 ================
@@ -314,9 +315,11 @@ void G_ChangeTeam( gentity_t *ent, team_t newTeam )
 		return;
 	}
 
+	Lua::ResetPushClient( ent->num() );
 	G_LeaveTeam( ent );
 	ent->client->pers.teamChangeTime = level.time;
 	ent->client->pers.team = newTeam;
+	Lua::QueuePersistentPushes( ent->num() );
 	ent->client->pers.teamInfo = level.startTime - 1;
 	ent->client->pers.classSelection = PCL_NONE;
 	ent->client->pers.spawnLocation = 0;

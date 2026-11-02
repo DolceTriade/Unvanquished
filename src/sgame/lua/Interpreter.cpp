@@ -45,6 +45,7 @@ Maryland 20850 USA.
 #include "sgame/lua/register_lua_extensions.h"
 #include "sgame/lua/Command.h"
 #include "sgame/lua/DataRequest.h"
+#include "sgame/lua/Hooks.h"
 
 using Shared::Lua::LuaLib;
 
@@ -193,7 +194,10 @@ void Initialize()
 
 void Shutdown()
 {
+	if ( !L ) return;
 	ClearDataEndpoints();
+	ClearPushCommands();
+	ClearAllHooks();
 	CleanupCommands();
 	lua_close( L );
 	L = nullptr;

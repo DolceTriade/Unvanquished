@@ -4520,6 +4520,14 @@ void ClientCommand( int clientNum )
 		Lua::HandleDataRequestAck( clientNum );
 		return;
 	}
+	if ( !Q_stricmp( cmd, "lua_push_ack" ) ) { Lua::HandlePushAck( clientNum ); return; }
+	if ( !Q_stricmp( cmd, "lua_push_nack" ) ) { Lua::HandlePushNack( clientNum ); return; }
+	if ( !Q_stricmp( cmd, "lua_push_resume" ) ) { Lua::HandlePushResume( clientNum ); return; }
+	if ( !Q_stricmp( cmd, "lua_push_reset" ) )
+	{
+		Lua::HandlePushReset( clientNum );
+		return;
+	}
 
 	command = (commands_t*) bsearch( cmd, cmds, numCmds, sizeof( cmds[ 0 ] ), cmdcmp );
 

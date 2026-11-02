@@ -4,13 +4,35 @@
 	<link type="text/template" href="/ui/shared/window.rml" />
 	<style>
 		body {
-			/* TODO: Use a relative system, once tables are implemented */
-			width: 50em;
-			height: 43.2em;
-			margin: auto;
+			position: relative;
+			top: 0;
+			margin: 0;
+			transform: none;
+			width: 100%;
+			height: 100%;
 			font-size: 13.2dp;
+		}
 
+		.scoreboard-center {
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			width: 100%;
+			height: 100%;
+		}
+
+		.scoreboard-panel {
+			position: relative;
+			width: 50em;
+			min-height: 43.2em;
+			flex-shrink: 0;
+			font-size: 13.2dp;
 			background-color: rgba(10%, 10%, 10%, 70%);
+		}
+
+		.scoreboard-header {
+			padding-top: 1em;
+			text-align: center;
 		}
 
 		.winner {
@@ -23,29 +45,55 @@
 			color: #FFFFFF;
 		}
 
-		half {
-			display: block;
+		.team-columns {
+			display: flex;
+			align-items: flex-start;
+			width: 100%;
+		}
+
+		.team-column {
 			width: 50%;
-			float: left;
+			flex-shrink: 0;
+		}
+
+		datagrid {
+			display: block;
+		}
+
+		teamname {
+			display: block;
+			width: 100%;
+			padding-top: 0.5em;
+			font-size: 1.5em;
+			font-family: Dejavu Sans;
+			font-weight: bold;
+			text-align: center;
 		}
 
 		teambox {
 			display: block;
-			margin-left: 1em;
-			margin-right: 1em;
-			overflow: auto;
+			margin: 0 1em;
+		}
+
+		teambox.alien,
+		teambox.human {
+			width: 23em;
+			height: 25em;
 		}
 
 		teambox.alien {
 			background-color: #ff2b2630;
-			width: 23em;
-			height: 25em;
 		}
 
 		teambox.human {
 			background-color: #26abff30;
-			width: 23em;
-			height: 25em;
+		}
+
+		/* Bound the roster and keep scrolling on the list body. */
+		teambox.alien datagridbody,
+		teambox.human datagridbody {
+			max-height: 22em;
+			overflow-y: auto;
 		}
 
 		teambox.spec {
@@ -54,26 +102,70 @@
 			padding: 0.5em;
 		}
 
-		teamname {
-			display: block;
-			width: 100%;
-			font-size: 1.5em;
-			font-family: Dejavu Sans;
-			font-weight: bold;
-			text-align: center;
-			padding-top: 0.5em;
-			clear: both;
-		}
-
-		infoarea {
+		.match-info {
 			display: block;
 			margin: 1em;
 			padding: 0.5em;
 		}
 
-		infopiece {
+		.match-meta {
+			display: flex;
+			justify-content: space-between;
+			width: 100%;
+		}
+
+		.modeinfo {
 			display: block;
-			float: left;
+			margin-top: 0.25em;
+			margin-bottom: 0.25em;
+			padding: 0;
+		}
+
+		#modeInfo .modeinfo-label {
+			width: 35%;
+			max-width: 35%;
+			padding-right: 0.75em;
+			text-align: right;
+			font-weight: bold;
+			color: #D0D0D0;
+		}
+
+		#modeInfo .modeinfo-row {
+			display: flex;
+			width: 100%;
+			min-height: 1.5em;
+			align-items: center;
+			padding-top: 0.05em;
+			padding-bottom: 0.05em;
+		}
+
+		#modeInfo .modeinfo-row:nth-child(odd) {
+			background: rgba(50%, 50%, 50%, 20%);
+		}
+
+		#modeInfo .modeinfo-row:nth-child(even) {
+			background: rgba(50%, 50%, 50%, 50%);
+		}
+
+		#modeInfo .modeinfo-value {
+			width: 60%;
+			max-width: 60%;
+			padding-left: 0.75em;
+			text-align: left;
+			color: #FFFFFF;
+		}
+
+		#modeInfo .modeinfo-label,
+		#modeInfo .modeinfo-value {
+			display: block;
+			flex-shrink: 0;
+			white-space: normal;
+			overflow: visible;
+			color: #FFFFFF;
+		}
+
+		#modeInfo .modeinfo-label {
+			color: #D0D0D0;
 		}
 
 		hostname {
@@ -102,7 +194,7 @@
 			overflow: hidden;
 			width: 100%;
 			margin: 0em;
-			padding: 0em;
+			padding: 0;
 		}
 
 		datagridcell:nth-child(1),
@@ -117,7 +209,7 @@
 			/* Name cell */
 			text-align: left;
 			max-width: 51%;
-			white-space: pre;
+			white-space: nowrap;
 		}
 
 		datagridcell:nth-child(n + 3),
@@ -149,52 +241,69 @@
 		span.playername {
 			color: white;
 			padding-right: 10dp;
+			white-space: nowrap;
+		}
+
+		span.playername.long {
+			font-size: 0.8em;
 		}
 	</style>
 </head>
 
-<body  id="scoreboard">
-	<infopiece style="text-align:center; width: 100%; padding-top: 1em;"><hostname/></infopiece>
+<body id="scoreboard">
+	<div class="scoreboard-center">
+	<div class="scoreboard-panel">
+	<div class="scoreboard-header"><hostname/></div>
 
 	<inlinecvar cvar="ui_winner" class="winner" />
 
-	<half>
-		<teamname><span style="color: #FF0033"><translate>Aliens</translate></span> (<playerCount team="aliens"/>)</teamname>
-		<teambox class="alien">
-			<datagrid source="playerList.aliens" id="aliens">
-				<col fields="num" formatter="GearOrReady"></col>
-				<col fields="num" formatter="PlayerName">Name</col>
-				<col fields="score">Score</col>
-				<col fields="time">Time</col>
-				<col fields="ping">Ping</col>
-			</datagrid>
-		</teambox>
-	</half>
+	<div class="team-columns">
+		<div class="team-column">
+			<teamname><span style="color: #FF0033"><translate>Aliens</translate></span> (<playerCount team="aliens"/>)</teamname>
+			<teambox class="alien">
+				<datagrid source="playerList.aliens" id="aliens">
+					<col fields="num" formatter="GearOrReady"></col>
+					<col fields="num" formatter="PlayerName">Name</col>
+					<col fields="score">Score</col>
+					<col fields="time">Time</col>
+					<col fields="ping">Ping</col>
+				</datagrid>
+			</teambox>
+		</div>
 
-	<half>
-		<teamname><span style="color: #007FFF"><translate>Humans</translate></span> (<playerCount team="humans"/>)</teamname>
-		<teambox class="human">
-			<datagrid source="playerList.humans" id="humans">
-				<col fields="num" formatter="GearOrReady"></col>
-				<col fields="num" formatter="PlayerName">Name</col>
-				<col fields="score">Score</col>
-				<col fields="time">Time</col>
-				<col fields="ping">Ping</col>
-			</datagrid>
-		</teambox>
-	</half>
+		<div class="team-column">
+			<teamname><span style="color: #007FFF"><translate>Humans</translate></span> (<playerCount team="humans"/>)</teamname>
+			<teambox class="human">
+				<datagrid source="playerList.humans" id="humans">
+					<col fields="num" formatter="GearOrReady"></col>
+					<col fields="num" formatter="PlayerName">Name</col>
+					<col fields="score">Score</col>
+					<col fields="time">Time</col>
+					<col fields="ping">Ping</col>
+				</datagrid>
+			</teambox>
+		</div>
+	</div>
 
 	<teamname><translate>Spectators</translate> (<playerCount team="spectators"/>)</teamname>
 	<teambox class="spec">
-		<datasource  source="playerList.spectators" fields="num" formatter="PlayerName" />
+		<datasource source="playerList.spectators" fields="num" formatter="PlayerName" />
 	</teambox>
 
-	<infoarea>
-		<infopiece style="float: left; text-align: left; width: auto; margin-left: 5px;"><translate>Map:</translate>&nbsp;<levelname/></infopiece>
-		<infopiece style="float: right; text-align: right; width: auto; margin-right: 5px;"><translate>Game time:</translate>&nbsp;<timer/></infopiece>
-		<infopiece style="text-align: center; width: 100%; padding-top: 0.5em;"><motd/></infopiece>
-	</infoarea>
+	<div class="match-info">
+		<div class="match-meta">
+			<div><translate>Map:</translate>&nbsp;<levelname/></div>
+			<div><translate>Game time:</translate>&nbsp;<timer/></div>
+		</div>
+		<div style="width: 100%; padding-top: 0.5em; text-align: center;"><motd/></div>
+	</div>
 
+	<div class="modeinfo">
+		<div id="modeInfo"></div>
+	</div>
+
+	</div>
+	</div>
 </body>
 
 </rml>

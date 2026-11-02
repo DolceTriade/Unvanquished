@@ -805,12 +805,19 @@ void G_ShutdownGame( int /* restart */ )
 #ifndef BUILD_VM_IN_PROCESS
 	if ( !g_pedanticShutdown.Get() )
 	{
-		G_BotDelAllBots();
+		// Bot behavior trees own Lua registry references, so they must be freed
+		// before the Lua state is closed even on the reduced shutdown path.
+		G_BotCleanup();
+		Lua::Shutdown();
 		return;
 	}
 #endif
 
 	G_BotCleanup();
+
+	// A map restart starts a new Lua game-mode session. Reset client push state
+	// before closing Lua so connected clients discard the previous mode's rows.
+	Lua::Shutdown();
 
 	G_admin_cleanup();
 	G_namelog_cleanup();
@@ -822,8 +829,6 @@ void G_ShutdownGame( int /* restart */ )
 
 	level.restarted = false;
 	level.surrenderTeam = TEAM_NONE;
-
-	Lua::Shutdown();
 
 	/*
 	 * delete cbse entities attached to gentities

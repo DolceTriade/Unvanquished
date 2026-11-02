@@ -35,6 +35,7 @@ Maryland 20850 USA.
 #include "common/Common.h"
 #include "cg_local.h"
 #include "rocket/rocket.h"
+#include "engine/qcommon/q_unicode.h"
 
 static int GCD( int a, int b )
 {
@@ -106,8 +107,28 @@ static void CG_Rocket_DFServerPlayers( int handle, const char *data )
 
 static void CG_Rocket_DFPlayerName( int handle, const char *data )
 {
-	std::string nameRml = Rocket_QuakeToRML( cgs.clientinfo[ atoi( Info_ValueForKey( data, "1" ) ) ].name );
-	Rocket_DataFormatterFormattedData( handle, va("<span class=\"playername\">%s</span>", nameRml.c_str() ), false );
+	const char *name = cgs.clientinfo[ atoi( Info_ValueForKey( data, "1" ) ) ].name;
+	char cleanName[ MAX_NAME_LENGTH ];
+	Color::StripColors( name, cleanName, sizeof( cleanName ) );
+
+	int visibleLength = 0;
+	for ( const char *p = cleanName; *p; visibleLength++ )
+	{
+		if ( BG_EmoticonAt( p ) )
+		{
+			const char *end = strchr( p + 1, ']' );
+			p = end ? end + 1 : p + Q_UTF8_Width( p );
+		}
+		else
+		{
+			p += Q_UTF8_Width( p );
+		}
+	}
+
+	const char *className = visibleLength > 21 ? "playername long" : "playername";
+	std::string nameRml = Rocket_QuakeToRML( name );
+	Rocket_DataFormatterFormattedData( handle, va( "<span class=\"%s\">%s</span>", className,
+	                                             nameRml.c_str() ), false );
 }
 
 static score_t *ScoreFromClientNum( int clientNum )

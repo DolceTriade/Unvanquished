@@ -87,6 +87,24 @@ void Rocket_LoadUnit( const char *path )
 	}
 }
 
+void Rocket_ReinitializeScoreboard()
+{
+	if ( !hudContext ) return;
+	Rml::ElementDocument *current = hudContext->GetDocument( "scoreboard" );
+	bool wasVisible = current && current->IsVisible();
+	if ( current )
+	{
+		current->Close();
+		hudContext->Update();
+	}
+	Rml::ElementDocument *reloaded = hudContext->LoadDocument( "ui/ingame_scoreboard.rml" );
+	if ( !reloaded ) return;
+	Rocket_SetDocumentScale( *reloaded );
+	hudContext->PullDocumentToFront( reloaded );
+	if ( wasVisible ) reloaded->Show();
+	else reloaded->Hide();
+}
+
 void Rocket_AddUnitToHud( int weapon, const char *id )
 {
 	if ( id && *id )

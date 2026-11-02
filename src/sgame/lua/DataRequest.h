@@ -38,12 +38,24 @@ struct lua_State;
 
 namespace Lua
 {
-// Lua API: sgame.RegisterDataEndpoint(name, function(requestingEntity, params) ... end)
-int RegisterDataEndpoint( lua_State *L );
+
+int RegisterDataEndpoint( lua_State *L ); // sgame.RegisterDataEndpoint(name, function(requestingEntity, params) ... end)
 bool HandleDataRequest( int clientNum );
 bool HandleDataRequestAck( int clientNum );
 void UpdateDataRequestStreams();
 void ClearDataEndpoints();
+int PushCommand( lua_State *L ); // sgame.PushCommand(target, handler, data)
+int PushLua( lua_State *L );     // sgame.PushLua(target, source, data)
+int RetractCommand( lua_State *L ); // sgame.RetractCommand(target, id)
+bool HandlePushAck( int clientNum );
+bool HandlePushNack( int clientNum );
+bool HandlePushResume( int clientNum );
+bool HandlePushReset( int clientNum );
+void ClearPushCommands();
+void ResetPushClient( int clientNum );
+void ClearPushClient( int clientNum );
+void DisconnectPushClient( int clientNum );
+void QueuePersistentPushes( int clientNum );
 }  // namespace Lua
 
 #endif  // SGAME_LUA_DATA_REQUEST_H_

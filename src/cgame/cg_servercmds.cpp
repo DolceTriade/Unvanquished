@@ -1611,6 +1611,12 @@ static void CG_ServerCommand()
 		CG_Rocket_HandleDataChunk();
 		return;
 	}
+	if ( !Q_stricmp( cmd, "lua_push" ) ) { CG_Rocket_HandlePushCommand(); return; }
+	if ( !Q_stricmp( cmd, "lua_push_reset" ) )
+	{
+		CG_Rocket_ResetPushCommands();
+		return;
+	}
 
 	if ( !cmd[ 0 ] )
 	{
