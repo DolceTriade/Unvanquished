@@ -31,9 +31,11 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "botlib/bot_api.h"
 #include "shared/bot_nav_shared.h"
 #include "shared/navgen/navgen.h"
+#include "Entities.h"
 
 #include "shared/bg_gameplay.h"
 
+#include <algorithm>
 #include <glm/geometric.hpp>
 #include <glm/gtx/norm.hpp>
 
@@ -145,6 +147,66 @@ static bool BotDevolveIfNavigationBlocked( gentity_t *self, int stuckTime )
 
 	return BotEvolveToClass( self, mostMobileClass );
 }
+
+// Find an escape direction for a stuck bot. Try all four horizontal directions
+// and prefer the clearest one whose projected landing is not lethal.
+static bool BotFindStuckRecoveryDirection( gentity_t *self, glm::vec3 &direction )
+{
+	class_t pClass = static_cast<class_t>( self->client->ps.stats[ STAT_CLASS ] );
+	glm::vec3 mins, maxs;
+	BG_BoundingBox( pClass, &mins, &maxs, nullptr, nullptr, nullptr );
+	glm::vec3 origin = VEC2GLM( self->client->ps.origin );
+	float yaw = DEG2RAD( self->client->ps.viewangles[ YAW ] );
+	glm::vec3 forward( cosf( yaw ), sinf( yaw ), 0.0f );
+	glm::vec3 right( -forward.y, forward.x, 0.0f );
+	glm::vec3 candidates[] = { forward, -forward, right, -right };
+	float bestClearance = -1.0f;
+	int rotation = ( level.time / 500 ) % 4;
+
+	for ( int i = 0; i < 4; ++i )
+	{
+		glm::vec3 candidate = candidates[ ( i + rotation ) % 4 ];
+		glm::vec3 stepEnd = origin + 2.0f * BOT_OBSTACLE_AVOID_RANGE * candidate;
+
+		trace_t moveTrace;
+		trap_Trace( &moveTrace, origin, mins, maxs, stepEnd, self->num(), MASK_PLAYERSOLID, 0 );
+
+		// Probe down beyond the immediate ledge. An unknown landing is allowed:
+		// stuck recovery takes a leap of faith when the trace cannot prove death.
+		glm::vec3 downEnd = stepEnd - glm::vec3( 0.0f, 0.0f, 2048.0f );
+		trace_t landingTrace;
+		trap_Trace( &landingTrace, stepEnd, mins, maxs, downEnd, self->num(), MASK_PLAYERSOLID, 0 );
+		if ( landingTrace.fraction < 1.0f && !landingTrace.startsolid && !landingTrace.allsolid
+		  && !( landingTrace.surfaceFlags & SURF_NODAMAGE ) )
+		{
+			float dropHeight = origin.z - landingTrace.endpos[ 2 ];
+			if ( dropHeight > 0.0f )
+			{
+				float fallDistance = 2.0f * self->client->ps.gravity * dropHeight * 0.0001f;
+				float damageFraction = ( fallDistance - MIN_FALL_DISTANCE ) /
+					( MAX_FALL_DISTANCE - MIN_FALL_DISTANCE );
+				damageFraction = std::clamp( damageFraction, 0.0f, 1.0f );
+				int damage = static_cast<int>( BG_Class( pClass )->health * BG_Class( pClass )->fallDamage *
+					damageFraction );
+				if ( damage >= Entities::HealthOf( self ) )
+				{
+					continue;
+				}
+			}
+		}
+
+		float clearance = moveTrace.fraction;
+		if ( clearance > bestClearance )
+		{
+			bestClearance = clearance;
+			direction = candidate;
+		}
+	}
+
+	return bestClearance >= 0.0f;
+}
+
+static void BotSeek( gentity_t *self, const glm::vec3 &direction );
 
 //tells if all navmeshes loaded successfully
 // Only G_BotNavInit and G_BotNavCleanup should set it
@@ -1091,6 +1153,25 @@ static void BotSeek( gentity_t *self, const glm::vec3 &direction )
 	BotAimAtLocation( self, seekPos );
 }
 
+bool BotTryStuckRecovery( gentity_t *self )
+{
+	constexpr int softStuckThreshold = 5000;
+	if ( level.time - self->botMind->stuckTime <= softStuckThreshold )
+	{
+		return false;
+	}
+
+	glm::vec3 recoveryDirection;
+	if ( !BotFindStuckRecoveryDirection( self, recoveryDirection ) )
+	{
+		return false;
+	}
+
+	BotJump( self );
+	BotSeek( self, recoveryDirection );
+	return true;
+}
+
 /*
 =========================
 Global Bot Navigation
@@ -1386,6 +1467,11 @@ bool BotMoveToGoal( gentity_t *self )
 
 	if ( stuckTime > softStuckThreshold )
 	{
+		if ( BotTryStuckRecovery( self ) )
+		{
+			return true;
+		}
+
 		if ( BotDevolveIfNavigationBlocked( self, stuckTime ) )
 		{
 			return true;

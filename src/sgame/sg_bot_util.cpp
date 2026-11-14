@@ -42,7 +42,7 @@ static Cvar::Cvar<int> g_bot_alienAimDelay = Cvar::Cvar<int>( "g_bot_alienAimDel
 static Cvar::Cvar<int> g_bot_humanAimDelay = Cvar::Cvar<int>( "g_bot_humanAimDelay", "make bots of human team slower to aim", Cvar::NONE, 150 );
 
 //consider bot to be stuck if it does not move farther than this in some period of time
-constexpr float BOT_STUCK_RADIUS = 150.0f;
+constexpr float BOT_STUCK_RADIUS = 300.0f;
 
 static void ListTeamEquipment( gentity_t *self, unsigned int (&numUpgrades)[UP_NUM_UPGRADES], unsigned int (&numWeapons)[WP_NUM_WEAPONS] );
 static const int MIN_SKILL = 1;
@@ -1530,6 +1530,11 @@ bool BotChangeGoal( gentity_t *self, botTarget_t target )
 			self->botMind->hasOffmeshGoal = true;
 			return true;
 		}
+
+		// Route setup can fail before BotMoveToGoal gets a chance to run its
+		// stuck recovery. Still issue an escape move for bots that have already
+		// exceeded the stuck timeout.
+		BotTryStuckRecovery( self );
 		return false;
 	}
 
@@ -3344,8 +3349,11 @@ void BotCalculateStuckTime( gentity_t *self )
 {
 	// last think time condition to avoid stuck condition after respawn or /pause
 	bool dataValid = level.time - self->botMind->lastThink < 1000;
+	glm::vec3 position = VEC2GLM( self->client->ps.origin );
+	float displacement = glm::distance( self->botMind->stuckPosition, position );
+	bool movedEnough = displacement >= BOT_STUCK_RADIUS;
 	if ( !dataValid
-			|| glm::distance2( self->botMind->stuckPosition, VEC2GLM( self->client->ps.origin ) ) >= Square( BOT_STUCK_RADIUS ) )
+			|| movedEnough )
 	{
 		BotResetStuckTime( self );
 	}
