@@ -89,6 +89,7 @@ void     BotClassMovement( gentity_t *self, bool inAttackRange );
 // Apply the bot's selected combat evasion style. Returns false when no style
 // is selected, so callers can retain the legacy movement behavior.
 bool     BotCombatEvasion( gentity_t *self );
+bool     BotCombatEvasionAgainst( gentity_t *self, const gentity_t *target );
 bool     BotEnemyInAttackRange( const gentity_t *self );
 
 // human bots

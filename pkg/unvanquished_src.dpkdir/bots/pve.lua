@@ -779,6 +779,9 @@ local function human_armoury_distance(mind)
 end
 
 local function human_resupply_phase(number, level, client, weapon_attr, mind)
+    if not common.can_attempt_purchase(client) then
+        return nil
+    end
     if out_of_human_ammo(client, weapon_attr) then
         local armoury_distance = human_armoury_distance(mind)
         if armoury_distance and armoury_distance <= 100 then
