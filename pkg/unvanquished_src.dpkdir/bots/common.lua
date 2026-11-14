@@ -277,14 +277,18 @@ function M.try_evolve_targets(self, ctx, client, level, targets)
 
     if #terminal_candidates > 0 then
         local status = ctx:evolveTo(terminal_candidates[math.random(#terminal_candidates)])
-        M.buy_overload_upgrades(self, ctx)
+        if status == STATUS_SUCCESS then
+            M.buy_overload_upgrades(client, ctx)
+        end
         return status
     end
 
     for _, class_name in ipairs(candidates) do
         if M.can_evolve_to_class(self, client, level, class_name) and ctx:canEvolveTo(class_name) then
             local status = ctx:evolveTo(class_name)
-            M.buy_overload_upgrades(self, ctx)
+            if status == STATUS_SUCCESS then
+                M.buy_overload_upgrades(client, ctx)
+            end
             return status
         end
     end
@@ -292,24 +296,31 @@ function M.try_evolve_targets(self, ctx, client, level, targets)
     return STATUS_FAILURE
 end
 
-function M.buy_overload_upgrades(self, ctx)
-    if not ctx then
+function M.buy_overload_upgrades(client, ctx)
+    if not client or not ctx then
         return STATUS_FAILURE
     end
 
-    return ctx:buyOverloadUpgrades()
+    local spend = math.max(0, math.floor(client.credits or 0))
+    if spend <= 0 then
+        return STATUS_SUCCESS
+    end
+
+    return ctx:buyOverloadUpgrades(spend)
 end
 
 local EQUIP_RETRY_COOLDOWN_MS = 5000
 
-function M.equip_and_buy_overload(ctx, retry_times, slot, now)
+function M.equip_and_buy_overload(client, ctx, retry_times, slot, now)
     local retry_at = retry_times and slot and retry_times[slot]
     if now and retry_at and retry_at > now then
         return STATUS_FAILURE
     end
 
     local status = ctx:equip()
-    M.buy_overload_upgrades(true, ctx)
+    if status == STATUS_SUCCESS then
+        M.buy_overload_upgrades(client, ctx)
+    end
     if status == STATUS_SUCCESS and retry_times and slot and now then
         retry_times[slot] = now + EQUIP_RETRY_COOLDOWN_MS
     end

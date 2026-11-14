@@ -43,7 +43,7 @@ local function maybe_use_medkit(team, client, ctx)
     return use_medkit_if_low(team, client, ctx, 50)
 end
 
-local function maybe_equip(team, number, mind, ctx)
+local function maybe_equip(team, number, client, mind, ctx)
     if not is_human(team) then
         return STATUS_FAILURE
     end
@@ -53,7 +53,7 @@ local function maybe_equip(team, number, mind, ctx)
         return STATUS_FAILURE
     end
 
-    return common.equip_and_buy_overload(ctx, STATE.equip_retry_at, number, sgame.level.time)
+    return common.equip_and_buy_overload(client, ctx, STATE.equip_retry_at, number, sgame.level.time)
 end
 
 local function maybe_evolve(self, team, client, enemy_visible, ctx)
@@ -138,7 +138,7 @@ local ESCORT_TASK = {
                 return status
             end
 
-            status = maybe_equip(state.team, state.number, state.mind, ctx)
+            status = maybe_equip(state.team, state.number, state.client, state.mind, ctx)
             if status == STATUS_RUNNING then
                 return status
             end

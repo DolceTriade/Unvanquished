@@ -583,8 +583,8 @@ local function human_repair_target(mind)
     return info and info.target or nil
 end
 
-local function equip_and_buy_overload_for_bot(number, ctx)
-    return common.equip_and_buy_overload(ctx, STATE.equip_retry_at, number, sgame.level.time)
+local function equip_and_buy_overload_for_bot(number, client, ctx)
+    return common.equip_and_buy_overload(client, ctx, STATE.equip_retry_at, number, sgame.level.time)
 end
 
 local maybe_fight
@@ -604,7 +604,7 @@ local function maybe_retire_builder(team, number, client, builder, wants_build, 
             end
             return STATUS_FAILURE
         end
-        return equip_and_buy_overload_for_bot(number, ctx)
+        return equip_and_buy_overload_for_bot(number, client, ctx)
     end
 
     if is_alien(team) then
@@ -865,7 +865,7 @@ local function maybe_return_for_ammo(team, number, client, weapon_attr, mind, ct
         return STATUS_FAILURE
     end
     if armoury.distance and armoury.distance <= 100 then
-        return equip_and_buy_overload_for_bot(number, ctx)
+        return equip_and_buy_overload_for_bot(number, client, ctx)
     end
     return ctx:moveTo("arm")
 end
@@ -878,7 +878,7 @@ local function maybe_equip(team, number, client, level, ctx, mind, enemy_visible
         return STATUS_FAILURE
     end
 
-    return equip_and_buy_overload_for_bot(number, ctx)
+    return equip_and_buy_overload_for_bot(number, client, ctx)
 end
 
 local function maybe_flee_human(team, weapon, enemy_visible, ctx)

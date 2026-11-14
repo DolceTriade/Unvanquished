@@ -165,7 +165,7 @@ local function human_armoury_distance(mind)
     return building_distance(mind, "arm")
 end
 
-local function maybe_equip_human_near_armoury(number, team, level, mind, ctx)
+local function maybe_equip_human_near_armoury(number, team, level, mind, client, ctx)
     if not is_human(team) then
         return STATUS_FAILURE
     end
@@ -180,7 +180,7 @@ local function maybe_equip_human_near_armoury(number, team, level, mind, ctx)
         return STATUS_FAILURE
     end
 
-    local status = common.equip_and_buy_overload(ctx, STATE.equip_retry_at, number, level.time)
+    local status = common.equip_and_buy_overload(client, ctx, STATE.equip_retry_at, number, level.time)
     if status == STATUS_FAILURE then
         STATE.human_equip_retry_at[number] = level.time + 500
         return STATUS_FAILURE
@@ -300,7 +300,7 @@ local RESUPPLY_TASK = {
 
         if task.phase == "equip" then
             local status = common.equip_and_buy_overload(
-                ctx, STATE.equip_retry_at, state.number, state.level.time)
+                state.client, ctx, STATE.equip_retry_at, state.number, state.level.time)
             if status ~= STATUS_FAILURE then
                 return status
             end
@@ -311,7 +311,8 @@ local RESUPPLY_TASK = {
         end
 
         if task.phase == "opportunistic_equip" then
-            return maybe_equip_human_near_armoury(state.number, state.team, state.level, state.mind, ctx)
+            return maybe_equip_human_near_armoury(
+                state.number, state.team, state.level, state.mind, state.client, ctx)
         end
 
         return STATUS_FAILURE
@@ -326,7 +327,8 @@ local ASSAULT_TASK = {
         local status = nil
 
         if is_human(state.team) then
-            status = maybe_equip_human_near_armoury(state.number, state.team, state.level, state.mind, ctx)
+            status = maybe_equip_human_near_armoury(
+                state.number, state.team, state.level, state.mind, state.client, ctx)
             if status ~= STATUS_FAILURE then
                 return status
             end

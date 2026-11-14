@@ -806,7 +806,7 @@ local function maybe_retire_builder(team, number, client, builder, wants_build, 
         if client.weapon == "ckit" and cache.usable_build_points(team) < 10 then
             return ctx:buyPrimary("rifle")
         end
-        return common.equip_and_buy_overload(ctx, STATE.equip_retry_at, number, level.time)
+        return common.equip_and_buy_overload(client, ctx, STATE.equip_retry_at, number, level.time)
     end
 
     if is_alien(team) then
@@ -995,7 +995,7 @@ local function maybe_reload(team, client, weapon_attr, level, ctx, mind, enemy_v
     return ctx:reload()
 end
 
-local function maybe_equip(team, number, level, ctx, mind, enemy_visible)
+local function maybe_equip(team, number, client, level, ctx, mind, enemy_visible)
     if not is_human(team) or enemy_visible or elapsed_since(level.time, mind.enemyLastSeen) <= 1000 then
         return STATUS_FAILURE
     end
@@ -1004,7 +1004,7 @@ local function maybe_equip(team, number, level, ctx, mind, enemy_visible)
         return STATUS_FAILURE
     end
 
-    return common.equip_and_buy_overload(ctx, STATE.equip_retry_at, number, level.time)
+    return common.equip_and_buy_overload(client, ctx, STATE.equip_retry_at, number, level.time)
 end
 
 local function maybe_resupply_human(team, number, level, client, weapon_attr, mind, ctx)
@@ -1018,7 +1018,7 @@ local function maybe_resupply_human(team, number, level, client, weapon_attr, mi
 
     local phase = human_resupply_phase(number, level, client, weapon_attr, mind)
     if phase == "equip" then
-        return common.equip_and_buy_overload(ctx, STATE.equip_retry_at, number, level.time)
+        return common.equip_and_buy_overload(client, ctx, STATE.equip_retry_at, number, level.time)
     end
 
     if phase == "move_to_arm" then
@@ -1098,7 +1098,8 @@ local function run_builder_task(task, state, ctx)
             task.phase = "search"
             task.search_until = state.level.time + PVE_HUMAN_BUILDER_SEARCH_MS
         else
-            return common.equip_and_buy_overload(ctx, STATE.equip_retry_at, state.number, state.level.time)
+            return common.equip_and_buy_overload(
+                state.client, ctx, STATE.equip_retry_at, state.number, state.level.time)
         end
     end
 
@@ -1321,7 +1322,8 @@ local function run_roam_task(task, state, ctx)
         return status
     end
 
-    status = maybe_equip(state.team, state.number, state.level, ctx, state.mind, state.enemy_visible)
+    status = maybe_equip(
+        state.team, state.number, state.client, state.level, ctx, state.mind, state.enemy_visible)
     if status ~= STATUS_FAILURE then
         return status
     end

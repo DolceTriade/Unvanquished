@@ -26,19 +26,11 @@ along with Unvanquished. If not, see <http://www.gnu.org/licenses/>.
 #include "sg_overload.h"
 #include "sg_local.h"
 #include "sg_bot_local.h"
+#include "sg_bot_ai.h"
 
-static constexpr int OVERLOAD_BOT_PURCHASE_COOLDOWN = 3000;
-static constexpr int OVERLOAD_BOT_FAILURE_COOLDOWN = 1000;
-static constexpr int OVERLOAD_BOT_SPEND_CHUNK = 200;
-static constexpr int OVERLOAD_BOT_HUMAN_RESERVE = 200;
-static constexpr int OVERLOAD_BOT_ALIEN_RESERVE = 200;
+#include <algorithm>
 
-static int BotReserveCredits( team_t team )
-{
-	return team == TEAM_ALIENS ? OVERLOAD_BOT_ALIEN_RESERVE : OVERLOAD_BOT_HUMAN_RESERVE;
-}
-
-AINodeStatus_t BotActionBuyOverloadUpgrades( gentity_t *ent, AIGenericNode_t * )
+AINodeStatus_t BotActionBuyOverloadUpgrades( gentity_t *ent, AIGenericNode_t *node )
 {
 	if ( !ent || !ent->client || !ent->botMind || !ent->client->pers.isBot )
 	{
@@ -51,38 +43,31 @@ AINodeStatus_t BotActionBuyOverloadUpgrades( gentity_t *ent, AIGenericNode_t * )
 		return STATUS_FAILURE;
 	}
 
-	if ( level.time < ent->botMind->overloadNextPurchaseTime )
-	{
-		// This action is polled opportunistically. A cooldown means there is
-		// nothing to do this tick, not that the purchase attempt failed.
-		return STATUS_SUCCESS;
-	}
-
 	if ( !G_ActiveMainBuildable( team ) )
 	{
 		return STATUS_SUCCESS;
 	}
 
-	const int spendableCredits = ent->client->pers.credit - BotReserveCredits( team );
-	if ( spendableCredits <= 0 )
+	AIActionNode_t *action = reinterpret_cast<AIActionNode_t *>( node );
+	const int availableCredits = std::max( 0, static_cast<int>( ent->client->pers.credit ) );
+	const int requestedCredits = action->nparams > 0 ? AIUnBoxInt( action->params[ 0 ] ) : availableCredits;
+	const int spend = std::min( std::max( 0, requestedCredits ), availableCredits );
+	if ( spend <= 0 )
 	{
 		return STATUS_SUCCESS;
 	}
 
 	std::string error;
-	if ( !G_OverloadAutoDonate( ent, std::min( spendableCredits, OVERLOAD_BOT_SPEND_CHUNK ), &error ) )
+	if ( !G_OverloadAutoDonate( ent, spend, &error ) )
 	{
 		if ( error == "no eligible overload purchase found" )
 		{
-			ent->botMind->overloadNextPurchaseTime = level.time + OVERLOAD_BOT_PURCHASE_COOLDOWN;
 			return STATUS_SUCCESS;
 		}
 
 		Log::Warn( "%s: Bot failed autodonate: %s", ent->client->pers.netname, error.c_str() );
-		ent->botMind->overloadNextPurchaseTime = level.time + OVERLOAD_BOT_FAILURE_COOLDOWN;
 		return STATUS_FAILURE;
 	}
 
-	ent->botMind->overloadNextPurchaseTime = level.time + OVERLOAD_BOT_PURCHASE_COOLDOWN;
 	return STATUS_SUCCESS;
 }

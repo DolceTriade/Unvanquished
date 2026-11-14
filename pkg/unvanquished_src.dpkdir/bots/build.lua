@@ -442,7 +442,7 @@ local function maybe_retire_builder(team, number, client, builder, wants_build, 
             return STATUS_FAILURE
         end
 
-        return common.equip_and_buy_overload(ctx, STATE.equip_retry_at, number, level.time)
+        return common.equip_and_buy_overload(client, ctx, STATE.equip_retry_at, number, level.time)
     end
 
     if is_alien(team) then
@@ -557,14 +557,14 @@ local function maybe_reload(team, client, weapon_attr, level, mind, enemy_visibl
     return ctx:reload()
 end
 
-local function maybe_equip(team, number, level, mind, enemy_visible, ctx)
+local function maybe_equip(team, number, client, level, mind, enemy_visible, ctx)
     if not is_human(team)
         or enemy_visible
         or elapsed_since(level.time, mind.enemyLastSeen) <= 1000 then
         return STATUS_FAILURE
     end
 
-    return common.equip_and_buy_overload(ctx, STATE.equip_retry_at, number, level.time)
+    return common.equip_and_buy_overload(client, ctx, STATE.equip_retry_at, number, level.time)
 end
 
 local function maybe_empty_ammo_resupply(team, client, weapon_attr, ctx)
@@ -732,7 +732,8 @@ local SUPPORT_TASK = {
                 return status
             end
 
-            status = maybe_equip(state.team, state.number, state.level, state.mind, state.enemy_visible, ctx)
+            status = maybe_equip(
+                state.team, state.number, state.client, state.level, state.mind, state.enemy_visible, ctx)
             if status ~= STATUS_FAILURE then
                 return status
             end
