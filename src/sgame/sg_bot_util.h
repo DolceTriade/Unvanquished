@@ -77,6 +77,7 @@ float    BotGetEnemyPriority( gentity_t *self, gentity_t *ent );
 
 // goal changing
 bool BotChangeGoal( gentity_t *self, botTarget_t target );
+bool BotTryStuckRecovery( gentity_t *self );
 bool BotChangeGoalEntity( gentity_t *self, gentity_t const *goal );
 bool BotChangeGoalPos( gentity_t *self, const glm::vec3 &goal );
 

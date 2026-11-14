@@ -783,11 +783,6 @@ local function maybe_heal_or_fight_alien(number, health_frac, enemy, enemy_targe
         return status
     end
 
-    if low_tier_alien and health_frac < 0.4 then
-        ctx:say("I'm too weak to continue as this alien class.")
-        return ctx:suicide()
-    end
-
     if not low_tier_alien and health_frac < 0.4 and not in_safe_heal_area and not recently_attacked_now then
         local status = ctx:heal()
         if status ~= STATUS_FAILURE then
