@@ -185,7 +185,7 @@ static bool BotFindStuckRecoveryDirection( gentity_t *self, glm::vec3 &direction
 				float fallDistance = 2.0f * self->client->ps.gravity * dropHeight * 0.0001f;
 				float damageFraction = ( fallDistance - MIN_FALL_DISTANCE ) /
 					( MAX_FALL_DISTANCE - MIN_FALL_DISTANCE );
-				damageFraction = std::clamp( damageFraction, 0.0f, 1.0f );
+				damageFraction = Math::Clamp( damageFraction, 0.0f, 1.0f );
 				int damage = static_cast<int>( BG_Class( pClass )->health * BG_Class( pClass )->fallDamage *
 					damageFraction );
 				if ( damage >= Entities::HealthOf( self ) )
