@@ -54,6 +54,14 @@ function M.alive(self)
     return client and client.health > 0
 end
 
+function M.can_attempt_purchase(client)
+    return client ~= nil and (client.credits or 0) >= 200
+end
+
+function M.can_attempt_evolve(client)
+    return client ~= nil and (client.evos or 0) >= 2
+end
+
 function M.queued_for_spawn(self, queued_flag)
     local client = self.client
     return client and (client.pm_flags & queued_flag) ~= 0
@@ -254,6 +262,9 @@ function M.try_evolve_targets(self, ctx, client, level, targets)
     end
 
     local candidates = targets or M.ALIEN_EVOLVE_TARGETS
+    if not M.can_attempt_evolve(client) then
+        return STATUS_FAILURE
+    end
 
     local terminal_candidates = {}
     for _, class_name in ipairs(candidates) do
@@ -289,7 +300,7 @@ function M.buy_overload_upgrades(self, ctx)
     return ctx:buyOverloadUpgrades()
 end
 
-local EQUIP_RETRY_COOLDOWN_MS = 30000
+local EQUIP_RETRY_COOLDOWN_MS = 5000
 
 function M.equip_and_buy_overload(ctx, retry_times, slot, now)
     local retry_at = retry_times and slot and retry_times[slot]

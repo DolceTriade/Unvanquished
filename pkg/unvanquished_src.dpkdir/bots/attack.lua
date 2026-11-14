@@ -182,7 +182,7 @@ local function maybe_equip_human_near_armoury(number, team, level, mind, ctx)
 
     local status = common.equip_and_buy_overload(ctx, STATE.equip_retry_at, number, level.time)
     if status == STATUS_FAILURE then
-        STATE.human_equip_retry_at[number] = level.time + 2000
+        STATE.human_equip_retry_at[number] = level.time + 500
         return STATUS_FAILURE
     end
 
@@ -201,6 +201,9 @@ local function human_should_equip_near_armoury(number, level, mind)
 end
 
 local function human_resupply_phase(number, level, client, weapon_attr, mind)
+    if not common.can_attempt_purchase(client) then
+        return nil
+    end
     if out_of_human_ammo(client, weapon_attr) then
         local armoury_distance = human_armoury_distance(mind)
         if armoury_distance and armoury_distance < 500 then

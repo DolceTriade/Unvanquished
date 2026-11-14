@@ -1219,19 +1219,21 @@ AINodeStatus_t BotActionFight( gentity_t *self, AIGenericNode_t *node )
 	// Evasive action: if we have the "feels-pain" skill and were recently shot
 	// or can currently see an enemy, dodge to make ourselves a harder target.
 	constexpr int PAIN_EVASIVE_WINDOW = 1500; // ms after being shot / seeing an enemy
-	bool evasiveAction = self->botMind->skillSet[BOT_B_PAIN]
-		&& ( level.time - self->botMind->painTime < PAIN_EVASIVE_WINDOW
-		     || level.time - self->botMind->seenEnemyTime < PAIN_EVASIVE_WINDOW );
+	bool evasiveAction = level.time - self->botMind->painTime < PAIN_EVASIVE_WINDOW
+		|| ( self->botMind->skillSet[BOT_B_PAIN]
+		     && level.time - self->botMind->seenEnemyTime < PAIN_EVASIVE_WINDOW );
 	bool enemyInAttackRange = BotEnemyInAttackRange( self );
+	bool chargeWithShortRangeWeapon = self->client->ps.weapon == WP_PAIN_SAW
+		|| self->client->ps.weapon == WP_FLAMER;
 	bool hasCombatEvasionStyle = self->botMind->skillSet[BOT_H_EVASION_ORBIT]
 		|| self->botMind->skillSet[BOT_H_EVASION_MATADOR]
 		|| self->botMind->skillSet[BOT_H_EVASION_BURST];
-	if ( BotCombatEvasion( self ) )
+	if ( !chargeWithShortRangeWeapon && BotCombatEvasion( self ) )
 	{
 		// The selected combat style owns grounded movement while the target is
 		// visible; aiming and firing above remain unchanged.
 	}
-	else if ( !hasCombatEvasionStyle && evasiveAction && enemyInAttackRange )
+	else if ( evasiveAction && enemyInAttackRange )
 	{
 		BotStrafeDodge( self );
 	}
@@ -1248,7 +1250,8 @@ AINodeStatus_t BotActionFight( gentity_t *self, AIGenericNode_t *node )
 		// the result: we go around the enemy
 		BotAlternateStrafe( self );
 	}
-	else if ( !hasCombatEvasionStyle && goalDist >= Square( MAX_HUMAN_DANCE_DIST ) && self->client->ps.weapon != WP_PAIN_SAW )
+	else if ( !hasCombatEvasionStyle && goalDist >= Square( MAX_HUMAN_DANCE_DIST ) && self->client->ps.weapon != WP_PAIN_SAW
+			&& self->client->ps.weapon != WP_FLAMER )
 	{
 		if ( goalDist - Square( MAX_HUMAN_DANCE_DIST ) < 100 )
 		{
@@ -1262,7 +1265,16 @@ AINodeStatus_t BotActionFight( gentity_t *self, AIGenericNode_t *node )
 
 	if ( inAttackRange && self->botMind->goal.getTargetType() == entityType_t::ET_BUILDABLE )
 	{
+		// Don't walk into the structure. If a player threat is nearby, evade it
+		// while keeping the buildable as the attack target.
 		BotStandStill( self );
+		const gentity_t *attacker = self->botMind->bestEnemy.goal.getTargetedEntity();
+		bool evading = attacker && attacker->client && BotCombatEvasionAgainst( self, attacker );
+		if ( !evading && evasiveAction )
+		{
+			BotStrafeDodge( self );
+			evading = true;
+		}
 		// try to complete navcon flight: fire jetpack and move to target
 		switch ( self->botMind->jetpackState )
 		{

@@ -1056,8 +1056,11 @@ gentity_t* BotFindBestEnemy( gentity_t *self )
 		}
 
 		glm::vec3 vorigin = VEC2GLM( target->s.origin );
-		if ( target->s.eType == entityType_t::ET_PLAYER && self->client->pers.team == TEAM_HUMANS
-		    && BotAimAngle( self, vorigin ) > g_bot_fov.Get() / 2 )
+		bool outsideFov = target->s.eType == entityType_t::ET_PLAYER
+			&& self->client->pers.team == TEAM_HUMANS
+			&& BotAimAngle( self, vorigin ) > g_bot_fov.Get() / 2;
+		bool visible = outsideFov && BotEntityIsVisible( self, target, MASK_OPAQUE );
+		if ( outsideFov && !visible )
 		{
 			continue;
 		}
@@ -1069,7 +1072,7 @@ gentity_t* BotFindBestEnemy( gentity_t *self )
 
 		newScore = BotGetEnemyPriority( self, target );
 
-		if ( newScore > bestVisibleEnemyScore && BotEntityIsVisible( self, target, MASK_OPAQUE ) )
+		if ( newScore > bestVisibleEnemyScore && ( visible || BotEntityIsVisible( self, target, MASK_OPAQUE ) ) )
 		{
 			//store the new score and the index of the entity
 			bestVisibleEnemyScore = newScore;
@@ -2295,8 +2298,12 @@ bool BotEnemyInAttackRange( const gentity_t *self )
 
 bool BotCombatEvasion( gentity_t *self )
 {
+	return BotCombatEvasionAgainst( self, self->botMind->goal.getTargetedEntity() );
+}
+
+bool BotCombatEvasionAgainst( gentity_t *self, const gentity_t *target )
+{
 	botMemory_t *mind = self->botMind;
-	const gentity_t *target = mind->goal.getTargetedEntity();
 	if ( !target || !target->client || !( mind->skillSet[BOT_H_EVASION_ORBIT]
 	                || mind->skillSet[BOT_H_EVASION_MATADOR]
                 || mind->skillSet[BOT_H_EVASION_BURST] ) )
@@ -2610,9 +2617,9 @@ void BotClassMovement( gentity_t *self, bool inAttackRange )
 	// or can currently see an enemy, dodge to make ourselves a harder target.
 	// This takes priority over normal strafing since we know we're engaged.
 	constexpr int PAIN_EVASIVE_WINDOW = 1500; // ms after being shot / seeing an enemy
-	bool evasiveAction = self->botMind->skillSet[BOT_B_PAIN]
-		&& ( level.time - self->botMind->painTime < PAIN_EVASIVE_WINDOW
-		     || level.time - self->botMind->seenEnemyTime < PAIN_EVASIVE_WINDOW );
+	bool evasiveAction = level.time - self->botMind->painTime < PAIN_EVASIVE_WINDOW
+		|| ( self->botMind->skillSet[BOT_B_PAIN]
+		     && level.time - self->botMind->seenEnemyTime < PAIN_EVASIVE_WINDOW );
 	if ( evasiveAction )
 	{
 		BotStrafeDodge( self );
@@ -3299,8 +3306,7 @@ void BotPain( gentity_t *self, gentity_t *attacker, int )
 {
 	if ( G_Team( attacker ) != TEAM_NONE
 		&& !G_OnSameTeam( self, attacker )
-		&& attacker->s.eType == entityType_t::ET_PLAYER
-		&& self->botMind->skillSet[BOT_B_PAIN] )
+		&& attacker->s.eType == entityType_t::ET_PLAYER )
 	{
 		if ( BotEnemyIsAbandoned( self, attacker ) )
 		{

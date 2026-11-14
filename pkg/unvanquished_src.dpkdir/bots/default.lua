@@ -379,6 +379,10 @@ local function builder_needed(team_name, number, team_snapshot, level, already_b
     end
 
     local level_time = sgame.level.match_time
+    local main_buildable = is_alien(team_name) and "overmind"
+        or is_human(team_name) and "reactor"
+    local restoring_main = main_buildable ~= nil
+        and (team_snapshot.buildables[main_buildable] or 0) == 0
     local chosen_cost = cache.chosen_buildable_cost(team_name)
     local usable_build_points = cache.usable_build_points(team_name)
     local team_key = is_alien(team_name) and "aliens" or "humans"
@@ -389,23 +393,25 @@ local function builder_needed(team_name, number, team_snapshot, level, already_b
     end
     -- Retirement can take time. Equipment/class must not reactivate a
     -- retired builder while the team is still waiting to recover BP.
-    if not STATE.builder_bp_enabled[team_key] then
+    if not restoring_main and not STATE.builder_bp_enabled[team_key] then
         return false
     end
     -- Keep an active builder through the low-BP range, but only assign a new
     -- builder after the team has recovered above 30 BP.
     local bp_threshold = already_builder and 10 or 30
-    if already_builder and usable_build_points < bp_threshold then
-        return false
-    elseif not already_builder and usable_build_points <= bp_threshold then
-        return false
+    if not restoring_main then
+        if already_builder and usable_build_points < bp_threshold then
+            return false
+        elseif not already_builder and usable_build_points <= bp_threshold then
+            return false
+        end
     end
 
     if is_alien(team_name) then
         return level_time >= 60000
             and level.num_players == 0
             and cache.cvar("g_bot_buildAliens") ~= "0"
-            and (already_builder or usable_build_points >= chosen_cost)
+            and (restoring_main or already_builder or usable_build_points >= chosen_cost)
             and not cache.has_teammate_weapon(team_name, "abuild", number)
             and not cache.has_teammate_weapon(team_name, "abuildupg", number)
     end
@@ -414,7 +420,7 @@ local function builder_needed(team_name, number, team_snapshot, level, already_b
         return level_time >= 60000
             and level.num_players == 0
             and cache.cvar("g_bot_buildHumans") ~= "0"
-            and (already_builder or usable_build_points >= chosen_cost)
+            and (restoring_main or already_builder or usable_build_points >= chosen_cost)
             and not has_human_builder(team_snapshot, number)
             and not cache.has_teammate_weapon(team_name, "ckit", number)
     end
@@ -540,6 +546,10 @@ local function become_builder(team, number, client, builder_elapsed, ctx)
             return STATUS_FAILURE
         end
 
+        if not common.can_attempt_purchase(client) then
+            return STATUS_FAILURE
+        end
+
         if builder_elapsed >= 20000 then
             ctx:resetMyTimer()
             return STATUS_FAILURE
@@ -589,7 +599,10 @@ local function maybe_retire_builder(team, number, client, builder, wants_build, 
             return STATUS_FAILURE
         end
         if client.weapon == "ckit" and cache.usable_build_points(team) < 10 then
-            return ctx:buyPrimary("rifle")
+            if common.can_attempt_purchase(client) then
+                return ctx:buyPrimary("rifle")
+            end
+            return STATUS_FAILURE
         end
         return equip_and_buy_overload_for_bot(number, ctx)
     end
@@ -793,7 +806,7 @@ local function maybe_heal_or_fight_alien(number, health_frac, enemy, enemy_targe
     return STATUS_FAILURE
 end
 
-local function maybe_repair(team, number, weapon, team_snapshot, ctx, mind)
+local function maybe_repair(team, number, client, weapon, team_snapshot, ctx, mind)
     if not is_human(team) or not team_snapshot then
         return STATUS_FAILURE
     end
@@ -820,6 +833,9 @@ local function maybe_repair(team, number, weapon, team_snapshot, ctx, mind)
     end
 
     if weapon ~= "ckit" then
+        if not common.can_attempt_purchase(client) then
+            return STATUS_FAILURE
+        end
         return ctx:buyPrimary("ckit")
     end
 
@@ -841,7 +857,7 @@ end
 
 local function maybe_return_for_ammo(team, number, client, weapon_attr, mind, ctx)
     if not is_human(team) or client.weapon == "ckit" or not weapon_attr or weapon_attr.ammo <= 0
-        or (client.ammo or 0) > 0 then
+        or (client.ammo or 0) > 0 or not common.can_attempt_purchase(client) then
         return STATUS_FAILURE
     end
     local armoury = mind:closestBuilding("arm")
@@ -856,6 +872,7 @@ end
 
 local function maybe_equip(team, number, client, level, ctx, mind, enemy_visible)
     if not is_human(team) or client.weapon == "ckit" or enemy_visible
+        or not common.can_attempt_purchase(client)
         or enemy_seen_recently(level, mind, 3000)
         or human_repair_target(mind) then
         return STATUS_FAILURE
@@ -1011,7 +1028,7 @@ local function run_roam_task(task, state, ctx)
         return status
     end
 
-    status = maybe_repair(state.team, state.number, state.weapon, state.team_snapshot, ctx, state.mind)
+    status = maybe_repair(state.team, state.number, state.client, state.weapon, state.team_snapshot, ctx, state.mind)
     if status ~= STATUS_FAILURE then
         return status
     end
