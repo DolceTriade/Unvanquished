@@ -39,7 +39,7 @@ local function prepare_builder(self, ctx, boss_entity)
         end
 
         local status = common.equip_and_buy_overload(
-            ctx, STATE.equip_retry_at, number, sgame.level.time)
+            client, ctx, STATE.equip_retry_at, number, sgame.level.time)
         if status == STATUS_FAILURE or status == STATUS_SUCCESS then
             STATE[number] = {
                 number = boss_entity.number,

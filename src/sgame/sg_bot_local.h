@@ -245,7 +245,6 @@ struct botMemory_t
 		int spawnTime;
 		int lastThink;
 		int overloadTargetPurchase;
-		int overloadNextPurchaseTime;
 		int weaponRecoveryRetryTime;
 
 		int stuckTime;

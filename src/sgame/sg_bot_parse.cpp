@@ -1093,7 +1093,7 @@ static const struct AIActionMap_s
 	{ "buildNow",          BotActionBuildNow,          1, 1 },
 	{ "buildNowChosenBuildable", BotActionBuildNowChosenBuildable, 0, 0 },
 	{ "buy",               BotActionBuy,               1, 4 },
-	{ "buyOverloadUpgrades", BotActionBuyOverloadUpgrades, 0, 0 },
+	{ "buyOverloadUpgrades", BotActionBuyOverloadUpgrades, 0, 1 },
 	{ "buyPrimary",        BotActionBuyPrimary,        1, 1 },
 	{ "changeBehavior",    BotActionChangeBehavior,    1, 1 },
 	{ "changeGoal",        BotActionChangeGoal,        1, 3 },

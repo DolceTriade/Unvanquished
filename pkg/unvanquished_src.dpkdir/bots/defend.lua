@@ -27,8 +27,8 @@ local STATE = behavior_state.new_behavior("defend", {
     equip_retry_at = {},
 }, { "equip_retry_at" })
 
-local function equip_and_buy_overload_for_bot(number, level, ctx)
-    return common.equip_and_buy_overload(ctx, STATE.equip_retry_at, number, level.time)
+local function equip_and_buy_overload_for_bot(number, level, client, ctx)
+    return common.equip_and_buy_overload(client, ctx, STATE.equip_retry_at, number, level.time)
 end
 
 local function entity_is_alive(entity)
@@ -91,7 +91,7 @@ local function maybe_retire_repair_kit(team, number, client, level, mind, ctx)
         return STATUS_FAILURE
     end
 
-    return equip_and_buy_overload_for_bot(number, level, ctx)
+    return equip_and_buy_overload_for_bot(number, level, client, ctx)
 end
 
 local function maybe_repair(team, number, client, ctx, mind)
@@ -140,12 +140,12 @@ local function maybe_return_for_ammo(team, number, client, weapon_attr, level, m
         return STATUS_FAILURE
     end
     if armoury.distance and armoury.distance <= 100 then
-        return equip_and_buy_overload_for_bot(number, level, ctx)
+        return equip_and_buy_overload_for_bot(number, level, client, ctx)
     end
     return ctx:moveTo("arm")
 end
 
-local function maybe_equip(team, number, enemy_visible, level, mind, ctx)
+local function maybe_equip(team, number, client, enemy_visible, level, mind, ctx)
     if not is_human(team)
         or enemy_visible
         or elapsed_since(level.time, mind.enemyLastSeen) <= 1000 then
@@ -161,7 +161,7 @@ local function maybe_equip(team, number, enemy_visible, level, mind, ctx)
         return ctx:moveTo("arm")
     end
 
-    return equip_and_buy_overload_for_bot(number, level, ctx)
+    return equip_and_buy_overload_for_bot(number, level, client, ctx)
 end
 
 local function maybe_fight_human(team, client, enemy_visible, attack_active, mind, ctx)
@@ -448,7 +448,8 @@ local REPAIR_HEAL_TASK = {
         end
 
         if human_should_equip(state.number, state.team, state.enemy_visible, state.level, state.mind) then
-            status = maybe_equip(state.team, state.number, state.enemy_visible, state.level, state.mind, ctx)
+            status = maybe_equip(
+                state.team, state.number, state.client, state.enemy_visible, state.level, state.mind, ctx)
             if status == STATUS_FAILURE then
                 return STATUS_FAILURE
             end

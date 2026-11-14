@@ -1003,7 +1003,6 @@ void G_Bot_ResetBehaviorState( botMemory_t &memory )
 	memory.visibilitySearch = {};
 	memory.clearNav();
 	memory.overloadTargetPurchase = -1;
-	memory.overloadNextPurchaseTime = 0;
 	memory.weaponRecoveryRetryTime = 0;
 	memory.lastNavconTime = 0;
 	memory.lastNavconDistance = 0;

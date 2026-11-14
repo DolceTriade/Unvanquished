@@ -161,7 +161,7 @@ local function ensure_human_loadout(spec, self, ctx, state)
         end
     else
         local status = common.equip_and_buy_overload(
-            ctx, EQUIP_RETRY_AT, self.number, sgame.level.time)
+            self.client, ctx, EQUIP_RETRY_AT, self.number, sgame.level.time)
         if status ~= STATUS_FAILURE then
             return STATUS_RUNNING
         end
