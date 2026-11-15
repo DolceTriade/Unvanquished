@@ -539,6 +539,9 @@ enum persEnum_t
 #define EF_BOUNCE_HALF      BIT(4) // for missiles
 #define EF_NO_BOUNCE_SOUND  BIT(5) // for missiles
 
+// for players (shares a bit with missile flags)
+#define EF_POWER_AVAILABLE  BIT(4)
+
 // buildable flags:
 #define EF_B_SPAWNED        BIT(6)
 #define EF_B_POWERED        BIT(7)
@@ -1392,6 +1395,7 @@ struct classAttributes_t
 	int      staminaStopRestore;
 
 	int      price;
+	float    radarFadeOut;
 };
 
 struct classModelConfig_t
@@ -1458,6 +1462,7 @@ struct buildableAttributes_t
 	bool    transparentTest;
 	bool    uniqueTest;
 	bool    dretchAttackable;
+	float   radarFadeOut;
 };
 
 struct buildableModelConfig_t

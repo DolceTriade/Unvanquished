@@ -147,6 +147,7 @@ set(CGAMELIST
     ${GAMELOGIC_DIR}/cgame/cg_rocket_draw.cpp
     ${GAMELOGIC_DIR}/cgame/cg_rocket_events.cpp
     ${GAMELOGIC_DIR}/cgame/cg_rocket_progressbar.cpp
+    ${GAMELOGIC_DIR}/cgame/cg_scanner.cpp
     ${GAMELOGIC_DIR}/cgame/cg_segmented_skeleton.cpp
     ${GAMELOGIC_DIR}/cgame/cg_segmented_skeleton.h
     ${GAMELOGIC_DIR}/cgame/cg_servercmds.cpp

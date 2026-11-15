@@ -3680,6 +3680,30 @@ static void CG_Rocket_HaveJetpck()
 	Rocket_SetClass( "inactive", !jetpackInInventory );
 }
 
+static void CG_Rocket_DrawAlienSense()
+{
+	if ( !BG_ClassHasAbility( cg.snap->ps.stats[ STAT_CLASS ], SCA_ALIENSENSE ) )
+	{
+		return;
+	}
+
+	rectDef_t rect;
+	CG_GetRocketElementRect( &rect );
+	CG_AlienSense( &rect );
+}
+
+static void CG_Rocket_DrawHumanScanner()
+{
+	if ( !BG_InventoryContainsUpgrade( UP_RADAR, cg.snap->ps.stats ) )
+	{
+		return;
+	}
+
+	rectDef_t rect;
+	CG_GetRocketElementRect( &rect );
+	CG_Scanner( &rect );
+}
+
 struct elementRenderCmd_t
 {
 	const char *name;
@@ -3694,6 +3718,7 @@ struct elementRenderCmd_t
 // THESE MUST BE ALPHABETIZED
 static const elementRenderCmd_t elementRenderCmdList[] =
 {
+	{ "alien_sense", nullptr, &CG_Rocket_DrawAlienSense, ELEMENT_ALIENS },
 	{ "ammo_stack", nullptr, &CG_DrawPlayerAmmoStack, ELEMENT_HUMANS },
 	{ "chattype", &CG_Rocket_DrawChatType, nullptr, ELEMENT_ALL },
 	{ "clip_stack", nullptr, &CG_DrawPlayerClipsStack, ELEMENT_HUMANS },
@@ -3716,6 +3741,7 @@ static const elementRenderCmd_t elementRenderCmdList[] =
 	{ "minimap", nullptr, &CG_Rocket_DrawMinimap, ELEMENT_ALL },
 	{ "motd", &CG_Rocket_DrawMOTD, nullptr, ELEMENT_ALL },
 	{ "progress_value", &CG_Rocket_DrawProgressValue, nullptr, ELEMENT_ALL },
+	{ "scanner", nullptr, &CG_Rocket_DrawHumanScanner, ELEMENT_HUMANS },
 	{ "tutorial", &CG_Rocket_DrawTutorial, nullptr, ELEMENT_GAME },
 	{ "version", &CG_Rocket_DrawVersion, nullptr, ELEMENT_ALL },
 	{ "votes", &CG_Rocket_DrawVote, nullptr, ELEMENT_GAME },

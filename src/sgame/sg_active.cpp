@@ -881,29 +881,6 @@ static void BeaconAutoTag( gentity_t *self, int timePassed )
 	{
 		Beacon::Tag( traceEnt, team, ( traceEnt->s.eType == entityType_t::ET_BUILDABLE ), timePassed );
 	}
-
-	if ( BG_InventoryContainsUpgrade( UP_RADAR, client->ps.stats ) )
-	{
-		// Tag entities in human radar range, making sure they are also
-		// in vis and, for buildables, are in line of sight.
-		float rangeSquared = Square( RADAR_RANGE );
-
-		for ( int i = 0; i < level.num_entities; i++ ) // TODO TaggableComponent?
-		{
-			gentity_t *target = g_entities + i;
-			if ( target->inuse &&
-			     Beacon::EntityTaggable( i, team, false ) &&
-			     target != traceEnt &&
-			     DistanceSquared( self->s.origin, target->s.origin ) < rangeSquared &&
-			     trap_InPVSIgnorePortals( self->s.origin, target->s.origin ) &&
-			     ( target->s.eType != entityType_t::ET_BUILDABLE
-			       || G_LineOfSight( self, target, MASK_SOLID, false ) ) )
-			{
-				Beacon::Tag(
-					target, team, ( target->s.eType == entityType_t::ET_BUILDABLE ), timePassed );
-			}
-		}
-	}
 }
 
 static bool G_PlayerCanActivateEntity( const gentity_t *ent, team_t team )
@@ -2427,6 +2404,15 @@ void ClientEndFrame( gentity_t *ent )
 	if ( level.intermissiontime )
 	{
 		return;
+	}
+
+	if ( G_ActiveMainBuildable( static_cast<team_t>( ent->client->pers.team ) ) )
+	{
+		ent->client->ps.eFlags |= EF_POWER_AVAILABLE;
+	}
+	else
+	{
+		ent->client->ps.eFlags &= ~EF_POWER_AVAILABLE;
 	}
 
 	// burn from lava, etc

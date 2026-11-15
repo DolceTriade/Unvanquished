@@ -1852,6 +1852,8 @@ void ClientSpawn( gentity_t *ent, gentity_t *spawn, const vec3_t origin, const v
 
 	if ( willBeAlive )
 	{
+		ent->r.svFlags |= SVF_CLIENTS_IN_RANGE;
+		ent->r.clientRadius = std::max( RADAR_RANGE, ALIENSENSE_RANGE );
 		trap_LinkEntity( ent );
 
 		// force the base weapon up
@@ -1865,6 +1867,11 @@ void ClientSpawn( gentity_t *ent, gentity_t *spawn, const vec3_t origin, const v
 		}
 
 		client->ps.weaponstate = WEAPON_READY;
+	}
+	else
+	{
+		ent->r.svFlags &= ~SVF_CLIENTS_IN_RANGE;
+		ent->r.clientRadius = 0.0f;
 	}
 
 	// don't allow full run speed for a bit

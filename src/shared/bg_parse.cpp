@@ -260,7 +260,7 @@ void BG_ParseBuildableAttributeFile( const char *filename, buildableAttributes_t
 		TEAM = 1 << 8,
 		BUILDWEAPON = 1 << 9,
 		BUILDTIME = 1 << 10,
-		UNUSED_11 = 1 << 11,
+		RADAR = 1 << 11,
 		UNLOCKTHRESHOLD = 1 << 12
 	};
 
@@ -446,6 +446,12 @@ void BG_ParseBuildableAttributeFile( const char *filename, buildableAttributes_t
 		{
 			ba->dretchAttackable = true;
 		}
+		else if ( !Q_stricmp( token, "radarFadeOut" ) )
+		{
+			PARSE( text, token );
+			ba->radarFadeOut = atof( token );
+			defined |= RADAR;
+		}
 		else if ( BG_ParseConfigVar( va( "b_%s_%s", ba->name, token ), &text, filename ) )
 		{
 		}
@@ -464,6 +470,7 @@ void BG_ParseBuildableAttributeFile( const char *filename, buildableAttributes_t
 	else if ( !( defined & TEAM) ) { token = "team"; }
 	else if ( !( defined & BUILDWEAPON) ) { token = "buildWeapon"; }
 	else if ( !( defined & BUILDTIME) ) { token = "buildTime"; }
+	else if ( !( defined & RADAR) ) { token = "radarFadeOut"; }
 	else if ( !( defined & NORMAL) ) { token = "minNormal"; }
 
 	if ( *token )
@@ -660,7 +667,7 @@ void BG_ParseClassAttributeFile( const char *filename, classAttributes_t *ca )
 		ICON               = 1 << 14,
 		PRICE              = 1 << 15,
 		SPRINTMOD          = 1 << 16,
-		UNUSED_17          = 1 << 17,
+		RADAR              = 1 << 17,
 		MASS               = 1 << 18,
 		UNLOCKTHRESHOLD    = 1 << 19,
 		STAMINAJUMPCOST    = 1 << 20,
@@ -858,6 +865,12 @@ void BG_ParseClassAttributeFile( const char *filename, classAttributes_t *ca )
 			ca->sprintMod = atof( token );
 			defined |= SPRINTMOD;
 		}
+		else if ( !Q_stricmp( token, "radarFadeOut" ) )
+		{
+			PARSE( text, token );
+			ca->radarFadeOut = atof( token );
+			defined |= RADAR;
+		}
 		else if ( !Q_stricmp( token, "unlockThreshold" ) )
 		{
 			PARSE(text, token);
@@ -927,6 +940,7 @@ void BG_ParseClassAttributeFile( const char *filename, classAttributes_t *ca )
 		else if ( !( defined & JUMPMAGNITUDE ) )   { token = "jumpMagnitude"; }
 		else if ( !( defined & ICON ) )            { token = "icon"; }
 		else if ( !( defined & PRICE ) )           { token = "cost"; } // "cost" is same as "price"
+		else if ( !( defined & RADAR ) )           { token = "radarFadeOut"; }
 		else                                       { token = nullptr; }
 
 		if ( token )

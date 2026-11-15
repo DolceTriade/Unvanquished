@@ -54,6 +54,7 @@ const bgAttributeTrackedField_t classAttributeFields[] =
 	ATTR_INT( classAttributes_t, "staminaWalkRestore", staminaWalkRestore ),
 	ATTR_INT( classAttributes_t, "staminaStopRestore", staminaStopRestore ),
 	ATTR_FLOAT( classAttributes_t, "regen_rate", regenRate ),
+	ATTR_FLOAT( classAttributes_t, "radar_fade_out", radarFadeOut ),
 	ATTR_FLOAT( classAttributes_t, "speed", speed ),
 	ATTR_INT( classAttributes_t, "mass", mass ),
 	ATTR_FLOAT( classAttributes_t, "jump_magnitude", jumpMagnitude ),

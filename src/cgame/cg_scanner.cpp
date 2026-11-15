@@ -199,9 +199,10 @@ void CG_UpdateEntityPositions( void )
 	}
 }
 
-#define STALKWIDTH ( 2.0f * cgs.aspectScale )
-#define BLIPX      ( 16.0f * cgs.aspectScale )
-#define BLIPY      8.0f
+#define STALKWIDTH ( 1.0f * cgs.aspectScale )
+#define BLIPX      ( 8.0f * cgs.aspectScale )
+#define BLIPY      4.0f
+#define BLIP_ALPHA 0.8f
 #define FAR_ALPHA  0.8f
 #define NEAR_ALPHA 1.2f
 
@@ -234,6 +235,7 @@ static void CG_DrawBlips( rectDef_t *rect, vec3_t origin, vec4_t colour, qhandle
 
 	localColour[ 3 ] *= alphaMod;
 	localColour[ 3 ] *= ( 0.5f + ( timeFractionSinceRefresh * 0.5f ) );
+	localColour[ 3 ] *= BLIP_ALPHA;
 
 	if ( localColour[ 3 ] > 1.0f )
 	{
@@ -265,8 +267,8 @@ static void CG_DrawBlips( rectDef_t *rect, vec3_t origin, vec4_t colour, qhandle
 	trap_R_ClearColor();
 }
 
-#define BLIPX2 ( 36.0f * cgs.aspectScale )
-#define BLIPY2 36.0f
+#define BLIPX2 ( 18.0f * cgs.aspectScale )
+#define BLIPY2 18.0f
 
 /*
 =============
@@ -310,7 +312,7 @@ static void CG_DrawDir( rectDef_t *rect, vec3_t origin, vec4_t colour, qhandle_t
 
 	RotatePointAroundVector( drawOrigin, up, top, angle );
 
-	trap_R_SetColor( Color::Color( colour[ 0 ], colour[ 1 ], colour[ 2 ], colour[ 3 ] ) );
+	trap_R_SetColor( Color::Color( colour[ 0 ], colour[ 1 ], colour[ 2 ], colour[ 3 ] * BLIP_ALPHA ) );
 	CG_DrawPic( rect->x + ( rect->w / 2 ) - ( BLIPX2 / 2 ) - drawOrigin[ 0 ] * ( rect->w / 2 ),
 	            rect->y + ( rect->h / 2 ) - ( BLIPY2 / 2 ) + drawOrigin[ 1 ] * ( rect->h / 2 ),
 	            BLIPX2, BLIPY2, shader ); // cgs.media.scannerBlipShader

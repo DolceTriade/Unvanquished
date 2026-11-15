@@ -245,79 +245,6 @@ static bool LoadExplicitBeacons()
 }
 
 /**
- * @brief Fills cg.beacons with implicit (client side generated) beacons.
- * @return Whether all beacons found space in cg.beacons.
- */
-static bool LoadImplicitBeacons()
-{
-	// All alive aliens have enemy sense.
-	if ( cg.predictedPlayerState.persistant[ PERS_TEAM ] == TEAM_ALIENS &&
-	     cg.predictedPlayerState.persistant[ PERS_SPECSTATE ] == SPECTATOR_NOT &&
-	     cg.predictedPlayerState.stats[ STAT_HEALTH ] > 0 )
-	{
-		for ( int clientNum = 0; clientNum < MAX_CLIENTS; clientNum++ )
-		{
-			centity_t     *ent = &cg_entities[ clientNum ];
-			entityState_t *es = &ent->currentState;
-			clientInfo_t  *client = &cgs.clientinfo[ clientNum ];
-
-			// Can only track valid targets.
-			// TODO: Make beacons expire properly anyway.
-			if ( !ent->valid )                 continue;
-
-			// Only tag enemies like this, teammates have an explicit beacon.
-			if ( !client->infoValid )          continue;
-			if ( client->team != TEAM_HUMANS ) continue;
-
-			cbeacon_t *beacon = &ent->beacon;
-
-			SetClientBeaconPosition( ent, beacon );
-
-			// Add alpha fade at the borders of the sense range.
-			beacon->alphaMod = Math::Clamp(
-				( ( (float)ALIENSENSE_RANGE -
-			        Distance( cg.predictedPlayerState.origin, beacon->origin ) ) /
-			      ( ALIENSENSE_BORDER_FRAC * (float)ALIENSENSE_RANGE ) ), 0.0f, 1.0f );
-
-			// A value of 0 means the target is out of range, don't create a beacon in that case.
-			if ( beacon->alphaMod == 0.0f ) continue;
-
-			// Prepare beacon to be added.
-			beacon->ctime     = ent->pvsEnterTime;
-			beacon->mtime     = cg.time;
-			beacon->type      = BCT_TAG;
-			beacon->data      = es->weapon;
-			beacon->ownerTeam = TEAM_ALIENS;
-			beacon->owner     = ENTITYNUM_NONE;
-			beacon->flags     = EF_BC_TAG_PLAYER | EF_BC_ENEMY;
-			beacon->target    = es->number;
-
-			// Expire beacons on corpses.
-			if ( ent->currentState.eFlags & EF_DEAD ) {
-				beacon->flags |= EF_BC_DYING;
-
-				if ( !beacon->old || !( beacon->oldFlags & EF_BC_DYING ) ) {
-					beacon->etime = cg.time + 1500; // TODO: Sync delay with explicit beacons.
-				}
-
-				// Don't add beacon if it's both expired and faded out.
-				if ( beacon->etime <= cg.time ) {
-					continue;
-				}
-			} else {
-				beacon->etime = 0;
-			}
-
-			// Add beacon to cg.beacons.
-			cg.beacons[ cg.beaconCount++ ] = beacon;
-			if( cg.beaconCount >= MAX_CBEACONS ) return false;
-		}
-	}
-
-	return true;
-}
-
-/**
  * @brief Used by qsort to compare beacons.
  */
 static int CompareBeaconsByDist( const void *a, const void *b )
@@ -663,8 +590,7 @@ static void HandHLBeaconToUI()
  */
 void CG_RunBeacons()
 {
-	// Don't load implicit beacons if there wasn't enough space for the explicit ones.
-	LoadExplicitBeacons() && LoadImplicitBeacons();
+	LoadExplicitBeacons();
 
 	// Sort beacons by distance, code below this may assume this.
 	qsort( cg.beacons, cg.beaconCount, sizeof( cbeacon_t* ), CompareBeaconsByDist );

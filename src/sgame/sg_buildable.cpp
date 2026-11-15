@@ -1774,6 +1774,8 @@ static gentity_t *SpawnBuildable( gentity_t *builder, buildable_t buildable, con
 	// ----------------------------
 
 	built->s.eType = entityType_t::ET_BUILDABLE;
+	built->r.svFlags |= SVF_CLIENTS_IN_RANGE;
+	built->r.clientRadius = std::max( RADAR_RANGE, ALIENSENSE_RANGE );
 	built->killedBy = ENTITYNUM_NONE;
 	built->classname = BG_strdup( attr->entityName );
 	built->s.modelindex = buildable;

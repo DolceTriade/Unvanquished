@@ -1343,6 +1343,8 @@ void CG_AddPacketEntities()
 
 	cg_highestActiveEntity = highest;
 
+	CG_UpdateEntityPositions();
+
 	//make an attempt at drawing bounding boxes of selected entity types
 	if ( cg_drawBBOX.Get() > 0 )
 	{

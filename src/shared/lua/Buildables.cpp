@@ -56,6 +56,7 @@ const bgAttributeTrackedField_t buildableAttributeFields[] =
 	ATTR_INT( buildableAttributes_t, "splash_damage", splashDamage ),
 	ATTR_INT( buildableAttributes_t, "splash_radius", splashRadius ),
 	ATTR_INT( buildableAttributes_t, "build_time", buildTime ),
+	ATTR_FLOAT( buildableAttributes_t, "radar_fade_out", radarFadeOut ),
 	ATTR_BOOL( buildableAttributes_t, "usable", usable ),
 };
 

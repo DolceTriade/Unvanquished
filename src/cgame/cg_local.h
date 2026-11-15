@@ -1047,6 +1047,29 @@ struct minimap_t
     minimapZone_t zones[ MAX_MINIMAP_ZONES ];
 };
 
+struct entityPos_t
+{
+	vec3_t alienBuildablePos[ MAX_GENTITIES ];
+	float  alienBuildableIntensity[ MAX_GENTITIES ];
+	int    numAlienBuildables;
+
+	vec3_t humanBuildablePos[ MAX_GENTITIES ];
+	float  humanBuildableIntensity[ MAX_GENTITIES ];
+	int    numHumanBuildables;
+
+	vec3_t alienClientPos[ MAX_CLIENTS ];
+	float  alienClientIntensity[ MAX_CLIENTS ];
+	int    numAlienClients;
+
+	vec3_t humanClientPos[ MAX_CLIENTS ];
+	float  humanClientIntensity[ MAX_CLIENTS ];
+	int    numHumanClients;
+
+	int    lastUpdateTime;
+	vec3_t origin;
+	vec3_t vangles;
+};
+
 //======================================================================
 
 // all cg.stepTime, cg.duckTime, cg.landTime, etc are set to cg.time when the action
@@ -2292,6 +2315,11 @@ void          CG_RunBeacons();
 qhandle_t     CG_BeaconIcon( const cbeacon_t *b );
 qhandle_t     CG_BeaconDescriptiveIcon( const cbeacon_t *b );
 std::string   CG_BeaconName( const cbeacon_t *b );
+
+// cg_scanner.cpp
+void          CG_UpdateEntityPositions();
+void          CG_Scanner( rectDef_t *rect );
+void          CG_AlienSense( rectDef_t *rect );
 
 //
 //===============================================
