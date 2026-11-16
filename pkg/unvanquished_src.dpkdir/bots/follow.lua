@@ -16,7 +16,6 @@ local health_fraction = common.health_fraction
 local use_medkit_if_low = common.use_medkit_if_low
 local recently_attacked = common.recently_attacked
 local try_evolve_targets = common.try_evolve_targets
-local unstick = common.unstick
 
 local ALIEN_EVOLVE_TARGETS = common.ALIEN_EVOLVE_TARGETS
 local TASKS = task_runtime.new_runtime()
@@ -219,12 +218,8 @@ return function(self, ctx)
         weapon_attr = weapon_attr,
     }
 
-    local status = unstick(sgame.level.time, ctx, mind, enemy, enemy_visible, self.team, client)
-    if status ~= STATUS_FAILURE then
-        return status
-    end
-
     local task = TASKS.current(self.number)
+    local status
     if task then
         status = TASKS.maybe_preempt(state, ctx, select_task)
         if status ~= STATUS_FAILURE then

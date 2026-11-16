@@ -23,11 +23,11 @@ local use_medkit_if_low = common.use_medkit_if_low
 local try_evolve_targets = common.try_evolve_targets
 local human_repair_target_info = common.human_repair_target_info
 local roam_buildings = common.roam_buildings
-local unstick = common.unstick
 local STATE = behavior_state.new_behavior("pve", {
     alien_target_lock = {},
     alien_combat_until = {},
     builder_assignment = {},
+    roles = {},
     build_failures = {},
     build_retry_after = {},
     build_reposition_until = {},
@@ -37,7 +37,7 @@ local STATE = behavior_state.new_behavior("pve", {
     tasks = {},
     boss_epoch = {},
 }, {
-    "alien_target_lock", "alien_combat_until", "builder_assignment", "build_failures",
+    "alien_target_lock", "alien_combat_until", "builder_assignment", "roles", "build_failures",
     "build_retry_after", "build_reposition_until", "human_equip_retry_at", "equip_retry_at",
     "spawn_evolve_attempt_time", "tasks",
 })
@@ -127,6 +127,9 @@ end
 
 local function clear_builder_assignment(number)
     STATE.builder_assignment[number] = nil
+    if STATE.roles[number] == "home_builder" or STATE.roles[number] == "forward_builder" then
+        STATE.roles[number] = nil
+    end
 end
 
 local function builder_assignment_team(number)
@@ -169,6 +172,7 @@ local function clear_team_state(team)
             clear_alien_combat_latch(entity.number)
             clear_task(entity.number)
             clear_build_failure_state(entity.number)
+            STATE.roles[entity.number] = nil
         end
     end
 end
@@ -551,10 +555,16 @@ local function builder_needed(team_name, number, team_snapshot, level, selected_
     local build_enabled = is_alien(team_name) and cache.cvar("g_bot_buildAliens") ~= "0"
         or is_human(team_name) and cache.cvar("g_bot_buildHumans") ~= "0"
     local max_builders = tonumber(cache.cvar("lua_pve_max_builders")) or PVE_MAX_BUILDERS
+    local team_bots = 0
+    for _, entity in pairs(sgame.entity) do
+        if entity.bot and entity.client and entity.team == team_name then
+            team_bots = team_bots + 1
+        end
+    end
 
     return build_enabled
         and (already_assigned or usable_build_points >= chosen_cost)
-        and builder_count(team_name, team_snapshot, number) < max_builders
+        and builder_count(team_name, team_snapshot, number) < math.min(max_builders, math.max(0, team_bots - 1))
 end
 
 local function main_buildable_missing(team_name, team_snapshot)
@@ -1159,8 +1169,17 @@ local function run_builder_task(task, state, ctx)
 
     task.phase = nil
 
+    local function builder_anchor()
+        if state.role == "forward_builder" then
+            local names = is_human(state.team) and { "overmind" } or { "reactor" }
+            return roam_buildings(ctx, names, PVE_HUMAN_PRESSURE_RADIUS)
+        end
+        local anchor = is_human(state.team) and "reactor" or "overmind"
+        return ctx:roamInRadius(anchor, 700)
+    end
+
     if build_reposition_active(state.number, state.level.time) then
-        status = ctx:roam()
+        status = builder_anchor()
         if status ~= STATUS_FAILURE then
             return status
         end
@@ -1202,7 +1221,7 @@ local function run_builder_task(task, state, ctx)
         end
     end
 
-    status = ctx:roam()
+    status = builder_anchor()
     if status ~= STATUS_FAILURE then
         return status
     end
@@ -1255,7 +1274,7 @@ local function run_attack_task(task, state, ctx)
         end
     end
 
-    return STATUS_FAILURE
+    return roam_enemy_base(state.team, ctx)
 end
 
 local function should_preempt_attack_task(task, state, ctx)
@@ -1345,7 +1364,7 @@ local function run_roam_task(task, state, ctx)
         return status
     end
 
-    return roam_enemy_base(state.team, ctx)
+    return ctx:roam()
 end
 
 local function should_preempt_roam_task(task, state, ctx)
@@ -1361,12 +1380,106 @@ local function new_roam_task()
     }
 end
 
+local function friendly_base_patrol(state, ctx)
+    if is_human(state.team) then
+        local status = roam_buildings(ctx, { "reactor", "telenode", "arm", "medistat" }, 500)
+        return status ~= STATUS_FAILURE and status or ctx:roam()
+    end
+
+    local status = roam_buildings(ctx, { "overmind", "eggpod", "booster" }, 500)
+    return status ~= STATUS_FAILURE and status or ctx:roam()
+end
+
+local function new_defender_task()
+    return {
+        role = function(task) return task end,
+        preempt_cooldown_ms = 750,
+        run = function(task, state, ctx)
+            if combat_active(state) then
+                local status = run_attack_task(task, state, ctx)
+                if status ~= STATUS_FAILURE then return status end
+            end
+            if is_alien(state.team) then
+                local status = maybe_heal_or_fight_alien(state.number, state.health_frac, nil,
+                    state.enemy_target, false, false, state.base_rush_score, state.level, ctx,
+                    state.mind, state.team, state.client)
+                if status ~= STATUS_FAILURE then return status end
+            end
+            return friendly_base_patrol(state, ctx)
+        end,
+        should_preempt = function(task, state) return state.wants_build end,
+    }
+end
+
+local function team_bot_numbers(team)
+    local numbers = {}
+    for number, entity in pairs(sgame.entity) do
+        if entity.bot and entity.client and entity.team == team then
+            numbers[#numbers + 1] = number
+        end
+    end
+    table.sort(numbers)
+    return numbers
+end
+
+local function assign_role(state)
+    local number = state.number
+    local role = STATE.roles[number]
+    if state.wants_build then
+        if role ~= "home_builder" and role ~= "forward_builder" then
+            local other_builders = 0
+            for other, assigned_team in pairs(STATE.builder_assignment) do
+                if other ~= number and assigned_team == state.team then other_builders = other_builders + 1 end
+            end
+            role = other_builders == 0 and "home_builder" or "forward_builder"
+        end
+        STATE.roles[number] = role
+        return role
+    end
+
+    if role == "home_builder" or role == "forward_builder" then
+        role = nil
+        STATE.roles[number] = nil
+    end
+    local bots = team_bot_numbers(state.team)
+    local has_defender = false
+    for _, bot_number in ipairs(bots) do
+        if STATE.roles[bot_number] == "defender" then has_defender = true end
+    end
+    if not has_defender and bots[1] then
+        for _, bot_number in ipairs(bots) do
+            local assigned = STATE.roles[bot_number]
+            if assigned ~= "home_builder" and assigned ~= "forward_builder" then
+                STATE.roles[bot_number] = "defender"
+                has_defender = true
+                break
+            end
+        end
+    end
+
+    role = STATE.roles[number]
+    if role then return role end
+    local unassigned = 0
+    local roamer = false
+    for _, bot_number in ipairs(bots) do
+        if not STATE.roles[bot_number] then unassigned = unassigned + 1 end
+        if STATE.roles[bot_number] == "roamer" then roamer = true end
+    end
+    role = (not roamer and unassigned >= 2) and "roamer" or "attacker"
+    STATE.roles[number] = role
+    return role
+end
+
 select_task = function(state)
     if state.wants_build then
         return new_builder_task()
     end
 
-    if combat_active(state) then
+    local role = assign_role(state)
+    if role == "defender" then
+        return new_defender_task()
+    end
+    if role == "attacker" or combat_active(state) then
         return new_attack_task()
     end
 
@@ -1439,12 +1552,7 @@ return function(self, ctx)
         clear_builder_assignment(number)
     end
 
-    local status = unstick(level.time, ctx, mind, enemy, enemy_visible, team, client, builder)
-    if status ~= STATUS_FAILURE then
-        return status
-    end
-
-    status = maybe_retire_builder(team, number, client, builder, wants_build, level, ctx, mind)
+    local status = maybe_retire_builder(team, number, client, builder, wants_build, level, ctx, mind)
     if status ~= STATUS_FAILURE then
         clear_build_failure_state(number)
         return status
@@ -1477,6 +1585,7 @@ return function(self, ctx)
         base_rush_score = base_rush_score,
         mind = mind,
     }
+    state.role = assign_role(state)
 
     if is_alien(team) and STATE.spawn_evolve_attempt_time[number] ~= mind.spawnTime then
         status = maybe_evolve(self, team, client, builder, health_frac, ctx,

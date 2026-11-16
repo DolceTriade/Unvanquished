@@ -21,7 +21,6 @@ local health_fraction = common.health_fraction
 local use_medkit_if_low = common.use_medkit_if_low
 local try_evolve_targets = common.try_evolve_targets
 local human_repair_target_info = common.human_repair_target_info
-local unstick = common.unstick
 
 local STATE = behavior_state.new_behavior("build", {
     alien_builder_owner = nil,
@@ -872,12 +871,7 @@ return function(self, ctx)
         mind.stuckTimer = level.time
     end
 
-    status = unstick(level.time, ctx, mind, enemy, enemy_visible, team, client, builder)
-    if status ~= STATUS_FAILURE then
-        return status
-    end
-
-    status = maybe_retire_builder(team, number, client, builder, wants_build, level, ctx, mind)
+    local status = maybe_retire_builder(team, number, client, builder, wants_build, level, ctx, mind)
     if status ~= STATUS_FAILURE then
         return status
     end

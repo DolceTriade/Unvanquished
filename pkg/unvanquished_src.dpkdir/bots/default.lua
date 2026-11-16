@@ -3,6 +3,8 @@ local STATUS_FAILURE = constants.STATUS_FAILURE
 local STATUS_SUCCESS = constants.STATUS_SUCCESS
 local STATUS_RUNNING = constants.STATUS_RUNNING
 local PMF_QUEUED = constants.PMF_QUEUED
+
+-- Force reload common.lua
 package.loaded["bots/common.lua"] = nil
 
 local cache = require("bots/cache.lua")
@@ -21,7 +23,6 @@ local recently_attacked = common.recently_attacked
 local use_medkit_if_low = common.use_medkit_if_low
 local try_evolve_targets = common.try_evolve_targets
 local human_repair_target_info = common.human_repair_target_info
-local unstick = common.unstick
 local STATE = behavior_state.new_behavior("default", {
     alien_target_lock = {},
     alien_combat_until = {},
@@ -1147,12 +1148,7 @@ return function(self, ctx)
         mind.stuckTimer = level.time
     end
 
-    local status = unstick(level.time, ctx, mind, enemy, enemy_visible, team, client, builder)
-    if status ~= STATUS_FAILURE then
-        return status
-    end
-
-    status = maybe_retire_builder(team, number, client, builder, wants_build, level, ctx, mind)
+    local status = maybe_retire_builder(team, number, client, builder, wants_build, level, ctx, mind)
     if status ~= STATUS_FAILURE then
         return status
     end

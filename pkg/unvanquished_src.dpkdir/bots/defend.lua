@@ -21,7 +21,6 @@ local try_evolve_targets = common.try_evolve_targets
 local heal_to_full_unless_attacked = common.heal_to_full_unless_attacked
 local human_repair_target_info = common.human_repair_target_info
 local roam_buildings = common.roam_buildings
-local unstick = common.unstick
 local TASKS = task_runtime.new_runtime()
 local STATE = behavior_state.new_behavior("defend", {
     equip_retry_at = {},
@@ -520,12 +519,7 @@ return function(self, ctx)
         enemy_visible = enemy_visible,
         weapon_attr = weapon_attr,
     }
-    local status = unstick(sgame.level.time, ctx, mind, enemy, enemy_visible, self.team, client)
-    if status ~= STATUS_FAILURE then
-        return status
-    end
-
-    status = maybe_use_medkit(self.team, client, ctx)
+    local status = maybe_use_medkit(self.team, client, ctx)
     if status ~= STATUS_FAILURE then
         return status
     end

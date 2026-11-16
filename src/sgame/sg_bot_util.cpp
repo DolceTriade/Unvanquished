@@ -28,6 +28,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "sg_bot_util.h"
 #include "botlib/bot_api.h"
 #include "CBSE.h"
+#include "components/HealthComponent.h"
 #include "shared/bg_gameplay.h" // MIN_WALK_NORMAL
 #include "Entities.h"
 
@@ -42,7 +43,7 @@ static Cvar::Cvar<int> g_bot_alienAimDelay = Cvar::Cvar<int>( "g_bot_alienAimDel
 static Cvar::Cvar<int> g_bot_humanAimDelay = Cvar::Cvar<int>( "g_bot_humanAimDelay", "make bots of human team slower to aim", Cvar::NONE, 150 );
 
 //consider bot to be stuck if it does not move farther than this in some period of time
-constexpr float BOT_STUCK_RADIUS = 300.0f;
+constexpr float BOT_STUCK_RADIUS = 150.0f;
 
 static void ListTeamEquipment( gentity_t *self, unsigned int (&numUpgrades)[UP_NUM_UPGRADES], unsigned int (&numWeapons)[WP_NUM_WEAPONS] );
 static const int MIN_SKILL = 1;
@@ -2914,6 +2915,7 @@ static bool BotChangeHumanClass( gentity_t *self, class_t newClass )
 	self->client->ps.stats[ STAT_CLASS ] = newClass;
 	self->client->pers.classSelection = newClass;
 	self->client->ps.eFlags ^= EF_TELEPORT_BIT;
+	self->entity->Get<HealthComponent>()->SetMaxHealth( BG_Class( newClass )->health, true );
 	return true;
 }
 

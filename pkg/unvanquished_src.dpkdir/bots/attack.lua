@@ -18,7 +18,6 @@ local health_fraction = common.health_fraction
 local use_medkit_if_low = common.use_medkit_if_low
 local try_evolve_targets = common.try_evolve_targets
 local roam_buildings = common.roam_buildings
-local unstick = common.unstick
 local TASKS = task_runtime.new_runtime()
 local STATE = behavior_state.new_behavior("attack", {
     human_equip_retry_at = {},
@@ -402,12 +401,7 @@ return function(self, ctx)
 
     mind.stuckTimer = sgame.level.time
 
-    local status = unstick(sgame.level.time, ctx, mind, enemy, enemy_visible)
-    if status ~= STATUS_FAILURE then
-        return status
-    end
-
-    status = maybe_use_medkit(self.team, client, ctx)
+    local status = maybe_use_medkit(self.team, client, ctx)
     if status ~= STATUS_FAILURE then
         return status
     end

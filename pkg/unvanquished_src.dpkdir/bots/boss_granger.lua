@@ -12,7 +12,6 @@ local task_runtime = require("bots/task.lua")
 
 local random = math.random
 local target_entity = common.target_entity
-local unstick = common.unstick
 
 local TASKS = task_runtime.new_runtime()
 local BLOB_STANDOFF_DISTANCE = 180
@@ -343,12 +342,6 @@ local BOSS_ATTACK_TASK = {
 -- ---------------------------------------------------------------------------
 
 local function boss_patrol_task_run(task, state, ctx)
-    local status = unstick(state.level.time, ctx, state.mind, state.enemy,
-        state.enemy_visible, state.team, state.client)
-    if status ~= STATUS_FAILURE then
-        return status
-    end
-
     note_progress(task, state)
     if task.mode and task.mode ~= "standoff" then
         local status = run_stuck_mode(task, state, ctx)
