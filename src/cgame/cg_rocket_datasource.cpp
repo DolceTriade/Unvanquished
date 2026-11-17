@@ -248,6 +248,11 @@ static const char* OverloadStatusForEntry( const cgOverloadCatalogEntry_t& entry
 		return "owned";
 	}
 
+	if ( OverloadUpgradeHiddenUntilUnlocked( entry, CG_MyTeam(), state ) )
+	{
+		return "locked";
+	}
+
 	if ( entry.requiredCompletedCount > state.completedPurchases )
 	{
 		return "locked";
@@ -1719,12 +1724,12 @@ static void CG_Rocket_BuildOverloadList( const char *table )
 			continue;
 		}
 
-		if ( entry.kind == overloadPurchaseKind_t::UNLOCK && OverloadUnlockOwned( i, state ) && !OverloadUnlockHasUpgrade( i ) )
+		if ( OverloadUpgradeHiddenUntilUnlocked( entry, team, state ) )
 		{
 			continue;
 		}
 
-		if ( OverloadUpgradeHiddenUntilUnlocked( entry, team, state ) )
+		if ( entry.kind == overloadPurchaseKind_t::UNLOCK && OverloadUnlockOwned( i, state ) && !OverloadUnlockHasUpgrade( i ) )
 		{
 			continue;
 		}
@@ -1739,6 +1744,7 @@ static void CG_Rocket_BuildOverloadList( const char *table )
 		Info_SetValueForKey( buf, "thingLabel", entry.thingLabel, false );
 		Info_SetValueForKey( buf, "icon", OverloadIconForThing( entry, team ).c_str(), false );
 		Info_SetValueForKey( buf, "statLabel", entry.statLabel, false );
+		Info_SetValueForKey( buf, "stat", entry.stat, false );
 		Info_SetValueForKey( buf, "description", entry.description, false );
 		Info_SetValueForKey( buf, "command", OverloadCommandForEntry( entry ).c_str(), false );
 		Info_SetValueForKey( buf, "cost", OverloadFormatCurrency( state.nextCosts[ i ], team ).c_str(), false );
@@ -1756,6 +1762,7 @@ static void CG_Rocket_BuildOverloadList( const char *table )
 		Info_SetValueForKey( buf, "maxRanks", va( "%d", entry.maxRanks ), false );
 		Info_SetValueForKey( buf, "progress", OverloadProgressForEntry( entry, i, state ).c_str(), false );
 		Info_SetValueForKey( buf, "status", OverloadStatusForEntry( entry, i, state, credits ), false );
+		Info_SetValueForKey( buf, "effectPreviews", entry.effectPreviews, false );
 		Rocket_DSAddRow( "overloadList", "default", buf );
 	}
 }

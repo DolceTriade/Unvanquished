@@ -1507,6 +1507,7 @@ struct cgOverloadCatalogEntry_t
 	char statLabel[ 64 ];
 	char displayName[ 128 ];
 	char description[ 256 ];
+	char effectPreviews[ 1024 ];
 };
 
 struct rocketInfo_t

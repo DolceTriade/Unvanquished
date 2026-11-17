@@ -147,12 +147,6 @@
 			color: #7ba8ac;
 			font-size: 0.72em;
 		}
-		#searchFilter {
-			display: inline-block;
-			width: 12em;
-			border-width: 1px;
-			border-color: #235359;
-		}
 		.currency-panel {
 			display: inline-block;
 			padding: 0.26em 0.55em;
@@ -553,7 +547,6 @@
 	</style>
 	<script>
 		OverloadFilter = "available"
-		OverloadSearchFilter = ""
 		OverloadSelectedThing = ""
 
 		function KindLabel(kind)
@@ -608,14 +601,8 @@
 			return true
 		end
 
-		function SearchMatches(row)
-			if OverloadSearchFilter == "" then return true end
-			local haystack = string.lower((row.name or "") .. " " .. (row.thingLabel or "") .. " " .. (row.description or ""))
-			return string.find(haystack, string.lower(OverloadSearchFilter), 1, true) ~= nil
-		end
-
 		function RowVisible(row)
-			return FilterMatches(row.status) and SearchMatches(row)
+			return FilterMatches(row.status)
 		end
 
 		function SpendButtons(row)
@@ -675,7 +662,7 @@
 
 		function ReadRows()
 			CDataSource.Build("overloadList", "default")
-			local raw = CDataSource.Read("overloadList", "default", "index,name,description,command,cost,progress,status,kind,thing,sortIndex,remaining,investedAmount,nextCostAmount,currencyLabel,quickBuySmallLabel,quickBuyLargeLabel,requiredCompletedCount,completedPurchases,remainingCompletedCount,rank,maxRanks,icon,thingLabel,statLabel,group")
+			local raw = CDataSource.Read("overloadList", "default", "index,name,description,command,cost,progress,status,kind,thing,sortIndex,remaining,investedAmount,nextCostAmount,currencyLabel,quickBuySmallLabel,quickBuyLargeLabel,requiredCompletedCount,completedPurchases,remainingCompletedCount,rank,maxRanks,icon,thingLabel,statLabel,group,effectPreviews,stat")
 			local rows = {}
 			for i = 1, #raw do
 				rows[#rows + 1] = {
@@ -704,6 +691,8 @@
 					thingLabel = raw[i][23],
 					statLabel = raw[i][24],
 					group = raw[i][25] or "Other",
+					effectPreviews = raw[i][26] or "",
+					stat = raw[i][27] or "",
 				}
 			end
 			table.sort(rows, function(a, b)
@@ -1086,11 +1075,166 @@
 		end
 
 		function RenderUpgradeDetail(row)
+			local previews = ""
+			local effectNames = {
+				["armor:integrity:0"] = "Light Armour Health",
+				["armor:integrity:1"] = "Medium Armour Health",
+				["armor:integrity:2"] = "Battlesuit Health",
+				["humans:stamina:0"] = "Maximum Stamina",
+				["humans:stamina:1"] = "Naked Jog Recovery",
+				["humans:stamina:2"] = "Naked Walk Recovery",
+				["humans:stamina:3"] = "Naked Rest Recovery",
+				["humans:stamina:4"] = "Light Armour Jog Recovery",
+				["humans:stamina:5"] = "Light Armour Walk Recovery",
+				["humans:stamina:6"] = "Light Armour Rest Recovery",
+				["humans:stamina:7"] = "Medium Armour Jog Recovery",
+				["humans:stamina:8"] = "Medium Armour Walk Recovery",
+				["humans:stamina:9"] = "Medium Armour Rest Recovery",
+				["humans:stamina:10"] = "Battlesuit Jog Recovery",
+				["humans:stamina:11"] = "Battlesuit Walk Recovery",
+				["humans:stamina:12"] = "Battlesuit Rest Recovery",
+				["mgturret:damage:0"] = "Machinegun Turret Minimum Damage",
+				["mgturret:damage:1"] = "Machinegun Turret Maximum Damage",
+				["lcannon:damage:0"] = "Primary Damage",
+				["lcannon:damage:1"] = "Splash Radius",
+				["lcannon:damage:2"] = "Secondary Damage",
+				["biokit:regen:0"] = "Bio Kit Healing Interval",
+				["biokit:poison:0"] = "Bio Kit Poison Damage Taken",
+				["jetpack:fuel:0"] = "Maximum Jetpack Fuel",
+				["jetpack:fuel:1"] = "Jetpack Fuel Restore Rate",
+				["medistat:healing_rate:0"] = "Medistation Health Healing Rate",
+				["medistat:healing_rate:1"] = "Medistation Stamina Restoration",
+				["rocketpod:damage:0"] = "Rocket Pod Direct Damage",
+				["rocketpod:damage:1"] = "Rocket Pod Splash Damage",
+				["level3upg:barb_damage:0"] = "Barb Impact Damage",
+				["level3upg:barb_damage:1"] = "Barb Splash Damage",
+				["level3upg:barb_refresh:0"] = "Barb Refresh Time (Base)",
+				["level3upg:barb_refresh:1"] = "Barb Refresh Time (near Booster)",
+				["level3upg:barb_refresh:2"] = "Barb Refresh Time (on Creep)",
+				["aliens:vitality:0"] = "Builder Health",
+				["aliens:vitality:1"] = "Advanced Builder Health",
+				["aliens:vitality:2"] = "Dretch Health",
+				["aliens:vitality:3"] = "Mantis Health",
+				["aliens:vitality:4"] = "Marauder Health",
+				["aliens:vitality:5"] = "Advanced Marauder Health",
+				["aliens:vitality:6"] = "Shrike Health",
+				["aliens:vitality:7"] = "Dragoon Health",
+				["aliens:vitality:8"] = "Advanced Dragoon Health",
+				["aliens:vitality:9"] = "Tyrant Health",
+				["aliens:heal_rate:0"] = "Builder Healing Rate",
+				["aliens:heal_rate:1"] = "Advanced Builder Healing Rate",
+				["aliens:heal_rate:2"] = "Dretch Healing Rate",
+				["aliens:heal_rate:3"] = "Mantis Healing Rate",
+				["aliens:heal_rate:4"] = "Marauder Healing Rate",
+				["aliens:heal_rate:5"] = "Advanced Marauder Healing Rate",
+				["aliens:heal_rate:6"] = "Shrike Healing Rate",
+				["aliens:heal_rate:7"] = "Dragoon Healing Rate",
+				["aliens:heal_rate:8"] = "Advanced Dragoon Healing Rate",
+				["aliens:heal_rate:9"] = "Tyrant Healing Rate",
+				["levelfly:blight:0"] = "Blight Duration",
+				["levelfly:blight:1"] = "Blight Damage",
+				["levelfly:blight_regen:0"] = "Blight Recharge Time",
+				["levelfly:blight_regen:1"] = "Blight Recharge on Creep",
+				["levelfly:blight_regen:2"] = "Blight Recharge near Booster",
+			}
+			local staminaEffects = {
+				["1"] = { name = "Jog Recovery", target = "Naked" },
+				["2"] = { name = "Walk Recovery", target = "Naked" },
+				["3"] = { name = "Rest Recovery", target = "Naked" },
+				["4"] = { name = "Jog Recovery", target = "Light Armour" },
+				["5"] = { name = "Walk Recovery", target = "Light Armour" },
+				["6"] = { name = "Rest Recovery", target = "Light Armour" },
+				["7"] = { name = "Jog Recovery", target = "Medium Armour" },
+				["8"] = { name = "Walk Recovery", target = "Medium Armour" },
+				["9"] = { name = "Rest Recovery", target = "Medium Armour" },
+				["10"] = { name = "Jog Recovery", target = "Battlesuit" },
+				["11"] = { name = "Walk Recovery", target = "Battlesuit" },
+				["12"] = { name = "Rest Recovery", target = "Battlesuit" },
+			}
+			local grouped = {}
+			local groupedOrder = {}
+			local percentageEffects = {
+				["armor:integrity:0"] = true, ["armor:integrity:1"] = true, ["armor:integrity:2"] = true,
+				["humans:stamina:0"] = true, ["humans:stamina:1"] = true, ["humans:stamina:2"] = true,
+				["humans:stamina:3"] = true, ["humans:stamina:4"] = true, ["humans:stamina:5"] = true,
+				["humans:stamina:6"] = true, ["humans:stamina:7"] = true, ["humans:stamina:8"] = true,
+				["humans:stamina:9"] = true, ["humans:stamina:10"] = true, ["humans:stamina:11"] = true,
+				["humans:stamina:12"] = true, ["jetpack:fuel:0"] = true, ["jetpack:fuel:1"] = true,
+				["biokit:regen:0"] = true, ["biokit:poison:0"] = true,
+				["level3upg:barb_refresh:0"] = true, ["level3upg:barb_refresh:1"] = true,
+				["level3upg:barb_refresh:2"] = true,
+				["medistat:healing_rate:0"] = true, ["medistat:healing_rate:1"] = true,
+				["aliens:vitality:0"] = true, ["aliens:vitality:1"] = true, ["aliens:vitality:2"] = true,
+				["aliens:vitality:3"] = true, ["aliens:vitality:4"] = true, ["aliens:vitality:5"] = true,
+				["aliens:vitality:6"] = true, ["aliens:vitality:7"] = true, ["aliens:vitality:8"] = true,
+				["aliens:vitality:9"] = true, ["aliens:heal_rate:0"] = true, ["aliens:heal_rate:1"] = true,
+				["aliens:heal_rate:2"] = true, ["aliens:heal_rate:3"] = true, ["aliens:heal_rate:4"] = true,
+				["aliens:heal_rate:5"] = true, ["aliens:heal_rate:6"] = true, ["aliens:heal_rate:7"] = true,
+				["aliens:heal_rate:8"] = true, ["aliens:heal_rate:9"] = true,
+				["levelfly:blight_regen:0"] = true, ["levelfly:blight_regen:1"] = true,
+				["levelfly:blight_regen:2"] = true,
+			}
+			local function DeltaText(effectKey, current, nextValue)
+				local delta = nextValue - current
+				if percentageEffects[effectKey] and current ~= 0 then
+					return string.format("%+.4g%%", delta / math.abs(current) * 100), true
+				end
+				return string.format("%+.4g", delta), false
+			end
+			local function FormatValue(effectKey, value)
+				if effectKey == "levelfly:blight:0" then
+					return string.format("%.4g s", value / 1000)
+				end
+				return string.format("%.4g", value)
+			end
+			local function FormatAbsoluteDelta(effectKey, current, nextValue)
+				local delta = nextValue - current
+				if effectKey == "levelfly:blight:0" then
+					return string.format("%+.4g s", delta / 1000)
+				end
+				return string.format("%+.4g", delta)
+			end
+			for item in string.gmatch(row.effectPreviews or "", "([^~]+)") do
+				local effectIndex, current, nextValue = string.match(item, "^([^|]*)|([^|]*)|([^|]*)$")
+				local effectKey = (row.thing or "") .. ":" .. (row.stat or "") .. ":" .. (effectIndex or "")
+				local label = effectNames[effectKey]
+				if label == nil then label = row.statLabel or row.name or "Upgrade effect" end
+				current = tonumber(current)
+				nextValue = tonumber(nextValue)
+				if label ~= nil and current ~= nil and nextValue ~= nil then
+					local staminaEffect = row.thing == "humans" and row.stat == "stamina" and staminaEffects[effectIndex]
+					if staminaEffect then
+						local deltaText = DeltaText(effectKey, current, nextValue)
+						local key = string.format("%s|%s", staminaEffect.name, deltaText)
+						if grouped[key] == nil then
+							grouped[key] = { name = staminaEffect.name, delta = deltaText, targets = {} }
+							table.insert(groupedOrder, key)
+						end
+						table.insert(grouped[key].targets, staminaEffect.target)
+					else
+						local deltaText, isPercent = DeltaText(effectKey, current, nextValue)
+						if isPercent then
+							previews = previews .. string.format('<div class="detail-meta">%s: %s</div>', Rocket_QuakeToRML(label), deltaText)
+						else
+							previews = previews .. string.format('<div class="detail-meta">%s: %s → %s (%s)</div>', Rocket_QuakeToRML(label), FormatValue(effectKey, current), FormatValue(effectKey, nextValue), FormatAbsoluteDelta(effectKey, current, nextValue))
+						end
+					end
+				end
+			end
+			for i = 1, #groupedOrder do
+				local effect = grouped[groupedOrder[i]]
+				local targets = #effect.targets == 4 and "all human classes" or table.concat(effect.targets, ", ")
+				previews = previews .. string.format('<div class="detail-meta">%s (%s): %s</div>', Rocket_QuakeToRML(effect.name), Rocket_QuakeToRML(targets), effect.delta)
+			end
+			if previews ~= "" then
+				previews = '<div class="detail-meta">Next rank effects:</div>' .. previews
+			end
 			return string.format(
 				'<div class="detail-upgrade">' ..
 				'<div class="detail-upgrade-title">%s</div>' ..
 				'<div class="detail-meta">%s</div>' ..
 				'<div class="detail-meta">Next cost: %s %s</div>' ..
+				'%s' ..
 				'<div class="detail-meta">%s</div>' ..
 				'<div class="detail-actions">%s</div>' ..
 				'</div>',
@@ -1098,6 +1242,7 @@
 				row.progress or "",
 				row.cost,
 				row.currencyLabel,
+				previews,
 				row.description or "",
 				SpendButtons(row))
 		end
@@ -1132,7 +1277,6 @@
 						unlock.completedPurchases,
 						unlock.requiredCompletedCount)
 				end
-
 				detailBody = string.format(
 					'<div class="detail-meta">Next cost: %s %s</div>' ..
 					'<div class="detail-meta">%s to unlock</div>' ..
@@ -1250,11 +1394,6 @@
 			BuildOverloadMenu(document)
 		end
 
-		function OverloadSetSearchFilter(element, document)
-			OverloadSearchFilter = element.attributes["value"] or ""
-			BuildOverloadMenu(document)
-		end
-
 		function OverloadHandleKey(event, document)
 			if event.parameters.key_identifier == rmlui.key_identifier.ESCAPE then
 				Events.pushcmd("hide overload")
@@ -1286,10 +1425,6 @@
 											<button id="filterProgress" onclick="OverloadSetFilter('progress', document)"><translate>In Progress</translate></button>
 											<button id="filterDone" onclick="OverloadSetFilter('done', document)"><translate>Completed</translate></button>
 											<button id="filterAll" onclick="OverloadSetFilter('all', document)"><translate>All</translate></button>
-										</div>
-										<div class="filter-row">
-											<span class="filter-label"><translate>Search</translate></span>
-											<input id="searchFilter" type="text" class="text" value="" onkeyup="OverloadSetSearchFilter(event.target_element, document)" placeholder="Filter upgrades, unlocks, or items"/>
 										</div>
 									</div>
 									<div class="controls-side">

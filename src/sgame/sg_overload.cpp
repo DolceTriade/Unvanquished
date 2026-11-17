@@ -41,6 +41,7 @@ static void BuildOverloadCatalog();
 static int FindUnlockThresholdField( bgAttributeFamily_t family );
 static int OverloadNextCost( const overloadPurchaseDef_t& entry, int entryIndex, team_t team );
 static int AutoDonateSpendCapacity( team_t team, int purchaseIndex );
+static std::string EncodeEffectPreviews( team_t team, int purchaseIndex );
 static void ApplyGameplayEffectCallback( const overloadEffect_t& effect, team_t team, double value, bool& gameplayDirty, bool& attributeDirty );
 static void ApplyAttributeEffectCallback( const overloadEffect_t& effect, team_t team, double value, bool& gameplayDirty, bool& attributeDirty );
 static void UpdatePlayerClassMaxHealth( team_t team );
@@ -889,7 +890,7 @@ static int OverloadSortIndexForThing( team_t team, const char* thing )
 	return 999;
 }
 
-static void PublishOverloadCatalog()
+static void PublishOverloadCatalog( int changedPurchaseIndex = -1 )
 {
 	bool unlockHasUpgrade[ MAX_OVERLOAD_PURCHASES ] = {};
 	for ( int i = 0; i < static_cast<int>( overloadPurchases.size() ); ++i )
@@ -909,6 +910,40 @@ static void PublishOverloadCatalog()
 
 	for ( int i = 0; i < MAX_OVERLOAD_PURCHASES; ++i )
 	{
+		if ( changedPurchaseIndex >= 0 )
+		{
+			if ( i >= static_cast<int>( overloadPurchases.size() ) || changedPurchaseIndex >= static_cast<int>( overloadPurchases.size() ) )
+			{
+				continue;
+			}
+
+			const overloadPurchaseDef_t& changedEntry = overloadPurchases[ changedPurchaseIndex ];
+			const overloadPurchaseDef_t& candidateEntry = overloadPurchases[ i ];
+			bool affected = i == changedPurchaseIndex;
+			if ( !affected && candidateEntry.kind == overloadPurchaseKind_t::UPGRADE && candidateEntry.team == changedEntry.team )
+			{
+				for ( const overloadEffect_t& effect : changedEntry.effects )
+				{
+					if ( !effect.recomputeFromRanks ) continue;
+					for ( const overloadEffect_t& candidate : candidateEntry.effects )
+					{
+						if ( !candidate.recomputeFromRanks || effect.target != candidate.target ||
+						     effect.valueType != candidate.valueType || effect.gameplayIndex != candidate.gameplayIndex ||
+						     effect.attributeFamily != candidate.attributeFamily ||
+						     effect.attributeObject != candidate.attributeObject ||
+						     effect.attributeField != candidate.attributeField )
+						{
+							continue;
+						}
+						affected = true;
+						break;
+					}
+					if ( affected ) break;
+				}
+			}
+			if ( !affected ) continue;
+		}
+
 		char config[ BIG_INFO_STRING ];
 		config[ 0 ] = '\0';
 
@@ -929,6 +964,10 @@ static void PublishOverloadCatalog()
 			Info_SetValueForKey( config, "req", va( "%d", entry.requiredCompletedCount ), false );
 			Info_SetValueForKey( config, "mr", va( "%d", entry.maxRanks ), false );
 			Info_SetValueForKey( config, "hu", va( "%d", unlockHasUpgrade[ i ] ), false );
+			if ( entry.kind == overloadPurchaseKind_t::UPGRADE && G_IsPlayableTeam( entry.team ) )
+			{
+				Info_SetValueForKey( config, "pv", EncodeEffectPreviews( entry.team, i ).c_str(), false );
+			}
 
 			if ( strlen( config ) >= BIG_INFO_STRING )
 			{
@@ -1634,8 +1673,8 @@ static void BuildOverloadCatalog()
 	              PercentAttributeEffect( BG_ATTR_CLASS, "human_bsuit", "staminaStopRestore", 2500.0 / STAMINA_MAX, 1.0 ) } );
 	AddUpgrade( TEAM_HUMANS, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), DefaultUpgradeStepCost( OVERLOAD_STAGE2_COUNT ), OVERLOAD_UNCAPPED_RANKS, "biokit", "Bio Kit", "regen", "health regeneration", "Bio Kit Health Regeneration", "Increase the Bio Kit's health regeneration rate.",
 	            { GameplayEffect( "BIOKIT_INTERVAL", -200.0, 500.0 ) } );
-	AddUpgrade( TEAM_HUMANS, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), DefaultUpgradeStepCost( OVERLOAD_STAGE2_COUNT ), OVERLOAD_UNCAPPED_RANKS, "biokit", "Bio Kit", "poison", "poison resistance", "Bio Kit Poison Resistance", "Reduce damage taken from alien poison.",
-	            { GameplayEffect( "BIOKIT_MODIFIER", -0.1, 0.5 ) } );
+	AddUpgrade( TEAM_HUMANS, DefaultUpgradeBaseCost( OVERLOAD_STAGE2_COUNT ), DefaultUpgradeStepCost( OVERLOAD_STAGE2_COUNT ), 5, "biokit", "Bio Kit", "poison", "poison resistance", "Bio Kit Poison Resistance", "Reduce damage taken from alien poison.",
+	            { GameplayEffect( "BIOKIT_MODIFIER", -0.1, 0.0 ) } );
 
 	// Human buildable weapon upgrades.
 	// Covered buildables: medistat, mgturret, rocketpod.
@@ -1850,21 +1889,6 @@ static double ClampEffectValue( const overloadEffect_t& effect, double value )
 	return std::max( effect.minValue, std::min( effect.maxValue, value ) );
 }
 
-static bool SameEffectTarget( const overloadEffect_t& lhs, const overloadEffect_t& rhs )
-{
-	if ( !lhs.recomputeFromRanks || !rhs.recomputeFromRanks )
-	{
-		return false;
-	}
-
-	return lhs.target == rhs.target &&
-	       lhs.valueType == rhs.valueType &&
-	       lhs.gameplayIndex == rhs.gameplayIndex &&
-	       lhs.attributeFamily == rhs.attributeFamily &&
-	       lhs.attributeObject == rhs.attributeObject &&
-	       lhs.attributeField == rhs.attributeField;
-}
-
 static double EffectiveEffectValue( const overloadEffect_t& effect, team_t team )
 {
 	if ( !effect.recomputeFromRanks )
@@ -1885,7 +1909,13 @@ static double EffectiveEffectValue( const overloadEffect_t& effect, team_t team 
 
 		for ( const overloadEffect_t& candidate : entry.effects )
 		{
-			if ( SameEffectTarget( effect, candidate ) )
+			if ( candidate.recomputeFromRanks &&
+			     effect.target == candidate.target &&
+			     effect.valueType == candidate.valueType &&
+			     effect.gameplayIndex == candidate.gameplayIndex &&
+			     effect.attributeFamily == candidate.attributeFamily &&
+			     effect.attributeObject == candidate.attributeObject &&
+			     effect.attributeField == candidate.attributeField )
 			{
 				value += SumGrowth( candidate.growth, economy.repeatCounts[ i ] );
 			}
@@ -1893,6 +1923,45 @@ static double EffectiveEffectValue( const overloadEffect_t& effect, team_t team 
 	}
 
 	return ClampEffectValue( effect, value );
+}
+
+static std::string EncodeEffectPreviews( team_t team, int purchaseIndex )
+{
+	const TeamEconomyState& economy = TeamEconomy( team );
+	if ( purchaseIndex < 0 || purchaseIndex >= static_cast<int>( overloadPurchases.size() ) ) return "";
+	const overloadPurchaseDef_t& entry = overloadPurchases[ purchaseIndex ];
+	if ( entry.kind != overloadPurchaseKind_t::UPGRADE || economy.repeatCounts[ purchaseIndex ] >= entry.maxRanks ) return "";
+	std::ostringstream stream;
+	bool first = true;
+
+	for ( size_t j = 0; j < entry.effects.size(); ++j )
+	{
+		const overloadEffect_t& effect = entry.effects[ j ];
+		if ( !effect.recomputeFromRanks ) continue;
+
+		double added = 0.0;
+		for ( const overloadEffect_t& candidate : entry.effects )
+		{
+			if ( candidate.recomputeFromRanks &&
+			     effect.target == candidate.target &&
+			     effect.valueType == candidate.valueType &&
+			     effect.gameplayIndex == candidate.gameplayIndex &&
+			     effect.attributeFamily == candidate.attributeFamily &&
+			     effect.attributeObject == candidate.attributeObject &&
+			     effect.attributeField == candidate.attributeField )
+			{
+				added += candidate.growth( economy.repeatCounts[ purchaseIndex ] );
+			}
+		}
+
+		const double current = EffectiveEffectValue( effect, team );
+		const double next = ClampEffectValue( effect, current + added );
+		if ( !first ) stream << '|';
+		stream << j << ':' << current << ':' << next;
+		first = false;
+	}
+
+	return stream.str();
 }
 
 static void ApplyGameplayEffectCallback( const overloadEffect_t& effect, team_t, double value,
@@ -2096,7 +2165,7 @@ static std::string PurchaseProgressMessage( const overloadPurchaseDef_t& entry, 
 	                    FormatOverloadCurrency( nextCost, team ) );
 }
 
-void G_PublishOverloadState( team_t team )
+void G_PublishOverloadState( team_t team, int changedPurchaseIndex )
 {
 	if ( !G_IsPlayableTeam( team ) )
 	{
@@ -2104,6 +2173,10 @@ void G_PublishOverloadState( team_t team )
 	}
 
 	PublishOverloadStateInternal( team );
+	if ( changedPurchaseIndex >= 0 )
+	{
+		PublishOverloadCatalog( changedPurchaseIndex );
+	}
 }
 
 void G_InitOverloadEconomy()
@@ -2269,7 +2342,7 @@ int G_OverloadForceUpgrade( team_t team, Str::StringRef thing, Str::StringRef st
 	}
 
 	SyncOverloadProgress( team );
-	G_PublishOverloadState( team );
+	G_PublishOverloadState( team, purchaseIndex );
 	NotifyLegacyStageSensors( team, oldCompletedPurchases, economy.completedPurchases );
 	return economy.repeatCounts[ purchaseIndex ];
 }
@@ -2362,7 +2435,8 @@ bool G_OverloadPurchase( gentity_t *ent, const Cmd::Args& args, std::string* mes
 	}
 
 	SyncOverloadProgress( team );
-	G_PublishOverloadState( team );
+	G_PublishOverloadState( team, entry->kind == overloadPurchaseKind_t::UPGRADE && completionsApplied > 0
+	                              ? purchaseIndex : -1 );
 	NotifyLegacyStageSensors( team, oldCompletedPurchases, economy.completedPurchases );
 
 	if ( message )

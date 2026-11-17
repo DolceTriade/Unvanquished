@@ -214,6 +214,20 @@ void CG_ParseOverloadCatalogConfig( int index, const char* config )
 	Q_strncpyz( entry.statLabel, Info_ValueForKey( config, "sl" ), sizeof( entry.statLabel ) );
 	Q_strncpyz( entry.displayName, Info_ValueForKey( config, "name" ), sizeof( entry.displayName ) );
 	Q_strncpyz( entry.description, Info_ValueForKey( config, "desc" ), sizeof( entry.description ) );
+	std::stringstream previews( Info_ValueForKey( config, "pv" ) );
+	std::string preview;
+	while ( std::getline( previews, preview, '|' ) )
+	{
+		std::stringstream fields( preview );
+		std::string effectIndex, current, next;
+		if ( !std::getline( fields, effectIndex, ':' ) || !std::getline( fields, current, ':' ) ||
+		     !std::getline( fields, next, ':' ) ) continue;
+		std::string rowPreview = Str::Format( "%s|%s|%s~", effectIndex.c_str(), current.c_str(), next.c_str() );
+		if ( strlen( entry.effectPreviews ) + rowPreview.size() < sizeof( entry.effectPreviews ) )
+		{
+			Q_strcat( entry.effectPreviews, sizeof( entry.effectPreviews ), rowPreview.c_str() );
+		}
+	}
 
 	CG_MarkOverloadMenuDirty();
 }
