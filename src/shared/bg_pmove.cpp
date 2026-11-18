@@ -1679,7 +1679,6 @@ static bool PM_CheckShrikeFlightStart()
 	{
 		// Not Shrike: reset cooldown and return early.
 		pm->pmext->shrikeFlightCooldown = 0;
-		pm->pmext->pouncePayload = 0;
 		pm->ps->stats[ STAT_STATE2 ] &= ~( SS2_FLYING | SS2_DIVING );
 		return false;
 	}
