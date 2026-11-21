@@ -39,6 +39,8 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 #include "sgame/sg_local.h"
 #include "bot_local.h"
 
+#include <algorithm>
+
 static const char* NAVCON_HEADER_PREFIX = "navcon";
 static const int NAVCON_VERSION = 3;
 
@@ -238,7 +240,7 @@ static void BotLoadOffMeshConnections( const char *species, OffMeshConnections &
 		// Do not read numbers from the next line with sscanf;
 		navcon[ pos + lineLength ] = '\0';
 
-		if ( con.offMeshConCount > con.MAX_CON )
+		if ( con.offMeshConCount >= con.MAX_CON )
 		{
 			Log::Warn( "Too many connections in navcon file %s", filePath );
 			break;
@@ -286,6 +288,68 @@ static void BotLoadOffMeshConnections( const char *species, OffMeshConnections &
 
 // Returns UNINITIALIZED (if cache is invalidated),
 // LOAD_FAILED (for cached failure or internal error), or LOADED
+static void WarnUnlinkedNavcons( const NavData_t &nav, const char *species )
+{
+	const auto &authored = nav.process.con;
+	if ( !authored.offMeshConCount )
+	{
+		return;
+	}
+
+	const dtNavMesh &mesh = *nav.mesh;
+	const std::string map = Cvar::GetValue( "mapname" );
+	for ( int i = 0; i < authored.offMeshConCount; ++i )
+	{
+		const float *start = authored.verts + i * 6;
+		const float *end = start + 3;
+		int x, y;
+		mesh.calcTileLoc( start, &x, &y );
+		const dtMeshTile *tiles[ 32 ];
+		const int count = mesh.getTilesAt( x, y, tiles, 32 );
+
+		// Check the actual Detour links after all tiles have been built.
+		// A nearby polygon alone does not guarantee Detour can attach to it.
+		bool entered = false;
+		bool exited = false;
+		bool connected = false;
+		for ( int t = 0; t < count && !connected; ++t )
+		{
+			const dtMeshTile &tile = *tiles[ t ];
+			for ( int j = 0; j < tile.header->offMeshConCount; ++j )
+			{
+				const dtOffMeshConnection &con = tile.offMeshCons[ j ];
+				if ( con.rad != authored.rad[ i ] || !std::equal( start, end + 3, con.pos ) )
+				{
+					continue;
+				}
+
+				bool entry = false;
+				bool exit = false;
+				const dtPoly &poly = tile.polys[ con.poly ];
+				for ( unsigned link = poly.firstLink; link != DT_NULL_LINK; link = tile.links[ link ].next )
+				{
+					const dtLink &edge = tile.links[ link ];
+					if ( mesh.isValidPolyRef( edge.ref ) )
+					{
+						entry |= edge.edge == 0;
+						exit |= edge.edge == 1;
+					}
+				}
+				entered |= entry;
+				exited |= exit;
+				connected |= entry && exit;
+			}
+		}
+		if ( !connected )
+		{
+			Log::Warn( "maps/%s-%s.navcon: %.1f %.1f %.1f -> %.1f %.1f %.1f: no fully linked connection (entrance %s, exit %s)",
+			           map, species, start[ 0 ], start[ 2 ], start[ 1 ],
+			           end[ 0 ], end[ 2 ], end[ 1 ],
+			           entered ? "attached" : "missing polygon", exited ? "attached" : "missing polygon" );
+		}
+	}
+}
+
 static navMeshStatus_t BotLoadNavMesh( int f, const NavgenConfig &config, const char *species, NavData_t &nav )
 {
 	constexpr auto internalErrorStatus = navMeshStatus_t::LOAD_FAILED;
@@ -415,6 +479,7 @@ static navMeshStatus_t BotLoadNavMesh( int f, const NavgenConfig &config, const 
 		}
 	}
 
+	WarnUnlinkedNavcons( nav, species );
 	trap_FS_FCloseFile( f );
 	return navMeshStatus_t::LOADED;
 }
