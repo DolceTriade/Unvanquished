@@ -1004,8 +1004,8 @@ local function maybe_reload(team, client, weapon_attr, level, ctx, mind, enemy_v
     return ctx:reload()
 end
 
-local function maybe_equip(team, number, client, level, ctx, mind, enemy_visible)
-    if not is_human(team) or enemy_visible or elapsed_since(level.time, mind.enemyLastSeen) <= 1000 then
+local function maybe_equip(team, number, client, level, ctx)
+    if not is_human(team) then
         return STATUS_FAILURE
     end
 
@@ -1014,6 +1014,24 @@ local function maybe_equip(team, number, client, level, ctx, mind, enemy_visible
     end
 
     return common.equip_and_buy_overload(client, ctx, STATE.equip_retry_at, number, level.time)
+end
+
+local function should_equip(state)
+    if not is_human(state.team) or has_builder_assignment(state.number) then
+        return false
+    end
+
+    local attacked_recently = recently_attacked(state.level, state.mind, 2000)
+    local no_ammo_and_safe = out_of_human_ammo(state.client, state.weapon_attr) and not attacked_recently
+    local just_spawned = state.mind.spawnTime
+        and elapsed_since(state.level.time, state.mind.spawnTime) <= 5000
+    local enemy_nearby = state.enemy ~= nil or state.hostile_goal
+    local armoury_distance = human_armoury_distance(state.mind)
+    local armoury_nearby = armoury_distance ~= nil and armoury_distance < 500
+    local spawn_equip = just_spawned and (not enemy_nearby or armoury_nearby)
+    local heal_equip = state.health_frac < 0.4 and armoury_nearby
+
+    return no_ammo_and_safe or spawn_equip or heal_equip
 end
 
 local function maybe_resupply_human(team, number, level, client, weapon_attr, mind, ctx)
@@ -1296,6 +1314,43 @@ local function new_attack_task()
     }
 end
 
+local function new_equip_task()
+    return {
+        run = function(task, state, ctx)
+            if not should_equip(state) then
+                return STATUS_FAILURE
+            end
+
+            if task.retry_at and task.retry_at > state.level.time then
+                return STATUS_RUNNING
+            end
+
+            if out_of_human_ammo(state.client, state.weapon_attr)
+                and not recently_attacked(state.level, state.mind, 2000) then
+                local status = maybe_resupply_human(
+                    state.team, state.number, state.level, state.client, state.weapon_attr, state.mind, ctx)
+                if status ~= STATUS_FAILURE then
+                    return status
+                end
+            end
+
+            local status = maybe_equip(state.team, state.number, state.client, state.level, ctx)
+            if status ~= STATUS_FAILURE then
+                return status
+            end
+
+            status = maybe_resupply_human(
+                state.team, state.number, state.level, state.client, state.weapon_attr, state.mind, ctx)
+            if status ~= STATUS_FAILURE then
+                return status
+            end
+
+            task.retry_at = state.level.time + 1000
+            return STATUS_RUNNING
+        end,
+    }
+end
+
 local function run_roam_task(task, state, ctx)
     if is_alien(state.team) then
         local status = maybe_extinguish_fire(state.team, state.client, ctx)
@@ -1343,12 +1398,6 @@ local function run_roam_task(task, state, ctx)
     end
 
     status = maybe_reload(state.team, state.client, state.weapon_attr, state.level, ctx, state.mind, state.enemy_visible)
-    if status ~= STATUS_FAILURE then
-        return status
-    end
-
-    status = maybe_equip(
-        state.team, state.number, state.client, state.level, ctx, state.mind, state.enemy_visible)
     if status ~= STATUS_FAILURE then
         return status
     end
@@ -1466,6 +1515,10 @@ local function assign_role(state)
 end
 
 select_task = function(state)
+    if should_equip(state) then
+        return new_equip_task()
+    end
+
     if state.wants_build then
         return new_builder_task()
     end
@@ -1586,6 +1639,7 @@ return function(self, ctx)
         base_rush_score = base_rush_score,
         mind = mind,
     }
+
     state.role = assign_role(state)
 
     if is_alien(team) and STATE.spawn_evolve_attempt_time[number] ~= mind.spawnTime then
