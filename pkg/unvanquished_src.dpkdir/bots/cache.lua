@@ -140,11 +140,10 @@ local function count_weapon(team_name, weapon_name, exclude_entity_num)
         return 0
     end
 
-    local count = 0
-    for entity_num, info in pairs(team.entities) do
-        if entity_num ~= exclude_entity_num and info.weapon == weapon_name then
-            count = count + 1
-        end
+    local count = (team.weapons and team.weapons[weapon_name]) or 0
+    local excluded = team.entities and team.entities[exclude_entity_num]
+    if excluded and excluded.weapon == weapon_name then
+        count = count - 1
     end
     return count
 end
@@ -155,12 +154,13 @@ local function snapshot_counts()
 
     for _, ent in pairs(sgame.entity) do
         local team_name = normalize_team_name(ent.team)
-        if ent.client and team_name then
+        local client = ent.client
+        if client and team_name then
             local team = team_name == "aliens" and aliens or humans
             local entity_info = {
                 ref = entity_ref(ent),
-                weapon = ent.client.weapon,
-                class = ent.client.class,
+                weapon = client.weapon,
+                class = client.class,
                 is_bot = ent.bot ~= nil,
             }
             team.entities[ent.number] = entity_info
@@ -168,11 +168,12 @@ local function snapshot_counts()
             increment(team.classes, entity_info.class)
         end
 
-        if ent.buildable then
-            local buildable_team = normalize_team_name(ent.buildable.team)
+        local buildable = ent.buildable
+        if buildable then
+            local buildable_team = normalize_team_name(buildable.team)
             if buildable_team then
                 local team = buildable_team == "aliens" and aliens or humans
-                increment(team.buildables, ent.buildable.name)
+                increment(team.buildables, buildable.name)
             end
         end
     end
@@ -200,6 +201,39 @@ function M.refresh()
     end
 
     return M.state
+end
+
+local bot_roster_time
+local bot_rosters
+local empty_roster = {}
+
+-- Rosters are shared for the current server frame. Callers must not mutate them.
+function M.team_bot_numbers(team)
+    local team_name = normalize_team_name(team)
+    if not team_name then
+        return empty_roster
+    end
+
+    local level = sgame.level
+    local now = level.time
+    if bot_roster_time ~= now then
+        local rosters = { aliens = {}, humans = {} }
+        local entities = sgame.entity
+        for number = 0, level.max_clients - 1 do
+            local entity = entities[number]
+            if entity and entity.client and entity.bot then
+                local entity_team = normalize_team_name(entity.team)
+                if entity_team then
+                    local roster = rosters[entity_team]
+                    roster[#roster + 1] = number
+                end
+            end
+        end
+        bot_rosters = rosters
+        bot_roster_time = now
+    end
+
+    return bot_rosters[team_name]
 end
 
 function M.team(team)

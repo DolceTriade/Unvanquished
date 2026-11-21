@@ -131,6 +131,10 @@ local function attack_alert_active(state)
         return true
     end
 
+    if common.recently_attacked(state.level, state.mind, 2000) then
+        return true
+    end
+
     if is_human(state.team) then
         return false
     end
@@ -200,16 +204,21 @@ local function human_should_equip_near_armoury(number, level, mind)
 end
 
 local function human_resupply_phase(number, level, client, weapon_attr, mind)
-    if not common.can_attempt_purchase(client) then
+    local target = common.human_resupply_target(level, mind, client, weapon_attr)
+    if not target or (target == "arm" and not common.can_attempt_purchase(client)) then
         return nil
     end
-    if out_of_human_ammo(client, weapon_attr) then
+    if target == "arm" then
         local armoury_distance = human_armoury_distance(mind)
         if armoury_distance and armoury_distance < 500 then
             return "equip"
         end
 
         return "move_to_arm"
+    end
+
+    if target == "medistat" then
+        return "move_to_medistat"
     end
 
     if human_should_equip_near_armoury(number, level, mind) then
@@ -282,19 +291,25 @@ local RESUPPLY_TASK = {
             return STATUS_FAILURE
         end
 
-        if task.phase == "move_to_arm" then
-            if building_distance(state.mind, "arm") and building_distance(state.mind, "arm") < 500 then
-                task.phase = "equip"
+        if task.phase == "move_to_arm" or task.phase == "move_to_medistat" then
+            local building = task.phase == "move_to_arm" and "arm" or "medistat"
+            local distance = building_distance(state.mind, building)
+            if distance and distance < 100 then
+                task.phase = building == "arm" and "equip" or "heal"
             else
-                local status = ctx:moveTo("arm")
+                local status = ctx:moveTo(building)
                 if status ~= STATUS_FAILURE then
                     return status
                 end
-
                 task.phase = human_resupply_phase(
                     state.number, state.level, state.client, state.weapon_attr, state.mind)
                 return task.phase and STATUS_RUNNING or STATUS_FAILURE
             end
+        end
+
+        if task.phase == "heal" then
+            local status = ctx:heal()
+            return status ~= STATUS_FAILURE and status or STATUS_RUNNING
         end
 
         if task.phase == "equip" then

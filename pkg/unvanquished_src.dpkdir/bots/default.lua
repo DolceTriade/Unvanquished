@@ -856,19 +856,26 @@ local function maybe_reload(team, client, weapon_attr, level, ctx, mind, enemy_v
     return ctx:reload()
 end
 
-local function maybe_return_for_ammo(team, number, client, weapon_attr, mind, ctx)
-    if not is_human(team) or client.weapon == "ckit" or not weapon_attr or weapon_attr.ammo <= 0
-        or (client.ammo or 0) > 0 or not common.can_attempt_purchase(client) then
+local function maybe_return_for_ammo(team, number, client, weapon_attr, level, mind, ctx)
+    if not is_human(team) or client.weapon == "ckit" then
         return STATUS_FAILURE
     end
-    local armoury = mind:closestBuilding("arm")
-    if not armoury then
+    local target = common.human_resupply_target(level, mind, client, weapon_attr)
+    if not target or (target == "arm" and not common.can_attempt_purchase(client)) then
         return STATUS_FAILURE
     end
-    if armoury.distance and armoury.distance <= 100 then
-        return equip_and_buy_overload_for_bot(number, client, ctx)
+    local building = mind:closestBuilding(target)
+    if not building then
+        return STATUS_FAILURE
     end
-    return ctx:moveTo("arm")
+    if building.distance and building.distance <= 100 then
+        if target == "arm" then
+            return equip_and_buy_overload_for_bot(number, client, ctx)
+        end
+        local status = ctx:heal()
+        return status ~= STATUS_FAILURE and status or STATUS_RUNNING
+    end
+    return ctx:moveTo(target)
 end
 
 local function maybe_equip(team, number, client, level, ctx, mind, enemy_visible)
@@ -1034,7 +1041,8 @@ local function run_roam_task(task, state, ctx)
         return status
     end
 
-    status = maybe_return_for_ammo(state.team, state.number, state.client, state.weapon_attr, state.mind, ctx)
+    status = maybe_return_for_ammo(state.team, state.number, state.client, state.weapon_attr,
+        state.level, state.mind, ctx)
     if status ~= STATUS_FAILURE then
         return status
     end

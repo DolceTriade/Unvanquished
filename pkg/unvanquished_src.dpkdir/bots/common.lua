@@ -153,6 +153,26 @@ function M.recently_attacked(level, mind, window)
     return (level.time - pain_time) < window
 end
 
+-- Human bots should only leave combat to restock when they have had time to
+-- disengage. Empty reserve ammo takes priority over low health.
+function M.human_resupply_target(level, mind, client, weapon_attr, opts)
+    opts = opts or {}
+    if not client or M.recently_attacked(level, mind, opts.attacked_window or 2000) then
+        return nil
+    end
+
+    if weapon_attr and weapon_attr.ammo > 0 and (client.ammo or 0) <= 0
+        and (not opts.require_empty_clips or (client.clips or 0) <= 0) then
+        return "arm"
+    end
+
+    if M.health_fraction(client) < (opts.health_threshold or 0.4) then
+        return "medistat"
+    end
+
+    return nil
+end
+
 function M.heal_to_full_unless_attacked(level, mind, client, ctx, opts)
     opts = opts or {}
 

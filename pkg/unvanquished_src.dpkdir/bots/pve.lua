@@ -365,8 +365,7 @@ local function best_alien_combat_target(number, client, level)
     return common.best_alien_combat_target(number, client, level, ALIEN_COMBAT_TARGETS)
 end
 
-local function choose_alien_enemy(number, now, enemy_target, enemy_visible, hostile_goal, level, ctx, mind)
-    local sensed_entity = target_entity(enemy_target)
+local function choose_alien_enemy(number, now, sensed_entity, enemy_visible, hostile_goal, goal, ctx)
     local lock = alien_target_lock(number)
     local locked_entity = lock and resolve_entity_ref(lock.ref) or nil
     local aliensense_range = cache.cvar_number("g_bot_aliensenseRange")
@@ -388,7 +387,7 @@ local function choose_alien_enemy(number, now, enemy_target, enemy_visible, host
     end
 
     if hostile_goal then
-        local goal_entity = target_entity(mind.goal)
+        local goal_entity = target_entity(goal)
         if goal_entity and entity_is_alive(goal_entity) then
             lock_alien_target(number, goal_entity, now)
             return goal_entity
@@ -555,12 +554,7 @@ local function builder_needed(team_name, number, team_snapshot, level, selected_
     local build_enabled = is_alien(team_name) and cache.cvar("g_bot_buildAliens") ~= "0"
         or is_human(team_name) and cache.cvar("g_bot_buildHumans") ~= "0"
     local max_builders = tonumber(cache.cvar("lua_pve_max_builders")) or PVE_MAX_BUILDERS
-    local team_bots = 0
-    for _, entity in pairs(sgame.entity) do
-        if entity.bot and entity.client and entity.team == team_name then
-            team_bots = team_bots + 1
-        end
-    end
+    local team_bots = #cache.team_bot_numbers(team_name)
 
     return build_enabled
         and (already_assigned or usable_build_points >= chosen_cost)
@@ -789,16 +783,21 @@ local function human_armoury_distance(mind)
 end
 
 local function human_resupply_phase(number, level, client, weapon_attr, mind)
-    if not common.can_attempt_purchase(client) then
+    local target = common.human_resupply_target(level, mind, client, weapon_attr)
+    if not target or (target == "arm" and not common.can_attempt_purchase(client)) then
         return nil
     end
-    if out_of_human_ammo(client, weapon_attr) then
+    if target == "arm" then
         local armoury_distance = human_armoury_distance(mind)
         if armoury_distance and armoury_distance <= 100 then
             return "equip"
         end
 
         return "move_to_arm"
+    end
+
+    if target == "medistat" then
+        return "move_to_medistat"
     end
 
     return nil
@@ -1033,6 +1032,13 @@ local function maybe_resupply_human(team, number, level, client, weapon_attr, mi
 
     if phase == "move_to_arm" then
         local status = ctx:roamInRadius("arm", 1500)
+        if status ~= STATUS_FAILURE then
+            return status
+        end
+    end
+
+    if phase == "move_to_medistat" then
+        local status = ctx:roamInRadius("medistat", 1500)
         if status ~= STATUS_FAILURE then
             return status
         end
@@ -1411,17 +1417,6 @@ local function new_defender_task()
     }
 end
 
-local function team_bot_numbers(team)
-    local numbers = {}
-    for number, entity in pairs(sgame.entity) do
-        if entity.bot and entity.client and entity.team == team then
-            numbers[#numbers + 1] = number
-        end
-    end
-    table.sort(numbers)
-    return numbers
-end
-
 local function assign_role(state)
     local number = state.number
     local role = STATE.roles[number]
@@ -1441,7 +1436,7 @@ local function assign_role(state)
         role = nil
         STATE.roles[number] = nil
     end
-    local bots = team_bot_numbers(state.team)
+    local bots = cache.team_bot_numbers(state.team)
     local has_defender = false
     for _, bot_number in ipairs(bots) do
         if STATE.roles[bot_number] == "defender" then has_defender = true end
@@ -1475,7 +1470,7 @@ select_task = function(state)
         return new_builder_task()
     end
 
-    local role = assign_role(state)
+    local role = state.role
     if role == "defender" then
         return new_defender_task()
     end
@@ -1523,14 +1518,20 @@ return function(self, ctx)
     local weapon_attr = weapon and weapons[weapon] or nil
     local builder = is_builder(team, client)
     local wants_build = wants_builder(team, number, team_snapshot, team_level_data, builder, selected_buildable)
-    local hostile_goal = is_hostile_target(team, mind.goal)
+    local goal = mind.goal
+    local hostile_goal = is_hostile_target(team, goal)
     local enemy_target = mind.bestEnemy
     local enemy = target_entity(enemy_target)
     local enemy_visible = enemy and ctx:isVisibleEntity(enemy) or false
 
     if is_alien(team) then
-        enemy = choose_alien_enemy(number, level.time, enemy_target, enemy_visible, hostile_goal, level, ctx, mind)
-        enemy_visible = enemy and ctx:isVisibleEntity(enemy) or false
+        local selected_enemy = choose_alien_enemy(number, level.time, enemy, enemy_visible, hostile_goal, goal, ctx)
+        if not selected_enemy then
+            enemy_visible = false
+        elseif not rawequal(selected_enemy, enemy) and (not enemy or selected_enemy.number ~= enemy.number) then
+            enemy_visible = ctx:isVisibleEntity(selected_enemy)
+        end
+        enemy = selected_enemy
         hostile_goal = hostile_goal or enemy ~= nil
     else
         clear_alien_target_lock(number)
